@@ -1,0 +1,61 @@
+/* Recording page density tuning — compact cards without losing controls. */
+body.page-recording #channel-list {
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)) !important;
+  gap: 14px !important;
+  align-items: start !important;
+}
+
+body.page-recording #channel-list > .channel {
+  align-self: start !important;
+  min-width: 0 !important;
+  border-radius: 16px !important;
+}
+
+body.page-recording .channel-thumbnail-container {
+  aspect-ratio: 16 / 9 !important;
+  min-height: 0 !important;
+}
+
+body.page-recording .channel-info {
+  gap: 6px !important;
+  padding: 14px 15px 15px !important;
+}
+
+body.page-recording .channel-info .channel-name {
+  margin-bottom: 1px !important;
+  font-size: 15.5px !important;
+  line-height: 1.35 !important;
+}
+
+body.page-recording .channel-info p {
+  font-size: 12px !important;
+  line-height: 1.45 !important;
+}
+
+body.page-recording .channel-info p[id^="title-"] {
+  min-height: 34px !important;
+  font-size: 13px !important;
+  line-height: 1.42 !important;
+}
+
+body.page-recording .channel-info p[id^="timing-"],
+body.page-recording .channel-info p[id^="filename-"] {
+  padding: 7px 9px !important;
+  font-size: 11.5px !important;
+}
+
+body.page-recording .channel-info .start-recording,
+body.page-recording .channel-info .stop-recording,
+body.page-recording .channel > .start-recording,
+body.page-recording .channel > .stop-recording {
+  min-height: 40px !important;
+  margin-top: 2px !important;
+  padding-block: 8px !important;
+}
+
+@media (max-width: 620px) {
+  body.page-recording #channel-list {
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 12px !important;
+  }
+}
