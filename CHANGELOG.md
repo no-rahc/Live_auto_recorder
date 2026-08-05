@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.1.8 - 2026-08-05
+
+- Reorganized the dashboard around a compact glance-first hierarchy with status, key counts, quick navigation, system metrics, and activity in that order.
+- Replaced the oversized solid orange hero with a shorter light carrot-style status panel and removed the dashboard version badge.
+- Converted quick navigation from a tall vertical list into a compact responsive shortcut row.
+- Reduced dashboard metric and system-card height so storage, CPU, memory, and network information appear earlier on the first screen.
+- Added responsive dashboard layout checks for desktop, tablet, and mobile viewports.
+
 ## v1.1.7 - 2026-08-05
 
 - Rebalanced the recording status page so wide screens use a compact three-column channel grid instead of stretching two cards across the full content width.

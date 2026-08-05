@@ -58,6 +58,7 @@ jobs:
 
           for css_path in (
               'templates/static/css/app-v3.css',
+              'templates/static/css/dashboard-glance-v1.css',
               'templates/static/css/recording-density-v1.css',
               'templates/static/css/operations-v2.css',
           ):
