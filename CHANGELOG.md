@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.1.16 - 2026-08-05
+
+- Split the production entrypoint into a side-effect-free `lar_app` package for bootstrap, release metadata, server settings, middleware, and web asset registration.
+- Reduced `app_entry.py` to a small compatibility entrypoint while preserving `app`, `operations`, `PROGRAM_NAME`, and `RELEASE_VERSION` exports.
+- Replaced hard-coded CSS and JavaScript injection strings with a declarative asset manifest and idempotent HTML injection helpers.
+- Moved login throttling, security headers, audit logging, and HTML response rebuilding into focused middleware classes with instance-local state.
+- Updated Docker and CI validation to compile complete packages and validate every registered browser asset directly from the manifest.
+- Added unit coverage for package boundaries, release propagation, server environment validation, asset uniqueness, escaping, and injection idempotence.
+- Added architecture documentation and explicit dependency rules for future router, persistence, and UI consolidation work.
+
 ## v1.1.15 - 2026-08-05
 
 - Reworked the operations-center button hierarchy so only the active tab and primary save action use the orange emphasis color.
