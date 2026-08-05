@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.1.14 - 2026-08-05
+
+- Completed a project-wide UI consistency audit across dashboard, recording, settings, channels, cookies, files, operations, login, and account creation flows.
+- Replaced always-open channel edit forms with compact summaries and explicit accessible edit toggles while preserving the existing save and delete handlers.
+- Reorganized the channel registration form into a responsive field grid and added a clear empty state without changing channel input meanings.
+- Grouped CHZZK and YouTube cookie guidance into responsive provider panels and masked sensitive cookie values behind explicit reveal controls.
+- Reflowed the file-manager toolbar and mobile action bar, removed fixed input widths, and improved file modal roles, focus handling, and Escape behavior.
+- Removed the nested-card appearance from login, aligned account creation with the same authentication layout, and added password visibility and match feedback.
+- Added five-viewport interaction and screenshot coverage for channel management, cookies, files, login, and registration alongside the existing dashboard, recording, settings, and operations checks.
+
 ## v1.1.13 - 2026-08-05
 
 - Standardized dashboard status chips to one fixed height, baseline, padding, and icon alignment.
