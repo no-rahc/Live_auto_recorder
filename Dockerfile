@@ -27,9 +27,12 @@ COPY requirements.txt ./
 RUN python -m pip install --no-cache-dir --upgrade pip \
     && python -m pip install --no-cache-dir -r requirements.txt
 
-RUN curl -fsSL -o /usr/local/bin/ytarchive \
-        "https://github.com/Kethsar/ytarchive/releases/download/${YTARCHIVE_VERSION}/ytarchive-linux-amd64" \
-    && chmod +x /usr/local/bin/ytarchive
+RUN curl -fsSL -o /tmp/ytarchive.zip \
+        "https://github.com/Kethsar/ytarchive/releases/download/${YTARCHIVE_VERSION}/ytarchive_linux_amd64.zip" \
+    && python -m zipfile -e /tmp/ytarchive.zip /tmp/ytarchive \
+    && install -m 0755 /tmp/ytarchive/ytarchive /usr/local/bin/ytarchive \
+    && /usr/local/bin/ytarchive -V \
+    && rm -rf /tmp/ytarchive /tmp/ytarchive.zip
 
 COPY . .
 
