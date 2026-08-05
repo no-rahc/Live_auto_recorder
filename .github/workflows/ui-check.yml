@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'app_entry.py'
+      - 'module/config_*.py'
       - 'module/operations_*.py'
       - 'VERSION'
       - 'templates/**'
@@ -15,6 +16,7 @@ on:
     branches: [main]
     paths:
       - 'app_entry.py'
+      - 'module/config_*.py'
       - 'module/operations_*.py'
       - 'VERSION'
       - 'templates/**'
@@ -42,13 +44,13 @@ jobs:
       - name: Validate source files
         shell: bash
         run: |
-          python3 -m py_compile app_entry.py module/operations_common.py module/operations_health.py module/operations_backup.py module/operations_v2.py
+          python3 -m py_compile app_entry.py module/config_tools_v1.py module/operations_common.py module/operations_health.py module/operations_backup.py module/operations_v2.py
           node --check templates/static/js/system-metrics-v2.js
           node --check templates/static/js/sidebar-v3.js
           node --check templates/static/js/dashboard-v4.js
           node --check templates/static/js/dashboard-channel-modal-v1.js
           node --check templates/static/js/app-ui-v3.js
-          node --check templates/static/js/config-density-v1.js
+          node --check templates/static/js/config-workspace-v1.js
           node --check templates/static/js/operations-v2.js
           python3 - <<'PY'
           import re
@@ -62,7 +64,7 @@ jobs:
               'templates/static/css/app-v3.css',
               'templates/static/css/dashboard-glance-v1.css',
               'templates/static/css/dashboard-channel-modal-v1.css',
-              'templates/static/css/config-density-v1.css',
+              'templates/static/css/config-workspace-v1.css',
               'templates/static/css/recording-density-v1.css',
               'templates/static/css/operations-v2.css',
               'templates/static/css/ui-polish-v1.css',
