@@ -77,6 +77,9 @@ class ConsoleAssetsMiddleware(BaseHTTPMiddleware):
             '<link rel="stylesheet" href="/static/css/recording-v3.css?v='
             + version
             + '" data-lar-recording-v3>'
+            '<link rel="stylesheet" href="/static/css/metrics-compact-v1.css?v='
+            + version
+            + '" data-lar-metrics-compact-v1>'
             '<script src="/static/js/system-metrics-v2.js?v='
             + version
             + '" data-lar-metrics-v2></script>'
@@ -91,6 +94,9 @@ class ConsoleAssetsMiddleware(BaseHTTPMiddleware):
             '<script src="/static/js/dashboard-v4.js?v='
             + version
             + '" defer data-lar-dashboard-v4></script>'
+            '<script src="/static/js/metrics-compact-v1.js?v='
+            + version
+            + '" defer data-lar-metrics-compact-v1></script>'
         )
 
         if "data-lar-console-v2" not in html:
