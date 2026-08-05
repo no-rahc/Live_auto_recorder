@@ -34,8 +34,8 @@
       }
 
       const styles = getComputedStyle(grid);
-      const rowHeight = Number.parseFloat(styles.gridAutoRows) || 8;
-      const rowGap = Number.parseFloat(styles.rowGap) || 14;
+      const rowHeight = Number.parseFloat(styles.gridAutoRows) || 2;
+      const rowGap = Number.parseFloat(styles.rowGap) || 12;
 
       sections.forEach(function (section) {
         const height = section.getBoundingClientRect().height;
