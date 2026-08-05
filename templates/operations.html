@@ -30,23 +30,23 @@
   <main id="content" class="ops-page">
     <header class="ops-hero">
       <div><span class="ops-eyebrow">OPERATIONS CENTER</span><h1>운영 관리</h1><p>저장소 보호, 녹화 상태, 후처리, 백업과 자동 녹화 규칙을 한곳에서 관리합니다.</p></div>
-      <button type="button" id="ops-refresh" class="ops-primary">지금 새로고침</button>
+      <button type="button" id="ops-refresh" class="ops-refresh-button ops-action-secondary">지금 새로고침</button>
     </header>
 
     <div id="ops-notice" class="ops-notice" hidden role="status" aria-live="polite"></div>
     <section id="ops-summary" class="ops-summary" aria-label="운영 요약"></section>
 
-    <nav class="ops-tabs" aria-label="운영 관리 메뉴">
-      <button type="button" data-ops-tab="storage" class="is-active">저장소</button>
-      <button type="button" data-ops-tab="health">녹화 상태</button>
-      <button type="button" data-ops-tab="jobs">후처리</button>
-      <button type="button" data-ops-tab="backups">백업</button>
-      <button type="button" data-ops-tab="statistics">통계</button>
-      <button type="button" data-ops-tab="rules">채널 규칙</button>
-      <button type="button" data-ops-tab="audit">작업 기록</button>
+    <nav class="ops-tabs" aria-label="운영 관리 메뉴" role="tablist">
+      <button type="button" id="ops-tab-storage" data-ops-tab="storage" class="is-active" role="tab" aria-controls="ops-panel-storage" aria-selected="true" tabindex="0">저장소</button>
+      <button type="button" id="ops-tab-health" data-ops-tab="health" role="tab" aria-controls="ops-panel-health" aria-selected="false" tabindex="-1">녹화 상태</button>
+      <button type="button" id="ops-tab-jobs" data-ops-tab="jobs" role="tab" aria-controls="ops-panel-jobs" aria-selected="false" tabindex="-1">후처리</button>
+      <button type="button" id="ops-tab-backups" data-ops-tab="backups" role="tab" aria-controls="ops-panel-backups" aria-selected="false" tabindex="-1">백업</button>
+      <button type="button" id="ops-tab-statistics" data-ops-tab="statistics" role="tab" aria-controls="ops-panel-statistics" aria-selected="false" tabindex="-1">통계</button>
+      <button type="button" id="ops-tab-rules" data-ops-tab="rules" role="tab" aria-controls="ops-panel-rules" aria-selected="false" tabindex="-1">채널 규칙</button>
+      <button type="button" id="ops-tab-audit" data-ops-tab="audit" role="tab" aria-controls="ops-panel-audit" aria-selected="false" tabindex="-1">작업 기록</button>
     </nav>
 
-    <section class="ops-panel is-active" data-ops-panel="storage">
+    <section id="ops-panel-storage" class="ops-panel is-active" data-ops-panel="storage" role="tabpanel" aria-labelledby="ops-tab-storage" aria-hidden="false" tabindex="0">
       <div class="ops-section-head"><div><h2>저장소 보호</h2><p>디스크가 부족하면 신규 녹화를 차단하고 안전하게 오래된 파일을 정리합니다.</p></div></div>
       <div id="ops-storage-detail"></div>
       <form id="ops-storage-form" class="ops-form-grid">
@@ -55,47 +55,56 @@
         <label>정리 방식<select name="cleanup_mode"><option value="age">보관 기간</option><option value="size">총 용량</option><option value="free_space">여유 공간 회복</option></select></label>
         <label>보관 기간(일)<input type="number" name="retention_days" min="1" max="3650"></label>
         <label>최대 총 용량(GB)<input type="number" name="max_total_gb" min="0" step="1"></label>
-        <label class="ops-check"><input type="checkbox" name="auto_cleanup"> 임계치 도달 시 자동 정리</label>
-        <div class="ops-form-actions"><button type="submit" class="ops-primary">정책 저장</button><button type="button" id="ops-cleanup-preview">삭제 대상 미리보기</button><button type="button" id="ops-cleanup-run" class="ops-danger">미리보기 항목 삭제</button></div>
+        <label class="ops-check ops-check-card"><input type="checkbox" name="auto_cleanup"> 임계치 도달 시 자동 정리</label>
+        <div class="ops-form-actions ops-storage-actions">
+          <div class="ops-action-group">
+            <button type="submit" class="ops-action-primary">정책 저장</button>
+            <button type="button" id="ops-cleanup-preview" class="ops-action-secondary">삭제 대상 미리보기</button>
+          </div>
+          <div class="ops-danger-zone">
+            <span>미리보기로 확인된 항목만 삭제합니다.</span>
+            <button type="button" id="ops-cleanup-run" class="ops-action-danger" disabled aria-disabled="true">미리보기 항목 삭제</button>
+          </div>
+        </div>
       </form>
       <div id="ops-cleanup-result"></div>
     </section>
 
-    <section class="ops-panel" data-ops-panel="health">
+    <section id="ops-panel-health" class="ops-panel" data-ops-panel="health" role="tabpanel" aria-labelledby="ops-tab-health" aria-hidden="true" tabindex="0">
       <div class="ops-section-head"><div><h2>녹화 건강 상태</h2><p>파일 기록 속도와 프로세스 상태를 감시하고 멈춤이 감지되면 자동 재연결합니다.</p></div></div>
       <form id="ops-health-form" class="ops-form-grid ops-compact-form">
         <label>멈춤 판정(초)<input type="number" name="stall_seconds" min="30" max="3600"></label>
         <label>최대 재연결 횟수<input type="number" name="max_restart_attempts" min="0" max="20"></label>
         <label>재연결 대기(초)<input type="number" name="restart_cooldown_seconds" min="10" max="3600"></label>
-        <label class="ops-check"><input type="checkbox" name="auto_restart"> 자동 재연결 사용</label>
-        <div class="ops-form-actions"><button type="submit" class="ops-primary">감시 설정 저장</button></div>
+        <label class="ops-check ops-check-card"><input type="checkbox" name="auto_restart"> 자동 재연결 사용</label>
+        <div class="ops-form-actions"><button type="submit" class="ops-action-primary">감시 설정 저장</button></div>
       </form>
       <div id="ops-health-list" class="ops-card-list"></div>
     </section>
 
-    <section class="ops-panel" data-ops-panel="jobs">
+    <section id="ops-panel-jobs" class="ops-panel" data-ops-panel="jobs" role="tabpanel" aria-labelledby="ops-tab-jobs" aria-hidden="true" tabindex="0">
       <div class="ops-section-head"><div><h2>후처리 작업</h2><p>대기·진행·완료·실패 상태를 확인하고 실패 작업을 재시도하거나 실행 중 작업을 취소합니다.</p></div></div>
       <div class="ops-table-wrap"><table><thead><tr><th>상태</th><th>진행률</th><th>채널</th><th>입력 파일</th><th>시작</th><th>완료</th><th>작업</th></tr></thead><tbody id="ops-jobs-body"></tbody></table></div>
     </section>
 
-    <section class="ops-panel" data-ops-panel="backups">
-      <div class="ops-section-head"><div><h2>설정 백업</h2><p>복원 전 자동 안전 백업을 만들며, 쿠키·계정·웹훅 정보는 선택한 경우에만 포함합니다.</p></div><div class="ops-inline-actions"><label class="ops-check"><input id="ops-backup-secrets" type="checkbox"> 민감정보 포함</label><button type="button" id="ops-backup-create" class="ops-primary">지금 백업</button></div></div>
+    <section id="ops-panel-backups" class="ops-panel" data-ops-panel="backups" role="tabpanel" aria-labelledby="ops-tab-backups" aria-hidden="true" tabindex="0">
+      <div class="ops-section-head"><div><h2>설정 백업</h2><p>복원 전 자동 안전 백업을 만들며, 쿠키·계정·웹훅 정보는 선택한 경우에만 포함합니다.</p></div><div class="ops-inline-actions"><label class="ops-check"><input id="ops-backup-secrets" type="checkbox"> 민감정보 포함</label><button type="button" id="ops-backup-create" class="ops-action-secondary">지금 백업</button></div></div>
       <form id="ops-backup-form" class="ops-form-grid ops-compact-form">
         <label>자동 백업 간격(시간)<input type="number" name="interval_hours" min="1" max="720"></label>
         <label>보관 개수<input type="number" name="keep" min="1" max="100"></label>
-        <label class="ops-check"><input type="checkbox" name="scheduled"> 자동 백업 사용</label>
-        <div class="ops-form-actions"><button type="submit" class="ops-primary">백업 설정 저장</button></div>
+        <label class="ops-check ops-check-card"><input type="checkbox" name="scheduled"> 자동 백업 사용</label>
+        <div class="ops-form-actions"><button type="submit" class="ops-action-primary">백업 설정 저장</button></div>
       </form>
       <div class="ops-table-wrap"><table><thead><tr><th>백업 파일</th><th>크기</th><th>생성 시각</th><th>작업</th></tr></thead><tbody id="ops-backups-body"></tbody></table></div>
     </section>
 
-    <section class="ops-panel" data-ops-panel="statistics">
-      <div class="ops-section-head"><div><h2>녹화 통계</h2><p>최근 14일 추이, 성공률과 채널별 녹화 현황을 확인합니다.</p></div><a class="ops-button" href="/api/operations/statistics.csv">CSV 내려받기</a></div>
+    <section id="ops-panel-statistics" class="ops-panel" data-ops-panel="statistics" role="tabpanel" aria-labelledby="ops-tab-statistics" aria-hidden="true" tabindex="0">
+      <div class="ops-section-head"><div><h2>녹화 통계</h2><p>최근 14일 추이, 성공률과 채널별 녹화 현황을 확인합니다.</p></div><a class="ops-button ops-action-secondary" href="/api/operations/statistics.csv">CSV 내려받기</a></div>
       <div id="ops-stat-cards" class="ops-summary"></div><div id="ops-daily-chart" class="ops-chart"></div>
       <div class="ops-table-wrap"><table><thead><tr><th>채널</th><th>녹화</th><th>실패</th><th>누적 시간</th><th>현재 저장량</th></tr></thead><tbody id="ops-channel-stats"></tbody></table></div>
     </section>
 
-    <section class="ops-panel" data-ops-panel="rules">
+    <section id="ops-panel-rules" class="ops-panel" data-ops-panel="rules" role="tabpanel" aria-labelledby="ops-tab-rules" aria-hidden="true" tabindex="0">
       <div class="ops-section-head"><div><h2>채널별 자동 녹화 규칙</h2><p>제목·카테고리·요일·시간대·시작 지연·최대 녹화 시간을 채널별로 지정합니다.</p></div></div>
       <form id="ops-rule-form" class="ops-form-grid">
         <label>채널<select id="ops-rule-channel" name="channel_id"><option value="">채널 선택</option>{% for channel in channels %}<option value="{{ channel.id }}">{{ channel.name or channel.id }}</option>{% endfor %}</select></label>
@@ -107,12 +116,12 @@
         <label>시작 지연(초)<input type="number" name="start_delay_seconds" min="0" max="3600"></label>
         <label>최대 녹화(분, 0=제한 없음)<input type="number" name="max_duration_minutes" min="0" max="10080"></label><label>최소 녹화(분, 미만 자동 삭제)<input type="number" name="minimum_duration_minutes" min="0" max="1440"></label><label>화질 덮어쓰기<input name="quality_override" placeholder="예: best, 1080p"></label>
         <fieldset class="ops-days"><legend>허용 요일</legend><label><input type="checkbox" value="0">월</label><label><input type="checkbox" value="1">화</label><label><input type="checkbox" value="2">수</label><label><input type="checkbox" value="3">목</label><label><input type="checkbox" value="4">금</label><label><input type="checkbox" value="5">토</label><label><input type="checkbox" value="6">일</label></fieldset>
-        <label class="ops-check"><input type="checkbox" name="enabled" checked> 규칙 사용</label>
-        <div class="ops-form-actions"><button type="submit" class="ops-primary">채널 규칙 저장</button></div>
+        <label class="ops-check ops-check-card"><input type="checkbox" name="enabled" checked> 규칙 사용</label>
+        <div class="ops-form-actions"><button type="submit" class="ops-action-primary">채널 규칙 저장</button></div>
       </form>
     </section>
 
-    <section class="ops-panel" data-ops-panel="audit">
+    <section id="ops-panel-audit" class="ops-panel" data-ops-panel="audit" role="tabpanel" aria-labelledby="ops-tab-audit" aria-hidden="true" tabindex="0">
       <div class="ops-section-head"><div><h2>작업 기록</h2><p>자동 재연결, 저장소 차단, 정리, 백업과 설정 변경 이력을 확인합니다.</p></div></div>
       <div class="ops-table-wrap"><table><thead><tr><th>시간</th><th>작업</th><th>결과</th><th>내용</th></tr></thead><tbody id="ops-audit-body"></tbody></table></div>
     </section>
