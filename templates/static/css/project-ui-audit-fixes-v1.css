@@ -1,0 +1,30 @@
+/* Final visual corrections found during manual review of the full UI audit. */
+
+.lar-channel-edit-toggle:hover:not(:disabled),
+.lar-password-toggle:hover:not(:disabled),
+body.page-channels .lar-channel-edit-close:hover:not(:disabled) {
+  border-color: #ffc69b !important;
+  background: var(--lar-orange-soft) !important;
+  color: var(--lar-orange-hover) !important;
+  transform: none !important;
+}
+
+body.page-channels .lar-channel-edit-close:hover:not(:disabled) {
+  border-color: var(--lar-line-strong) !important;
+  background: var(--lar-surface-soft) !important;
+  color: var(--lar-text) !important;
+}
+
+@media (min-width: 1100px) {
+  body.lar-auth-mode.lar-sidebar-v3:not(.page-register) #content {
+    width: 500px !important;
+    margin-left: calc(var(--lar-sidebar-current) + (100vw - var(--lar-sidebar-current) - 500px) / 2) !important;
+    margin-right: 0 !important;
+  }
+
+  body.page-register.lar-sidebar-v3 #content {
+    width: 520px !important;
+    margin-left: calc(var(--lar-sidebar-current) + (100vw - var(--lar-sidebar-current) - 520px) / 2) !important;
+    margin-right: 0 !important;
+  }
+}
