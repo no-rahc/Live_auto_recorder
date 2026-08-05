@@ -3,25 +3,28 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from typing import Mapping, Any
+from typing import Any, Mapping
 
 import uvicorn
 
 
+DEFAULT_HOST = "0.0.0.0"
+DEFAULT_PORT = 5000
+DEFAULT_LOG_LEVEL = "info"
 _ALLOWED_LOG_LEVELS = frozenset({"critical", "error", "warning", "info", "debug", "trace"})
 
 
 @dataclass(frozen=True, slots=True)
 class ServerSettings:
-    host: str = "0.0.0.0"
-    port: int = 5000
-    log_level: str = "info"
+    host: str = DEFAULT_HOST
+    port: int = DEFAULT_PORT
+    log_level: str = DEFAULT_LOG_LEVEL
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None) -> "ServerSettings":
         source = env if env is not None else os.environ
-        host = str(source.get("HOST", cls.host)).strip() or cls.host
-        raw_port = str(source.get("PORT", cls.port)).strip()
+        host = str(source.get("HOST", DEFAULT_HOST)).strip() or DEFAULT_HOST
+        raw_port = str(source.get("PORT", DEFAULT_PORT)).strip()
         try:
             port = int(raw_port)
         except ValueError as exc:
@@ -29,7 +32,7 @@ class ServerSettings:
         if not 1 <= port <= 65535:
             raise ValueError(f"PORT must be between 1 and 65535, got {port}")
 
-        log_level = str(source.get("LOG_LEVEL", cls.log_level)).strip().lower() or cls.log_level
+        log_level = str(source.get("LOG_LEVEL", DEFAULT_LOG_LEVEL)).strip().lower() or DEFAULT_LOG_LEVEL
         if log_level not in _ALLOWED_LOG_LEVELS:
             allowed = ", ".join(sorted(_ALLOWED_LOG_LEVELS))
             raise ValueError(f"LOG_LEVEL must be one of: {allowed}")
