@@ -51,7 +51,7 @@ RUN chmod 0755 /usr/local/bin/ytarchive \
 COPY . .
 
 RUN mkdir -p /app/chzzk /app/json /app/logs /app/tmp/ytarchive \
-    && python -m py_compile app_entry.py module/operations_common.py module/operations_health.py module/operations_backup.py module/operations_v2.py
+    && python -m compileall -q app_entry.py lar_app module
 
 EXPOSE 5000
 VOLUME ["/app/json", "/app/chzzk", "/app/logs"]
