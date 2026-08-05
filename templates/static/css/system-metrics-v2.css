@@ -1,0 +1,159 @@
+/* System metrics stability layer
+   Keeps real-time values from changing card geometry or rebuilding the grid. */
+#sys-dashboard {
+  contain: layout paint;
+  overflow: clip;
+}
+
+#sys-dashboard .row-main {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: stretch;
+  gap: 14px !important;
+}
+
+#sys-dashboard .row-disks {
+  display: grid !important;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  align-items: stretch;
+  gap: 12px !important;
+  min-height: 0;
+}
+
+#sys-dashboard .row-disks.lar-empty-row {
+  display: none !important;
+}
+
+#sys-dashboard .tile,
+#sys-dashboard .lar-metric-tile,
+#sys-dashboard .dash-meter,
+#sys-dashboard .dash-storage,
+#sys-dashboard .dash-meters {
+  min-width: 0;
+  contain: layout paint;
+}
+
+#sys-dashboard .tile,
+#sys-dashboard .lar-metric-tile {
+  min-height: 142px;
+}
+
+#sys-dashboard .tile-head,
+#sys-dashboard .dash-meter-top {
+  min-width: 0;
+}
+
+#sys-dashboard .tile-title,
+#sys-dashboard .tile-sub,
+#sys-dashboard .dash-meter-sub {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#sys-dashboard .tile-value,
+#sys-dashboard .tile-brief,
+#sys-dashboard .dash-meter-val,
+#sys-dashboard .stor-num,
+#sys-dashboard .stor-pct,
+#cpu-percent,
+#mem-percent,
+#net-rate,
+#mem-brief,
+#net-brief {
+  font-variant-numeric: tabular-nums lining-nums;
+  font-feature-settings: "tnum" 1, "lnum" 1;
+}
+
+#cpu-percent,
+#mem-percent {
+  display: inline-block;
+  min-width: 3ch;
+  text-align: right;
+}
+
+#net-rate {
+  display: inline-block;
+  min-width: 27ch;
+  text-align: right;
+  white-space: nowrap;
+}
+
+#mem-brief,
+#net-brief,
+#sys-dashboard .tile-brief {
+  display: block;
+  min-height: 1.5em;
+  white-space: nowrap;
+}
+
+#sys-dashboard .dash-meter-top {
+  display: grid !important;
+  grid-template-columns: max-content minmax(0, 1fr) minmax(8ch, max-content);
+  align-items: baseline;
+  column-gap: 10px;
+}
+
+#sys-dashboard .dash-meter {
+  min-height: 72px;
+}
+
+#sys-dashboard .progress {
+  height: 8px;
+  transform: translateZ(0);
+}
+
+#sys-dashboard .progress-bar {
+  will-change: width;
+  transition: width 560ms cubic-bezier(.2, .7, .2, 1) !important;
+}
+
+#sys-dashboard .dash-sys-grid,
+#sys-dashboard.dash-sys .dash-sys-grid {
+  grid-template-columns: minmax(0, 1.12fr) minmax(360px, .88fr) !important;
+  align-items: stretch;
+}
+
+@media (max-width: 1050px) {
+  #sys-dashboard .row-disks {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  #sys-dashboard .dash-sys-grid,
+  #sys-dashboard.dash-sys .dash-sys-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+}
+
+@media (max-width: 720px) {
+  #sys-dashboard .row-main,
+  #sys-dashboard .row-disks {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  #sys-dashboard .tile,
+  #sys-dashboard .lar-metric-tile {
+    min-height: 126px;
+  }
+
+  #sys-dashboard .dash-meter-top {
+    grid-template-columns: max-content minmax(0, 1fr);
+  }
+
+  #sys-dashboard .dash-meter-val {
+    grid-column: 1 / -1;
+    justify-self: end;
+  }
+
+  #net-rate {
+    min-width: 0;
+    max-width: 100%;
+    font-size: 12px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #sys-dashboard .progress-bar {
+    transition: none !important;
+  }
+}
