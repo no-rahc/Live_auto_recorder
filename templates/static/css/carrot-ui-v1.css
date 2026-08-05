@@ -1,0 +1,1017 @@
+/* Live Auto Recorder — warm, clean marketplace-inspired UI */
+:root {
+  --carrot: #ff6f0f;
+  --carrot-hover: #e85f00;
+  --carrot-pressed: #d95700;
+  --carrot-soft: #fff2e8;
+  --carrot-soft-strong: #ffe3cf;
+  --carrot-bg: #f7f8fa;
+  --carrot-surface: #ffffff;
+  --carrot-surface-soft: #f9fafb;
+  --carrot-text: #212124;
+  --carrot-text-soft: #4d5159;
+  --carrot-muted: #868b94;
+  --carrot-line: #eaebee;
+  --carrot-line-strong: #dfe1e5;
+  --carrot-success: #20a868;
+  --carrot-danger: #e54747;
+  --carrot-warning: #d98112;
+  --carrot-radius-sm: 10px;
+  --carrot-radius-md: 14px;
+  --carrot-radius-lg: 20px;
+  --carrot-shadow: 0 2px 10px rgba(33, 33, 36, 0.05);
+  --carrot-shadow-hover: 0 9px 28px rgba(33, 33, 36, 0.1);
+
+  --shell-bg: var(--carrot-bg);
+  --shell-surface: var(--carrot-surface);
+  --shell-surface-raised: var(--carrot-surface);
+  --shell-surface-soft: var(--carrot-surface-soft);
+  --shell-text: var(--carrot-text);
+  --shell-muted: var(--carrot-muted);
+  --shell-subtle: #a3a7ae;
+  --shell-border: var(--carrot-line);
+  --shell-border-strong: var(--carrot-line-strong);
+  --shell-primary: var(--carrot);
+  --shell-primary-strong: var(--carrot-hover);
+  --shell-primary-soft: var(--carrot-soft);
+  --shell-danger: var(--carrot-danger);
+  --shell-success: var(--carrot-success);
+  --shell-warning: var(--carrot-warning);
+  --shell-shadow: var(--carrot-shadow);
+
+  --bg: var(--carrot-bg);
+  --panel: var(--carrot-surface);
+  --panel2: var(--carrot-surface-soft);
+  --text: var(--carrot-text);
+  --muted: var(--carrot-muted);
+  --line: var(--carrot-line);
+  --brand: var(--carrot);
+  --brand2: var(--carrot-hover);
+  --ok: var(--carrot-success);
+  --bad: var(--carrot-danger);
+  --warn: var(--carrot-warning);
+  --nav: var(--carrot-surface);
+  --shadow: var(--carrot-shadow);
+
+  --bg0: var(--carrot-bg);
+  --bg1: var(--carrot-surface);
+  --bg2: var(--carrot-surface-soft);
+  --bg3: #f1f3f5;
+  --bg4: #e6e8eb;
+  --tx0: var(--carrot-text);
+  --tx1: var(--carrot-text-soft);
+  --tx2: var(--carrot-muted);
+  --tx3: #a3a7ae;
+  --info: var(--carrot);
+  --info-soft: var(--carrot-soft);
+}
+
+html[data-theme="dark"] {
+  --carrot-bg: #17191c;
+  --carrot-surface: #222428;
+  --carrot-surface-soft: #2a2d31;
+  --carrot-text: #f7f7f8;
+  --carrot-text-soft: #d3d5d9;
+  --carrot-muted: #a4a8af;
+  --carrot-line: #34373c;
+  --carrot-line-strong: #41454b;
+  --carrot-soft: rgba(255, 111, 15, 0.14);
+  --carrot-soft-strong: rgba(255, 111, 15, 0.24);
+  --carrot-shadow: 0 4px 18px rgba(0, 0, 0, 0.18);
+  --carrot-shadow-hover: 0 12px 34px rgba(0, 0, 0, 0.3);
+
+  --bg3: #303338;
+  --bg4: #3a3e44;
+  --tx3: #7f858e;
+}
+
+html {
+  background: var(--carrot-bg) !important;
+}
+
+body.carrot-ui {
+  background: var(--carrot-bg) !important;
+  background-image: none !important;
+  color: var(--carrot-text) !important;
+  font-family: Pretendard, "Pretendard Variable", -apple-system, BlinkMacSystemFont,
+    "Segoe UI", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif !important;
+  font-size: 15px !important;
+  line-height: 1.58 !important;
+}
+
+body.carrot-ui::before,
+body.carrot-ui::after {
+  content: none !important;
+}
+
+body.carrot-ui * {
+  scrollbar-color: #c7c9ce transparent;
+}
+
+body.carrot-ui ::selection {
+  background: var(--carrot-soft-strong);
+  color: var(--carrot-text);
+}
+
+body.carrot-ui a {
+  color: var(--carrot);
+}
+
+body.carrot-ui :focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--carrot) 34%, transparent) !important;
+  outline-offset: 2px !important;
+}
+
+body.carrot-ui .navbar-container {
+  height: 64px !important;
+  min-height: 64px !important;
+  border-bottom: 1px solid var(--carrot-line) !important;
+  background: color-mix(in srgb, var(--carrot-surface) 94%, transparent) !important;
+  box-shadow: none !important;
+  backdrop-filter: blur(16px) saturate(150%) !important;
+}
+
+body.carrot-ui .navbar {
+  min-height: 64px !important;
+  height: 64px !important;
+  padding: 0 22px !important;
+}
+
+body.carrot-ui .brand {
+  gap: 10px !important;
+}
+
+body.carrot-ui .rec-dot {
+  width: 10px !important;
+  height: 10px !important;
+  background: var(--carrot) !important;
+  box-shadow: 0 0 0 5px var(--carrot-soft) !important;
+  animation: none !important;
+}
+
+body.carrot-ui .brand-text h2,
+body.carrot-ui .lar-current-page {
+  color: var(--carrot-text) !important;
+  font-size: 16px !important;
+  font-weight: 800 !important;
+  letter-spacing: -0.025em !important;
+}
+
+body.carrot-ui .brand-sub {
+  color: var(--carrot-muted) !important;
+  font-size: 9px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.12em !important;
+}
+
+body.carrot-ui .menu-icon,
+body.carrot-ui .lar-icon-button {
+  width: 40px !important;
+  height: 40px !important;
+  border: 1px solid var(--carrot-line) !important;
+  border-radius: 12px !important;
+  background: var(--carrot-surface) !important;
+  color: var(--carrot-text-soft) !important;
+  box-shadow: none !important;
+}
+
+body.carrot-ui .menu-icon:hover,
+body.carrot-ui .lar-icon-button:hover {
+  border-color: var(--carrot-line-strong) !important;
+  background: var(--carrot-surface-soft) !important;
+  color: var(--carrot) !important;
+  transform: none !important;
+}
+
+body.carrot-ui .sidenav {
+  color: var(--carrot-text) !important;
+  background: var(--carrot-surface) !important;
+  background-image: none !important;
+  border-right: 1px solid var(--carrot-line) !important;
+  box-shadow: 18px 0 44px rgba(33, 33, 36, 0.12) !important;
+}
+
+body.carrot-ui .lar-sidenav-head {
+  border-bottom-color: var(--carrot-line) !important;
+}
+
+body.carrot-ui .lar-sidenav-brand-mark {
+  color: #fff !important;
+  background: var(--carrot) !important;
+  box-shadow: none !important;
+}
+
+body.carrot-ui .lar-sidenav-brand-copy strong {
+  color: var(--carrot-text) !important;
+}
+
+body.carrot-ui .lar-sidenav-brand-copy small,
+body.carrot-ui .lar-sidenav-section-label,
+body.carrot-ui .lar-nav-copy small {
+  color: var(--carrot-muted) !important;
+}
+
+body.carrot-ui .sidenav > a:not(.closebtn):not(.logout-btn) {
+  min-height: 48px !important;
+  margin: 2px 0 !important;
+  padding: 9px 11px !important;
+  border: 0 !important;
+  border-radius: 12px !important;
+  background: transparent !important;
+  color: var(--carrot-text-soft) !important;
+  box-shadow: none !important;
+}
+
+body.carrot-ui .sidenav > a:not(.closebtn):not(.logout-btn):hover {
+  background: var(--carrot-surface-soft) !important;
+  color: var(--carrot-text) !important;
+  transform: none !important;
+}
+
+body.carrot-ui .sidenav > a.lar-active:not(.closebtn) {
+  background: var(--carrot-soft) !important;
+  color: var(--carrot-hover) !important;
+  box-shadow: none !important;
+}
+
+body.carrot-ui .sidenav > a.lar-active::after {
+  background: var(--carrot) !important;
+}
+
+body.carrot-ui .lar-nav-icon {
+  color: currentColor !important;
+  background: transparent !important;
+}
+
+body.carrot-ui #user-info {
+  border: 1px solid var(--carrot-line) !important;
+  background: var(--carrot-surface-soft) !important;
+  box-shadow: none !important;
+}
+
+body.carrot-ui #username-display {
+  color: var(--carrot-text) !important;
+}
+
+body.carrot-ui #username-display::before {
+  color: var(--carrot-success) !important;
+}
+
+body.carrot-ui .logout-btn {
+  border: 0 !important;
+  background: transparent !important;
+  color: var(--carrot-muted) !important;
+}
+
+body.carrot-ui .logout-btn:hover {
+  background: #fff0f0 !important;
+  color: var(--carrot-danger) !important;
+}
+
+html[data-theme="dark"] body.carrot-ui .logout-btn:hover {
+  background: rgba(229, 71, 71, 0.12) !important;
+}
+
+body.carrot-ui #content {
+  width: min(1320px, calc(100% - 48px)) !important;
+  max-width: 1320px !important;
+  padding-top: 34px !important;
+  padding-bottom: 84px !important;
+}
+
+body.carrot-ui #content > h1,
+body.carrot-ui #content > h2 {
+  display: block !important;
+  margin: 0 !important;
+  color: var(--carrot-text) !important;
+  font-size: clamp(28px, 3vw, 38px) !important;
+  font-weight: 850 !important;
+  line-height: 1.2 !important;
+  letter-spacing: -0.045em !important;
+}
+
+body.carrot-ui #content > h1::before,
+body.carrot-ui #content > h2::before,
+body.carrot-ui #content > h1::after {
+  content: none !important;
+  display: none !important;
+}
+
+body.carrot-ui .carrot-page-intro {
+  max-width: 760px;
+  margin: 8px 0 28px;
+  color: var(--carrot-muted);
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+body.carrot-ui .lar-status-rail {
+  display: none !important;
+}
+
+body.carrot-ui .card,
+body.carrot-ui .tile,
+body.carrot-ui .config-section,
+body.carrot-ui .channel,
+body.carrot-ui .channel-card,
+body.carrot-ui .login-form,
+body.carrot-ui .register-form,
+body.carrot-ui .filter-container,
+body.carrot-ui .global-buttons,
+body.carrot-ui .sys-dashboard,
+body.carrot-ui .dash-dock,
+body.carrot-ui .index-section,
+body.carrot-ui #configForm,
+body.carrot-ui #addChannelForm,
+body.carrot-ui .notice {
+  border: 1px solid var(--carrot-line) !important;
+  border-radius: var(--carrot-radius-lg) !important;
+  background: var(--carrot-surface) !important;
+  color: var(--carrot-text) !important;
+  box-shadow: var(--carrot-shadow) !important;
+}
+
+body.carrot-ui .card:hover,
+body.carrot-ui .channel-card:hover,
+body.carrot-ui .channel:hover {
+  border-color: var(--carrot-line-strong) !important;
+  box-shadow: var(--carrot-shadow-hover) !important;
+}
+
+body.carrot-ui .card-head,
+body.carrot-ui .section-head {
+  min-height: 36px;
+  margin-bottom: 20px !important;
+  padding-bottom: 15px;
+  border-bottom: 1px solid var(--carrot-line);
+}
+
+body.carrot-ui .eyebrow,
+body.carrot-ui .section-head h3 {
+  color: var(--carrot-text) !important;
+  font-size: 16px !important;
+  font-weight: 800 !important;
+  letter-spacing: -0.02em !important;
+  text-transform: none !important;
+}
+
+body.carrot-ui .section-num {
+  min-width: 30px;
+  height: 30px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 10px;
+  background: var(--carrot-soft) !important;
+  color: var(--carrot-hover) !important;
+  font-size: 11px !important;
+  font-weight: 850 !important;
+}
+
+body.carrot-ui .chip,
+body.carrot-ui .section-tag,
+body.carrot-ui .lar-status-chip {
+  border: 1px solid var(--carrot-line) !important;
+  border-radius: 999px !important;
+  background: var(--carrot-surface-soft) !important;
+  color: var(--carrot-muted) !important;
+  box-shadow: none !important;
+}
+
+body.carrot-ui button,
+body.carrot-ui input[type="submit"],
+body.carrot-ui .button {
+  min-height: 44px !important;
+  padding: 10px 17px !important;
+  border: 1px solid var(--carrot) !important;
+  border-radius: 11px !important;
+  background: var(--carrot) !important;
+  color: #fff !important;
+  font-size: 14px !important;
+  font-weight: 750 !important;
+  box-shadow: none !important;
+  transition: background 0.16s ease, border-color 0.16s ease, transform 0.16s ease !important;
+}
+
+body.carrot-ui button:hover:not(:disabled),
+body.carrot-ui input[type="submit"]:hover:not(:disabled),
+body.carrot-ui .button:hover {
+  border-color: var(--carrot-hover) !important;
+  background: var(--carrot-hover) !important;
+  transform: translateY(-1px) !important;
+}
+
+body.carrot-ui button:active:not(:disabled),
+body.carrot-ui input[type="submit"]:active:not(:disabled) {
+  background: var(--carrot-pressed) !important;
+  transform: translateY(0) !important;
+}
+
+body.carrot-ui button:disabled,
+body.carrot-ui input:disabled,
+body.carrot-ui select:disabled,
+body.carrot-ui textarea:disabled {
+  opacity: 0.48 !important;
+}
+
+body.carrot-ui .delete-channel,
+body.carrot-ui .stop-recording,
+body.carrot-ui #stop-all-recording {
+  border-color: var(--carrot-danger) !important;
+  background: var(--carrot-danger) !important;
+}
+
+body.carrot-ui .start-recording,
+body.carrot-ui #start-all-recording {
+  border-color: var(--carrot-success) !important;
+  background: var(--carrot-success) !important;
+}
+
+body.carrot-ui .button-row {
+  gap: 9px !important;
+}
+
+body.carrot-ui label {
+  margin: 18px 0 7px !important;
+  color: var(--carrot-text) !important;
+  font-size: 14px !important;
+  font-weight: 750 !important;
+}
+
+body.carrot-ui input[type="text"],
+body.carrot-ui input[type="password"],
+body.carrot-ui input[type="number"],
+body.carrot-ui input[type="url"],
+body.carrot-ui textarea,
+body.carrot-ui select {
+  width: 100% !important;
+  min-height: 48px !important;
+  padding: 11px 13px !important;
+  border: 1px solid var(--carrot-line-strong) !important;
+  border-radius: 11px !important;
+  background: var(--carrot-surface) !important;
+  color: var(--carrot-text) !important;
+  font-size: 14px !important;
+  box-shadow: none !important;
+}
+
+body.carrot-ui textarea {
+  min-height: 130px !important;
+}
+
+body.carrot-ui input:focus,
+body.carrot-ui textarea:focus,
+body.carrot-ui select:focus {
+  border-color: var(--carrot) !important;
+  box-shadow: 0 0 0 4px var(--carrot-soft) !important;
+}
+
+body.carrot-ui .description,
+body.carrot-ui .field-desc {
+  margin: 7px 0 0 !important;
+  color: var(--carrot-muted) !important;
+  font-size: 12.5px !important;
+  line-height: 1.65 !important;
+}
+
+body.carrot-ui code {
+  border: 0 !important;
+  border-radius: 6px !important;
+  background: var(--carrot-soft) !important;
+  color: var(--carrot-hover) !important;
+}
+
+body.carrot-ui .notice,
+body.carrot-ui .warning-banner,
+body.carrot-ui .error-message {
+  padding: 18px 20px !important;
+  border-radius: 14px !important;
+  line-height: 1.75 !important;
+}
+
+body.carrot-ui .notice {
+  margin: 18px 0 22px !important;
+  border-color: #ffd9bf !important;
+  background: #fff8f3 !important;
+  color: var(--carrot-text-soft) !important;
+}
+
+html[data-theme="dark"] body.carrot-ui .notice {
+  border-color: rgba(255, 111, 15, 0.28) !important;
+  background: rgba(255, 111, 15, 0.08) !important;
+}
+
+body.carrot-ui .warning-banner {
+  margin: 18px 0 24px !important;
+  border: 1px solid #ffe1a8 !important;
+  background: #fff9eb !important;
+  color: #8a5a00 !important;
+}
+
+html[data-theme="dark"] body.carrot-ui .warning-banner {
+  border-color: rgba(255, 193, 80, 0.25) !important;
+  background: rgba(255, 193, 80, 0.09) !important;
+  color: #ffd486 !important;
+}
+
+body.carrot-ui .table-wrap,
+body.carrot-ui [style*="overflow-x:auto"] {
+  border: 1px solid var(--carrot-line) !important;
+  border-radius: 14px !important;
+  background: var(--carrot-surface) !important;
+}
+
+body.carrot-ui table {
+  background: var(--carrot-surface) !important;
+  color: var(--carrot-text) !important;
+}
+
+body.carrot-ui th {
+  padding: 12px 14px !important;
+  border-bottom: 1px solid var(--carrot-line) !important;
+  background: var(--carrot-surface-soft) !important;
+  color: var(--carrot-muted) !important;
+  font-size: 11px !important;
+  font-weight: 750 !important;
+}
+
+body.carrot-ui td {
+  padding: 12px 14px !important;
+  border-color: var(--carrot-line) !important;
+  color: var(--carrot-text-soft) !important;
+}
+
+body.carrot-ui tbody tr:hover td {
+  background: var(--carrot-surface-soft) !important;
+}
+
+body.carrot-ui.lar-dashboard-v4 #content.page-index {
+  width: min(1320px, calc(100% - 48px)) !important;
+  max-width: 1320px !important;
+  padding-top: 28px !important;
+}
+
+body.carrot-ui .dash-v4-intro {
+  grid-template-columns: minmax(0, 1.4fr) minmax(300px, 0.8fr) !important;
+  gap: 16px !important;
+}
+
+body.carrot-ui .dash-hero {
+  min-height: 250px !important;
+  padding: 30px 32px !important;
+  border: 0 !important;
+  border-radius: 24px !important;
+  background: var(--carrot) !important;
+  box-shadow: none !important;
+}
+
+body.carrot-ui .dash-hero::before {
+  content: "" !important;
+  display: block !important;
+  position: absolute;
+  width: 280px;
+  height: 280px;
+  right: -80px;
+  top: -115px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+  pointer-events: none;
+}
+
+body.carrot-ui .dash-hero::after {
+  width: 190px !important;
+  height: 190px !important;
+  right: 24px !important;
+  bottom: -130px !important;
+  border: 38px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+body.carrot-ui .dash-title {
+  color: #fff !important;
+  font-size: clamp(34px, 4vw, 48px) !important;
+  font-weight: 850 !important;
+}
+
+body.carrot-ui .dash-greeting,
+body.carrot-ui .dash-v4-subtitle,
+body.carrot-ui .dash-date,
+body.carrot-ui .dash-clock,
+body.carrot-ui .dash-v4-clock-note {
+  color: rgba(255, 255, 255, 0.84) !important;
+}
+
+body.carrot-ui .dash-clock {
+  color: #fff !important;
+}
+
+body.carrot-ui .dash-autopill,
+body.carrot-ui .dash-ver,
+body.carrot-ui .dash-v4-health,
+body.carrot-ui .dash-v4-updated {
+  border-color: rgba(255, 255, 255, 0.24) !important;
+  background: rgba(255, 255, 255, 0.14) !important;
+  color: #fff !important;
+}
+
+body.carrot-ui .dash-autopill-label,
+body.carrot-ui .dash-autopill.is-on .dash-autopill-label {
+  color: rgba(255, 255, 255, 0.75) !important;
+}
+
+body.carrot-ui .dash-v4-quick,
+body.carrot-ui .dash-v4-stat,
+body.carrot-ui .dash-v4-system,
+body.carrot-ui .dash-v4-activity,
+body.carrot-ui .dash-storage,
+body.carrot-ui .dash-meters {
+  border: 1px solid var(--carrot-line) !important;
+  background: var(--carrot-surface) !important;
+  box-shadow: var(--carrot-shadow) !important;
+}
+
+body.carrot-ui .dash-dock {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+body.carrot-ui .dock-item {
+  align-items: flex-start !important;
+  min-height: 86px !important;
+  padding: 16px !important;
+  border: 1px solid var(--carrot-line) !important;
+  border-radius: 14px !important;
+  background: var(--carrot-surface) !important;
+  color: var(--carrot-text) !important;
+  box-shadow: none !important;
+}
+
+body.carrot-ui .dock-item:hover {
+  border-color: #ffc9a5 !important;
+  background: #fffaf6 !important;
+  box-shadow: none !important;
+  transform: translateY(-2px) !important;
+}
+
+html[data-theme="dark"] body.carrot-ui .dock-item:hover {
+  background: rgba(255, 111, 15, 0.08) !important;
+}
+
+body.carrot-ui .dock-ico {
+  width: 38px !important;
+  height: 38px !important;
+  border-radius: 12px !important;
+  background: var(--carrot-soft) !important;
+  color: var(--carrot) !important;
+}
+
+body.carrot-ui .dock-label,
+body.carrot-ui .dash-v4-quick-title,
+body.carrot-ui .dash-v4-section-copy h2,
+body.carrot-ui .dash-v4-stat-value,
+body.carrot-ui .dash-meter-val,
+body.carrot-ui .stor-used {
+  color: var(--carrot-text) !important;
+}
+
+body.carrot-ui .dock-desc,
+body.carrot-ui .dash-v4-quick-desc,
+body.carrot-ui .dash-v4-section-copy p,
+body.carrot-ui .dash-v4-stat-note,
+body.carrot-ui .dash-meter-sub,
+body.carrot-ui .stor-total {
+  color: var(--carrot-muted) !important;
+}
+
+body.carrot-ui .dash-v4-stat[data-tone="live"] .dash-v4-stat-dot,
+body.carrot-ui .progress-bar,
+body.carrot-ui #cpu-bar,
+body.carrot-ui #mem-bar,
+body.carrot-ui #net-bar,
+body.carrot-ui #stor-bar {
+  background: var(--carrot) !important;
+}
+
+body.carrot-ui .progress {
+  height: 7px !important;
+  background: #eceef1 !important;
+}
+
+html[data-theme="dark"] body.carrot-ui .progress {
+  background: #3b3f45 !important;
+}
+
+body.carrot-ui .progress-bar::after {
+  display: none !important;
+}
+
+body.carrot-ui .dash-v4-section-link {
+  color: var(--carrot) !important;
+}
+
+body.carrot-ui .ch-row {
+  border: 1px solid var(--carrot-line) !important;
+  border-radius: 13px !important;
+  background: var(--carrot-surface) !important;
+  box-shadow: none !important;
+}
+
+body.carrot-ui .ch-row:hover {
+  border-color: #ffc9a5 !important;
+  background: #fffaf6 !important;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+html[data-theme="dark"] body.carrot-ui .ch-row:hover {
+  background: rgba(255, 111, 15, 0.07) !important;
+}
+
+body.carrot-ui .ch-row--rec {
+  border-left: 3px solid var(--carrot) !important;
+  background: linear-gradient(90deg, var(--carrot-soft), var(--carrot-surface) 48%) !important;
+}
+
+body.carrot-ui .ch-name,
+body.carrot-ui .data-table td,
+body.carrot-ui .evt-badge {
+  color: var(--carrot-text) !important;
+}
+
+body.carrot-ui .ch-title {
+  color: var(--carrot-muted) !important;
+}
+
+body.carrot-ui .pill-rec,
+body.carrot-ui .evt-start {
+  border-color: #ffd2b3 !important;
+  background: var(--carrot-soft) !important;
+  color: var(--carrot-hover) !important;
+}
+
+body.carrot-ui.page-recording #sys-dashboard {
+  gap: 12px !important;
+}
+
+body.carrot-ui.page-recording #sys-dashboard .tile {
+  min-height: 132px !important;
+  border-radius: 16px !important;
+  box-shadow: none !important;
+}
+
+body.carrot-ui.page-recording #channel-list {
+  gap: 16px !important;
+}
+
+body.carrot-ui.page-recording #channel-list > .channel {
+  border-radius: 18px !important;
+  box-shadow: var(--carrot-shadow) !important;
+}
+
+body.carrot-ui.page-recording #channel-list > .channel:hover {
+  border-color: #ffc9a5 !important;
+  box-shadow: var(--carrot-shadow-hover) !important;
+}
+
+body.carrot-ui.page-recording .channel-thumbnail-container {
+  background: #111 !important;
+}
+
+body.carrot-ui.page-recording .channel-info {
+  padding: 20px !important;
+  background: var(--carrot-surface) !important;
+}
+
+body.carrot-ui.page-recording .channel-info .channel-name,
+body.carrot-ui.page-recording .channel-info p[id^="title-"] {
+  color: var(--carrot-text) !important;
+}
+
+body.carrot-ui.page-recording .channel-info p,
+body.carrot-ui.page-recording .channel-info p[id^="timing-"],
+body.carrot-ui.page-recording .channel-info p[id^="filename-"] {
+  color: var(--carrot-muted) !important;
+}
+
+body.carrot-ui.page-recording .channel-info p[id^="timing-"],
+body.carrot-ui.page-recording .channel-info p[id^="filename-"] {
+  border-color: var(--carrot-line) !important;
+  background: var(--carrot-surface-soft) !important;
+}
+
+body.carrot-ui.page-recording .filter-container,
+body.carrot-ui.page-recording .global-buttons {
+  box-shadow: none !important;
+}
+
+body.carrot-ui.page-channels #content > .card {
+  margin-top: 24px !important;
+  padding: 26px !important;
+}
+
+body.carrot-ui.page-channels #addChannelForm {
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+body.carrot-ui.page-channels .channel-list {
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)) !important;
+  gap: 16px !important;
+  margin-top: 24px !important;
+}
+
+body.carrot-ui.page-channels .channel-card {
+  padding: 22px !important;
+  border-radius: 18px !important;
+  box-shadow: none !important;
+}
+
+body.carrot-ui.page-channels .channel-card-body {
+  padding: 0 0 18px !important;
+  border-bottom: 1px solid var(--carrot-line) !important;
+}
+
+body.carrot-ui.page-channels .channel-card-body .channel-name {
+  color: var(--carrot-text) !important;
+  font-size: 19px !important;
+}
+
+body.carrot-ui.page-channels .channel-card-body .channel-name::before {
+  background: var(--carrot) !important;
+  box-shadow: 0 0 0 5px var(--carrot-soft) !important;
+}
+
+body.carrot-ui.page-channels .channel-output,
+body.carrot-ui.page-channels .channel-quality {
+  color: var(--carrot-muted) !important;
+}
+
+body.carrot-ui.page-channels .channel-edit-form {
+  padding: 2px 0 0 !important;
+  border: 0 !important;
+}
+
+body.carrot-ui.page-config #configForm {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 18px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+body.carrot-ui.page-config .config-section {
+  align-self: start !important;
+  margin: 0 !important;
+  padding: 24px !important;
+  box-shadow: none !important;
+}
+
+body.carrot-ui.page-config #configForm > button[type="submit"],
+body.carrot-ui.page-config #configForm > input[type="submit"] {
+  grid-column: 1 / -1;
+  justify-self: stretch;
+  min-height: 52px !important;
+  font-size: 15px !important;
+}
+
+body.carrot-ui.page-cookies #updateCookiesForm {
+  max-width: 760px;
+  padding: 24px !important;
+}
+
+body.carrot-ui.page-cookies #content > h2 {
+  margin-top: 42px !important;
+  font-size: 25px !important;
+}
+
+body.carrot-ui.page-files .files-toolbar,
+body.carrot-ui.page-files .file-toolbar,
+body.carrot-ui.page-files .toolbar,
+body.carrot-ui.page-files .breadcrumb,
+body.carrot-ui.page-files .path-bar {
+  border: 1px solid var(--carrot-line) !important;
+  border-radius: 14px !important;
+  background: var(--carrot-surface) !important;
+  box-shadow: none !important;
+}
+
+body.carrot-ui.page-files .file-card,
+body.carrot-ui.page-files .file-item,
+body.carrot-ui.page-files .folder-item {
+  border-color: var(--carrot-line) !important;
+  background: var(--carrot-surface) !important;
+  color: var(--carrot-text) !important;
+}
+
+body.carrot-ui.page-files .file-card:hover,
+body.carrot-ui.page-files .file-item:hover,
+body.carrot-ui.page-files .folder-item:hover {
+  border-color: #ffc9a5 !important;
+  background: #fffaf6 !important;
+}
+
+html[data-theme="dark"] body.carrot-ui.page-files .file-card:hover,
+html[data-theme="dark"] body.carrot-ui.page-files .file-item:hover,
+html[data-theme="dark"] body.carrot-ui.page-files .folder-item:hover {
+  background: rgba(255, 111, 15, 0.07) !important;
+}
+
+body.carrot-ui.lar-auth-page #content {
+  min-height: calc(100vh - 64px) !important;
+}
+
+body.carrot-ui .login-form,
+body.carrot-ui .register-form {
+  width: min(440px, 100%) !important;
+  padding: 30px !important;
+  box-shadow: var(--carrot-shadow-hover) !important;
+}
+
+body.carrot-ui .account-create-link {
+  color: var(--carrot) !important;
+}
+
+body.carrot-ui .lar-toast {
+  border-color: var(--carrot-line) !important;
+  border-radius: 13px !important;
+  background: var(--carrot-surface) !important;
+  color: var(--carrot-text) !important;
+  box-shadow: var(--carrot-shadow-hover) !important;
+}
+
+@media (max-width: 1100px) {
+  body.carrot-ui.page-config #configForm {
+    grid-template-columns: 1fr !important;
+  }
+
+  body.carrot-ui .dash-v4-intro {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@media (max-width: 760px) {
+  body.carrot-ui #content,
+  body.carrot-ui.lar-dashboard-v4 #content.page-index {
+    width: calc(100% - 28px) !important;
+    padding-top: 24px !important;
+  }
+
+  body.carrot-ui .navbar {
+    padding: 0 14px !important;
+  }
+
+  body.carrot-ui .dash-hero {
+    min-height: 225px !important;
+    padding: 24px !important;
+  }
+
+  body.carrot-ui .dash-title {
+    font-size: 34px !important;
+  }
+
+  body.carrot-ui .card,
+  body.carrot-ui .config-section,
+  body.carrot-ui.page-channels #content > .card {
+    padding: 20px !important;
+  }
+
+  body.carrot-ui.page-channels .channel-list {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@media (max-width: 480px) {
+  body.carrot-ui #content > h1,
+  body.carrot-ui #content > h2 {
+    font-size: 29px !important;
+  }
+
+  body.carrot-ui .dash-hero {
+    min-height: 210px !important;
+    border-radius: 20px !important;
+  }
+
+  body.carrot-ui .dash-title {
+    font-size: 30px !important;
+  }
+
+  body.carrot-ui button,
+  body.carrot-ui input[type="submit"],
+  body.carrot-ui .button {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body.carrot-ui *,
+  body.carrot-ui *::before,
+  body.carrot-ui *::after {
+    animation: none !important;
+    transition-duration: 0.01ms !important;
+  }
+}
