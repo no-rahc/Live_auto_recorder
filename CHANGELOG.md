@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.1.15 - 2026-08-05
+
+- Reworked the operations-center button hierarchy so only the active tab and primary save action use the orange emphasis color.
+- Changed the global refresh, preview, CSV, backup, and compact table actions to neutral outline controls with consistent 40 px sizing.
+- Separated destructive cleanup into its own danger zone and kept deletion disabled until a non-empty preview is available.
+- Added keyboard arrow navigation and synchronized ARIA tab and panel states across all operations sections.
+- Converted operational checkboxes into compact option cards and tightened responsive action spacing on tablet and mobile screens.
+- Added five-viewport browser checks for tab contrast, action hierarchy, cleanup safety state, keyboard navigation, and horizontal overflow.
+
 ## v1.1.14 - 2026-08-05
 
 - Completed a project-wide UI consistency audit across dashboard, recording, settings, channels, cookies, files, operations, login, and account creation flows.
