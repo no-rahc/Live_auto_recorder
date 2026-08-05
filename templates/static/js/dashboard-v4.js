@@ -6,9 +6,9 @@
   }
 
   const text = {
-    subtitle: "녹화 상태, 채널, 저장소와 오류를 한 화면에서 우선순위대로 확인하세요.",
+    subtitle: "지금 확인해야 할 녹화와 시스템 상태를 한눈에 확인하세요.",
     quick: "빠른 이동",
-    menuCount: "5개 메뉴",
+    menuCount: "자주 쓰는 메뉴",
     live: "녹화 중",
     liveNote: "현재 실행 중인 세션",
     channels: "관리 채널",
@@ -18,7 +18,7 @@
     failures: "오늘 실패",
     failuresNote: "확인이 필요한 이벤트",
     systemTitle: "시스템 상태",
-    systemDesc: "저장소와 주요 리소스 사용량",
+    systemDesc: "녹화 저장소와 주요 리소스 사용량",
     activityTitle: "운영 현황",
     activityDesc: "채널별 상태와 최근 녹화 이력",
     channelsLink: "채널 관리",
@@ -31,11 +31,11 @@
   };
 
   const dockMeta = {
-    "/recording": ["녹화 현황", "실시간 세션 제어", "activity"],
-    "/config": ["설정 관리", "자동화와 알림 규칙", "settings"],
-    "/channels": ["채널 관리", "녹화 대상과 품질", "channels"],
-    "/cookies": ["쿠키 관리", "플랫폼 인증 상태", "key"],
-    "/files": ["파일 관리", "녹화 파일과 저장소", "folder"],
+    "/recording": ["녹화 현황", "세션 제어", "activity"],
+    "/config": ["설정 관리", "자동화 설정", "settings"],
+    "/channels": ["채널 관리", "녹화 대상", "channels"],
+    "/cookies": ["쿠키 관리", "인증 상태", "key"],
+    "/files": ["파일 관리", "저장소 탐색", "folder"],
   };
 
   const icons = {
@@ -84,18 +84,15 @@
   }
 
   function buildLayout() {
-    document.body.classList.add("lar-dashboard-v4");
+    document.body.classList.add("lar-dashboard-v5");
     const content = document.querySelector("#content.page-index");
     const hero = content && content.querySelector(".dash-hero");
     const dock = content && content.querySelector(".dash-dock");
     const system = content && content.querySelector("#sys-dashboard");
     const activity = content && content.querySelector(".dash-two");
-    if (!content || !hero || !dock || !system || !activity || content.querySelector(".dash-v4-intro")) return;
+    if (!content || !hero || !dock || !system || !activity || content.querySelector(".dash-v5-top")) return;
 
-    const intro = el("section", "dash-v4-intro");
-    hero.parentNode.insertBefore(intro, hero);
-    intro.appendChild(hero);
-    intro.appendChild(dock);
+    hero.querySelector(".dash-ver")?.remove();
 
     const subtitle = el("p", "dash-v4-subtitle", text.subtitle);
     const heroLeft = hero.querySelector(".dash-hero-left");
@@ -113,7 +110,9 @@
     }
 
     const heroRight = hero.querySelector(".dash-hero-right");
-    if (heroRight) heroRight.appendChild(el("div", "dash-v4-clock-note", text.clockNote));
+    if (heroRight && !heroRight.querySelector(".dash-v4-clock-note")) {
+      heroRight.appendChild(el("div", "dash-v4-clock-note", text.clockNote));
+    }
 
     const dockHead = el("div", "dash-v4-dock-head");
     dockHead.appendChild(el("span", "dash-v4-dock-title", text.quick));
@@ -127,14 +126,16 @@
       const icon = link.querySelector(".dock-ico");
       const label = link.querySelector(".dock-label");
       if (icon) icon.innerHTML = icons[meta[2]] || icons.activity;
-      if (label) {
+      if (label && !label.parentNode.classList.contains("dash-v4-dock-copy")) {
         label.textContent = meta[0];
         const copy = el("span", "dash-v4-dock-copy");
         label.parentNode.insertBefore(copy, label);
         copy.appendChild(label);
         copy.appendChild(el("span", "dock-description", meta[1]));
       }
-      link.appendChild(el("span", "dash-v4-dock-arrow", "›"));
+      if (!link.querySelector(".dash-v4-dock-arrow")) {
+        link.appendChild(el("span", "dash-v4-dock-arrow", "›"));
+      }
     });
 
     const overview = el("section", "dash-v4-overview");
@@ -143,7 +144,12 @@
     overview.appendChild(statCard("channels", text.channels, "dash-v4-channel-count", text.channelsNote));
     overview.appendChild(statCard("today", text.today, "dash-v4-today-count", text.todayNote));
     overview.appendChild(statCard("fail", text.failures, "dash-v4-failure-count", text.failuresNote));
-    intro.insertAdjacentElement("afterend", overview);
+
+    const top = el("section", "dash-v5-top");
+    hero.parentNode.insertBefore(top, hero);
+    top.appendChild(hero);
+    top.appendChild(overview);
+    top.insertAdjacentElement("afterend", dock);
 
     system.insertAdjacentElement("beforebegin", sectionHead(text.systemTitle, text.systemDesc));
     activity.insertAdjacentElement("beforebegin", sectionHead(text.activityTitle, text.activityDesc, text.channelsLink, "/channels"));
@@ -236,5 +242,5 @@
   observe("mem-percent", syncHealth);
   observe("stor-pct", syncHealth);
   document.addEventListener("lar:sys-metrics", syncUpdated);
-  setInterval(syncUpdated, 30000);
+  window.setInterval(syncUpdated, 30000);
 })();
