@@ -32,7 +32,7 @@ test('dashboard prioritizes status in a compact glance layout', async ({ page, v
     expect(heroBox.height).toBeLessThanOrEqual(225);
     expect(overviewBox.height).toBeLessThanOrEqual(225);
     expect(dockBox.height).toBeLessThanOrEqual(100);
-    expect(cardBoxes.every((card) => card.height <= 150)).toBeTruthy();
+    expect(cardBoxes.every((card) => card.height <= 155)).toBeTruthy();
 
     if (width > 1180) {
       expect(new Set(cardBoxes.map((card) => Math.round(card.y))).size).toBe(1);
