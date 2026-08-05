@@ -1,20 +1,30 @@
 /* Final proportional and interaction refinements found during the v1.1.16 visual audit. */
 
-/* Page-specific working widths: dense data pages need more room than forms. */
+body.page-index,
+body.page-operations {
+  --lar-content-max: 1440px;
+}
+
+body.page-recording,
+body.page-files {
+  --lar-content-max: 1480px;
+}
+
+body.page-config {
+  --lar-content-max: 1240px;
+}
+
 body.page-index #content,
 body.page-operations #content {
-  width: min(1440px, calc(100% - 48px)) !important;
   max-width: 1440px !important;
 }
 
 body.page-recording #content,
 body.page-files #content {
-  width: min(1480px, calc(100% - 48px)) !important;
   max-width: 1480px !important;
 }
 
 body.page-config #content {
-  width: min(1240px, calc(100% - 48px)) !important;
   max-width: 1240px !important;
 }
 
@@ -60,10 +70,7 @@ body.page-recording #channel-list {
   justify-content: start !important;
 }
 
-body.page-recording .lar-recording-filter-toggle {
-  display: none;
-}
-
+body.page-recording .lar-recording-filter-toggle,
 body.page-recording .lar-recording-section-head {
   display: none;
 }
@@ -152,13 +159,23 @@ body.page-operations .ops-tabs.lar-can-scroll::after {
   background: linear-gradient(90deg, rgba(255,255,255,0), rgba(255,255,255,.98));
 }
 
-/* Small English eyebrow labels are secondary, not competing page headings. */
 .ops-eyebrow,
 .eyebrow,
 .lar-workspace-kicker {
   font-size: 9px !important;
   letter-spacing: .1em !important;
   opacity: .8;
+}
+
+@media (min-width: 1100px) {
+  body.page-index.lar-sidebar-v3 #content,
+  body.page-recording.lar-sidebar-v3 #content,
+  body.page-files.lar-sidebar-v3 #content,
+  body.page-operations.lar-sidebar-v3 #content,
+  body.page-config.lar-sidebar-v3 #content {
+    width: min(var(--lar-content-max), calc(100% - var(--lar-sidebar-current) - 64px)) !important;
+    max-width: var(--lar-content-max) !important;
+  }
 }
 
 @media (max-width: 900px) {
@@ -173,12 +190,11 @@ body.page-operations .ops-tabs.lar-can-scroll::after {
   body.page-files #content,
   body.page-operations #content,
   body.page-config #content {
-    width: min(100% - 28px, 1480px) !important;
+    width: min(100% - 28px, var(--lar-content-max)) !important;
   }
 
-  /* Dashboard compactness */
   body.page-index .dash-v5-top .dash-hero {
-    min-height: 170px !important;
+    min-height: 0 !important;
     padding: 18px !important;
   }
 
@@ -188,14 +204,29 @@ body.page-operations .ops-tabs.lar-can-scroll::after {
 
   body.page-index .dash-v4-subtitle {
     margin-bottom: 13px !important;
+    font-size: 12px !important;
+    line-height: 1.45 !important;
   }
 
   body.page-index .dash-hero-right {
+    display: flex !important;
+    align-items: baseline;
+    gap: 8px;
     margin-top: 12px !important;
+    text-align: left !important;
   }
 
   body.page-index .dash-clock {
-    font-size: 27px !important;
+    font-size: 25px !important;
+  }
+
+  body.page-index .dash-date {
+    font-size: 10px !important;
+    white-space: nowrap;
+  }
+
+  body.page-index .dash-v4-clock-note {
+    display: none !important;
   }
 
   body.page-index .dash-sys-grid {
@@ -225,7 +256,6 @@ body.page-operations .ops-tabs.lar-can-scroll::after {
     white-space: normal !important;
   }
 
-  /* Recording priority: controls and channels first, compact system panel second. */
   body.page-recording .lar-recording-filter-toggle {
     width: 100%;
     min-height: 40px;
@@ -238,6 +268,7 @@ body.page-operations .ops-tabs.lar-can-scroll::after {
     border-radius: 11px !important;
     background: var(--lar-surface) !important;
     color: var(--lar-text-soft) !important;
+    opacity: 1 !important;
   }
 
   body.page-recording .filter-container.lar-mobile-collapsed {
@@ -251,7 +282,7 @@ body.page-operations .ops-tabs.lar-can-scroll::after {
 
   body.page-recording .global-buttons {
     display: grid !important;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
     gap: 8px !important;
   }
 
@@ -290,15 +321,15 @@ body.page-operations .ops-tabs.lar-can-scroll::after {
     font-size: 10px;
   }
 
-  body.page-recording #sys-dashboard {
+  body.page-recording.lar-ui-refinement-v1 #sys-dashboard {
     display: grid !important;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
     gap: 8px !important;
     margin-top: 0 !important;
   }
 
-  body.page-recording #sys-dashboard .row-main,
-  body.page-recording #sys-dashboard .row-disks {
+  body.page-recording.lar-ui-refinement-v1 #sys-dashboard .row-main,
+  body.page-recording.lar-ui-refinement-v1 #sys-dashboard .row-disks {
     display: contents !important;
   }
 
@@ -322,7 +353,6 @@ body.page-operations .ops-tabs.lar-can-scroll::after {
     white-space: nowrap;
   }
 
-  /* Settings dirty bar */
   body.page-config {
     padding-bottom: 82px !important;
   }
@@ -354,7 +384,6 @@ body.page-operations .ops-tabs.lar-can-scroll::after {
     padding: 7px 10px !important;
   }
 
-  /* Channel registration progressive disclosure */
   body.page-channels .lar-channel-advanced-toggle {
     grid-column: 1 / -1;
     width: 100%;
@@ -380,7 +409,6 @@ body.page-operations .ops-tabs.lar-can-scroll::after {
     display: none !important;
   }
 
-  /* File actions */
   body.page-files .lar-toolbar-actions {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -389,7 +417,6 @@ body.page-operations .ops-tabs.lar-can-scroll::after {
     grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
   }
 
-  /* Operations KPI and tabs */
   body.page-operations .ops-summary {
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
   }
