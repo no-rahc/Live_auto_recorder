@@ -1,6 +1,22 @@
-FROM python:3.12-slim-bookworm
+# syntax=docker/dockerfile:1.7
+FROM --platform=$BUILDPLATFORM golang:1.23-bookworm AS ytarchive-builder
 
+ARG TARGETOS=linux
+ARG TARGETARCH=amd64
 ARG YTARCHIVE_VERSION=v0.5.0
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates git \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN mkdir -p /out \
+    && git clone --depth 1 --branch "${YTARCHIVE_VERSION}" \
+        https://github.com/Kethsar/ytarchive.git /src/ytarchive \
+    && cd /src/ytarchive \
+    && CGO_ENABLED=0 GOOS="${TARGETOS}" GOARCH="${TARGETARCH}" \
+        go build -trimpath -ldflags="-s -w" -o /out/ytarchive .
+
+FROM python:3.12-slim-bookworm
 
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONDONTWRITEBYTECODE=1 \
@@ -8,7 +24,8 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     TZ=Asia/Seoul \
     HOST=0.0.0.0 \
-    PORT=5000
+    PORT=5000 \
+    RECORDINGS_ROOT=/app/chzzk
 
 WORKDIR /app
 
@@ -27,16 +44,14 @@ COPY requirements.txt ./
 RUN python -m pip install --no-cache-dir --upgrade pip \
     && python -m pip install --no-cache-dir -r requirements.txt
 
-RUN curl -fsSL -o /tmp/ytarchive.zip \
-        "https://github.com/Kethsar/ytarchive/releases/download/${YTARCHIVE_VERSION}/ytarchive_linux_amd64.zip" \
-    && python -m zipfile -e /tmp/ytarchive.zip /tmp/ytarchive \
-    && install -m 0755 /tmp/ytarchive/ytarchive /usr/local/bin/ytarchive \
-    && /usr/local/bin/ytarchive -V \
-    && rm -rf /tmp/ytarchive /tmp/ytarchive.zip
+COPY --from=ytarchive-builder /out/ytarchive /usr/local/bin/ytarchive
+RUN chmod 0755 /usr/local/bin/ytarchive \
+    && /usr/local/bin/ytarchive -V
 
 COPY . .
 
-RUN mkdir -p /app/chzzk /app/json /app/logs /app/tmp/ytarchive
+RUN mkdir -p /app/chzzk /app/json /app/logs /app/tmp/ytarchive \
+    && python -m py_compile app_entry.py module/operations_common.py module/operations_health.py module/operations_backup.py module/operations_v2.py
 
 EXPOSE 5000
 VOLUME ["/app/json", "/app/chzzk", "/app/logs"]

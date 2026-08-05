@@ -1,5 +1,18 @@
 # Changelog
 
+## v1.1.6 - 2026-08-05
+
+- Added an operations center for storage protection, recording health, post-processing jobs, backups, statistics, channel rules, and audit history.
+- Added recording start blocking below a configurable free-space threshold and safe cleanup previews that always protect active and recently modified files.
+- Added file-growth health monitoring, stalled recording detection, bounded automatic reconnection, maximum recording duration, and low-storage notifications.
+- Added configurable title, category, weekday, time-window, start-delay, quality, maximum-duration, and short-recording cleanup rules per channel.
+- Added scheduled backups, pre-restore safety backups, optional secret inclusion, download and restore controls.
+- Added post-processing job tracking with progress states, cancellation, and retry controls.
+- Added 14-day and channel-level recording statistics with CSV export and storage estimates.
+- Added login throttling, security response headers, and mutation audit logging.
+- Added `linux/arm64` Docker images and a pull-request multi-platform build check.
+- Added unit and responsive UI tests for the new operational features.
+
 ## v1.1.5 - 2026-08-05
 
 - Standardized version updates around the root `VERSION` file and a reusable release helper.
