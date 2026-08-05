@@ -1,0 +1,96 @@
+/* Compact system metrics: CPU, memory, live network and one recording volume. */
+body.page-recording #sys-dashboard {
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  gap: 14px !important;
+  margin: 18px 0 22px !important;
+}
+
+body.page-recording #sys-dashboard > .row-main,
+body.page-recording #sys-dashboard > #disk-row-1 {
+  display: contents !important;
+}
+
+body.page-recording #sys-dashboard > #disk-row-2,
+body.page-recording #disk-row-2,
+body.page-index #disk-row-1,
+body.page-index #disk-row-2 {
+  display: none !important;
+}
+
+body.page-recording #disk-row-1 .tile.disk:not(.lar-primary-storage),
+body.page-recording #disk-row-2 .tile.disk {
+  display: none !important;
+}
+
+body.page-recording #sys-dashboard .tile {
+  min-width: 0 !important;
+  min-height: 142px !important;
+  padding: 18px !important;
+  border-radius: 17px !important;
+  background: var(--shell-surface, var(--panel)) !important;
+  border-color: var(--shell-border, var(--line)) !important;
+  box-shadow: var(--shell-shadow, var(--shadow)) !important;
+}
+
+body.page-recording #sys-dashboard .tile-head {
+  min-width: 0 !important;
+  margin-bottom: 14px !important;
+}
+
+body.page-recording #sys-dashboard .tile-title {
+  color: var(--shell-text, var(--text)) !important;
+  font-size: 13px !important;
+  font-weight: 800 !important;
+}
+
+body.page-recording #sys-dashboard .tile-sub {
+  max-width: 64% !important;
+  color: var(--shell-muted, var(--muted)) !important;
+  font-size: 11px !important;
+}
+
+body.page-recording #sys-dashboard .tile-value {
+  margin-bottom: 14px !important;
+  color: var(--shell-text, var(--text)) !important;
+  font-size: 29px !important;
+  line-height: 1.1 !important;
+}
+
+body.page-recording #sys-dashboard #net-rate {
+  font-size: 15px !important;
+  line-height: 1.4 !important;
+  white-space: normal !important;
+}
+
+body.page-recording #sys-dashboard .tile-brief {
+  margin-top: 11px !important;
+  color: var(--shell-muted, var(--muted)) !important;
+  font-size: 11px !important;
+  overflow-wrap: anywhere !important;
+}
+
+body.page-recording #sys-dashboard .lar-primary-storage .tile-sub {
+  max-width: 72% !important;
+}
+
+body.page-recording #sys-dashboard .lar-primary-storage .tile-value {
+  color: var(--shell-primary, var(--brand)) !important;
+}
+
+@media (max-width: 1180px) {
+  body.page-recording #sys-dashboard {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 640px) {
+  body.page-recording #sys-dashboard {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+
+  body.page-recording #sys-dashboard .tile {
+    min-height: 128px !important;
+  }
+}
