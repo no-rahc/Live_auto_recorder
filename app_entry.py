@@ -84,6 +84,9 @@ class ConsoleAssetsMiddleware(BaseHTTPMiddleware):
             '<link rel="stylesheet" href="/static/css/app-v3.css?v='
             + version
             + '" data-lar-ui-v3>'
+            '<style data-lar-ui-v3-critical>'
+            '@media (min-width:1100px){body.lar-sidebar-v3 .menu-icon{display:none!important}}'
+            '</style>'
             '<script src="/static/js/system-metrics-v2.js?v='
             + version
             + '" data-lar-metrics-v2></script>'
