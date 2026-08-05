@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="ko" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Live Auto Recorder</title>
+  <link rel="stylesheet" href="/templates/static/css/style.css">
+  <link rel="stylesheet" href="/templates/static/css/app-v3.css">
+  <link rel="stylesheet" href="/templates/static/css/dashboard-glance-v1.css">
+  <style>@media (min-width:1100px){body.lar-sidebar-v3 .menu-icon{display:none!important}}</style>
+  <script src="/templates/static/js/dashboard-v4.js" defer></script>
+</head>
+<body class="page-index lar-sidebar-v3 lar-desktop-nav lar-ui-v3">
+  <div class="navbar-container"><div class="navbar"><button class="menu-icon">☰</button><div class="lar-topbar-context"><span class="lar-topbar-context-icon">⌂</span><span><small>Live Auto Recorder</small><strong>대시보드</strong></span></div></div></div>
+  <aside id="mySidenav" class="sidenav">
+    <div class="lar-sidenav-head"><a class="lar-sidebar-brand"><span class="lar-sidebar-logo">◉</span><span class="lar-sidebar-brand-copy"><strong>Live Auto Recorder</strong><small>v1.1.8</small></span></a></div>
+    <nav class="lar-sidebar-list"><a class="lar-sidebar-link lar-active"><span class="lar-sidebar-link-icon">⌂</span><span class="lar-sidebar-link-copy"><strong>대시보드</strong><small>전체 상태</small></span></a><a class="lar-sidebar-link"><span class="lar-sidebar-link-icon">◉</span><span class="lar-sidebar-link-copy"><strong>녹화 현황</strong><small>세션 제어</small></span></a></nav>
+  </aside>
+  <main id="content" class="page-index">
+    <header class="dash-hero">
+      <div class="dash-hero-left">
+        <span class="dash-greeting">활기찬 오후예요</span>
+        <h1 class="dash-title">녹화 관제 보드</h1>
+        <div class="dash-statusline"><span class="dash-autopill is-on" id="auto-rec-pill"><span class="strip-dot dot-on"></span><strong id="auto-rec-state">ON</strong><span class="dash-autopill-label">자동녹화</span></span><span class="dash-ver">v1.1.8</span></div>
+      </div>
+      <div class="dash-hero-right"><div class="dash-clock" id="clock">13:30:16</div><div class="dash-date">8월 5일 수요일</div></div>
+    </header>
+    <nav class="dash-dock" aria-label="빠른 이동">
+      <a href="/recording" class="dock-item"><span class="dock-ico">●</span><span class="dock-label">녹화현황</span></a>
+      <a href="/config" class="dock-item"><span class="dock-ico">●</span><span class="dock-label">설정관리</span></a>
+      <a href="/channels" class="dock-item"><span class="dock-ico">●</span><span class="dock-label">채널관리</span></a>
+      <a href="/cookies" class="dock-item"><span class="dock-ico">●</span><span class="dock-label">쿠키관리</span></a>
+      <a href="/files" class="dock-item"><span class="dock-ico">●</span><span class="dock-label">파일관리</span></a>
+    </nav>
+    <section id="sys-dashboard" class="sys-dashboard dash-sys">
+      <div class="dash-sys-grid">
+        <div class="card dash-storage"><header class="card-head"><div class="eyebrow">녹화 저장소</div><span class="chip" id="stor-mount">/app/chzzk</span></header><div class="stor-num"><span class="stor-used" id="stor-used">112.53 GB</span><span class="stor-sep">/</span><span class="stor-total" id="stor-total">10.83 TB</span><span class="stor-pct" id="stor-pct">1.0%</span></div><div class="progress progress--big"><div id="stor-bar" class="progress-bar" style="width:1%"></div></div><div class="stor-vols"><span class="stor-vols-label">볼륨</span><div class="row row-disks" id="disk-row-1"></div><div class="row row-disks" id="disk-row-2"></div></div></div>
+        <div class="card dash-meters"><header class="card-head"><div class="eyebrow">리소스 사용량</div><span class="chip chip--live">실시간</span></header><div class="dash-meter"><div class="dash-meter-top"><span class="dash-meter-label">CPU</span><span class="dash-meter-sub" id="cpu-name">Intel Core i5</span><span class="dash-meter-val"><span id="cpu-percent">8</span><small>%</small></span></div><div class="progress"><div class="progress-bar" style="width:8%"></div></div></div><div class="dash-meter"><div class="dash-meter-top"><span class="dash-meter-label">메모리</span><span class="dash-meter-sub">3.50 GB / 11.11 GB</span><span class="dash-meter-val"><span id="mem-percent">32</span><small>%</small></span></div><div class="progress"><div class="progress-bar" style="width:32%"></div></div></div><div class="dash-meter"><div class="dash-meter-top"><span class="dash-meter-label">네트워크</span><span class="dash-meter-sub">실시간</span><span class="dash-meter-val">0.00 MB/s</span></div><div class="progress"><div class="progress-bar" style="width:2%"></div></div></div></div>
+      </div>
+    </section>
+    <div class="dash-two">
+      <section class="card index-section"><header class="card-head"><div class="eyebrow">채널 현황</div><span class="chip" id="ch-count">2개 채널</span></header><div id="ch-list" class="ch-list"><div class="ch-row ch-row--rec">채널 A</div><div class="ch-row">채널 B</div></div></section>
+      <section class="card index-section"><header class="card-head"><div class="eyebrow">최근 녹화 이력</div><span class="chip" id="hist-stats">오늘 3건 · 실패 0건</span></header><div class="table-wrap"><table><tbody><tr><td>13:20</td><td>채널 A</td><td>녹화 시작</td></tr></tbody></table></div></section>
+    </div>
+  </main>
+</body>
+</html>
