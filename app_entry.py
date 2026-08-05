@@ -62,12 +62,18 @@ class ConsoleAssetsMiddleware(BaseHTTPMiddleware):
             '<link rel="stylesheet" href="/static/css/console-v2.css?v='
             + version
             + '" data-lar-console-v2>'
+            '<link rel="stylesheet" href="/static/css/shell-v3.css?v='
+            + version
+            + '" data-lar-shell-v3>'
             '<link rel="stylesheet" href="/static/css/sidebar-v3.css?v='
             + version
             + '" data-lar-sidebar-v3>'
             '<link rel="stylesheet" href="/static/css/system-metrics-v2.css?v='
             + version
             + '" data-lar-metrics-v2>'
+            '<link rel="stylesheet" href="/static/css/dashboard-v4.css?v='
+            + version
+            + '" data-lar-dashboard-v4>'
             '<script src="/static/js/system-metrics-v2.js?v='
             + version
             + '" data-lar-metrics-v2></script>'
@@ -79,6 +85,9 @@ class ConsoleAssetsMiddleware(BaseHTTPMiddleware):
             '<script src="/static/js/sidebar-v3.js?v='
             + version
             + '" defer data-lar-sidebar-v3></script>'
+            '<script src="/static/js/dashboard-v4.js?v='
+            + version
+            + '" defer data-lar-dashboard-v4></script>'
         )
 
         if "data-lar-console-v2" not in html:
