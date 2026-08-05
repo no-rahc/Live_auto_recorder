@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 VERSION_FILE = ROOT / "VERSION"
 PACKAGE_FILE = ROOT / "package.json"
 CHANGELOG_FILE = ROOT / "CHANGELOG.md"
-APP_ENTRY_FILE = ROOT / "app_entry.py"
+RELEASE_MODULE_FILE = ROOT / "lar_app" / "release.py"
 DOCKER_WORKFLOW_FILE = ROOT / ".github" / "workflows" / "docker-publish.yml"
 
 VERSION_RE = re.compile(r"^v(\d+)\.(\d+)\.(\d+)$")
@@ -98,9 +98,12 @@ def check_release_metadata() -> None:
     if not changelog_match or changelog_match.group(1) != version:
         errors.append(f"CHANGELOG.md first release heading must be {version}")
 
-    app_entry = APP_ENTRY_FILE.read_text(encoding="utf-8")
-    if 'VERSION_FILE = ROOT_DIR / "VERSION"' not in app_entry:
-        errors.append("app_entry.py must read the root VERSION file")
+    if not RELEASE_MODULE_FILE.is_file():
+        errors.append("lar_app/release.py must own runtime release metadata")
+    else:
+        release_module = RELEASE_MODULE_FILE.read_text(encoding="utf-8")
+        if 'root / "VERSION"' not in release_module:
+            errors.append("lar_app/release.py must read the root VERSION file")
 
     docker_workflow = DOCKER_WORKFLOW_FILE.read_text(encoding="utf-8")
     if "< VERSION" not in docker_workflow:
