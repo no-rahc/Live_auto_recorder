@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.1.10 - 2026-08-05
+
+- Added a dashboard channel-details modal that opens from each channel status row.
+- Added view and edit modes for channel name, recording path, quality, extension, watch-party filters, and automatic recording state.
+- Kept platform and channel ID read-only, omitted destructive delete actions, and linked advanced management back to the channel management page.
+- Added recording-state guidance so path and format changes are clearly marked as applying to the next recording session.
+- Added keyboard access, unsaved-change confirmation, responsive mobile sheet layout, and automated API/save interaction checks.
+
 ## v1.1.9 - 2026-08-05
 
 - Replaced the dashboard's stretched storage/resource split with four compact cards for storage, CPU, memory, and live network traffic.
