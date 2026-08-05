@@ -50,9 +50,15 @@ test('dashboard channel row opens editable detail modal', async ({ page }, testI
   if (viewport && viewport.width >= 1100) {
     const sidebar = await page.locator('.sidenav').boundingBox();
     const topbar = await page.locator('.lar-topbar-context').boundingBox();
-    const gap = topbar.x - (sidebar.x + sidebar.width);
+    const topbarIcon = await page.locator('.lar-topbar-context-icon').boundingBox();
+    const sidebarRight = sidebar.x + sidebar.width;
+    const gap = topbar.x - sidebarRight;
+    const iconGap = topbarIcon.x - sidebarRight;
     expect(gap).toBeGreaterThanOrEqual(24);
     expect(gap).toBeLessThanOrEqual(36);
+    expect(iconGap).toBeGreaterThanOrEqual(24);
+    expect(iconGap).toBeLessThanOrEqual(36);
+    expect(topbarIcon.width).toBeGreaterThanOrEqual(36);
   }
 
   const firstRow = page.locator('#ch-list .ch-row').first();
