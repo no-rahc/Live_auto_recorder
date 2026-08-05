@@ -74,6 +74,9 @@ class ConsoleAssetsMiddleware(BaseHTTPMiddleware):
             '<link rel="stylesheet" href="/static/css/dashboard-v4.css?v='
             + version
             + '" data-lar-dashboard-v4>'
+            '<link rel="stylesheet" href="/static/css/recording-v3.css?v='
+            + version
+            + '" data-lar-recording-v3>'
             '<script src="/static/js/system-metrics-v2.js?v='
             + version
             + '" data-lar-metrics-v2></script>'
