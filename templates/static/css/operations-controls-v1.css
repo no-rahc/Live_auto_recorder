@@ -279,3 +279,10 @@ body.page-operations .ops-table-wrap td .ops-button-small {
     width: 100%;
   }
 }
+
+body.page-operations #content > .ops-panel,
+body.page-operations #content > .ops-panel.is-active {
+  animation: none !important;
+  opacity: 1 !important;
+  transform: none !important;
+}
