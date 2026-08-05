@@ -1,0 +1,76 @@
+/* Settings density — remove forced row height and pack cards without dead space. */
+body.page-config #configForm {
+  display: block !important;
+}
+
+body.page-config .lar-config-masonry-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-flow: row dense;
+  grid-auto-rows: 2px;
+  gap: 12px;
+  align-items: start;
+}
+
+body.page-config .lar-config-masonry-grid > .config-section {
+  min-width: 0;
+  min-height: 0 !important;
+  height: auto !important;
+  align-self: start !important;
+  margin: 0 !important;
+  padding: 18px !important;
+}
+
+body.page-config .config-section .section-head {
+  min-height: 32px !important;
+  margin-bottom: 14px !important;
+  padding-bottom: 11px !important;
+}
+
+body.page-config .config-section .description {
+  margin: 6px 0 14px !important;
+  line-height: 1.55 !important;
+}
+
+body.page-config .config-section table.description {
+  margin: 8px 0 16px !important;
+}
+
+body.page-config .config-section > :last-child {
+  margin-bottom: 0 !important;
+}
+
+body.page-config #configForm > button[type="submit"],
+body.page-config #configForm > input[type="submit"] {
+  width: min(360px, 100%) !important;
+  display: flex;
+  justify-content: center;
+  margin: 16px 0 0 auto !important;
+}
+
+@media (max-width: 1099px) {
+  body.page-config .lar-config-masonry-grid {
+    grid-template-columns: 1fr;
+    grid-auto-flow: row;
+    grid-auto-rows: auto;
+  }
+
+  body.page-config .lar-config-masonry-grid > .config-section {
+    grid-row-end: auto !important;
+  }
+}
+
+@media (max-width: 700px) {
+  body.page-config .lar-config-masonry-grid {
+    gap: 10px;
+  }
+
+  body.page-config .lar-config-masonry-grid > .config-section {
+    padding: 16px !important;
+  }
+
+  body.page-config #configForm > button[type="submit"],
+  body.page-config #configForm > input[type="submit"] {
+    width: 100% !important;
+  }
+}

@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="ko" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>설정 관리</title>
+  <link rel="stylesheet" href="/templates/static/css/style.css">
+  <link rel="stylesheet" href="/templates/static/css/app-v3.css">
+  <link rel="stylesheet" href="/templates/static/css/config-density-v1.css">
+  <script src="/templates/static/js/config-density-v1.js" defer></script>
+</head>
+<body class="page-config lar-ui-v3">
+  <main id="content">
+    <h1>설정 관리</h1>
+    <p class="lar-page-intro">녹화 방식과 저장 규칙을 관리합니다.</p>
+    <form id="configForm">
+      <section class="config-section">
+        <header class="section-head"><span class="section-num">01</span><h3>일반</h3><span class="section-tag">General</span></header>
+        <label>자동녹화 모드</label><select><option>ON</option></select>
+        <p class="description">프로그램 시작 시 등록한 채널의 녹화를 자동으로 시작합니다.</p>
+      </section>
+      <section class="config-section">
+        <header class="section-head"><span class="section-num">02</span><h3>플러그인</h3><span class="section-tag">Plugin</span></header>
+        <label>플러그인 선택</label><select><option>기본 플러그인</option></select>
+        <p class="description">사용할 플러그인을 선택합니다.</p>
+        <table class="description"><tbody><tr><td>기본</td><td>일반 녹화</td></tr><tr><td>타임머신</td><td>방송 시작 이전 구간 포함</td></tr></tbody></table>
+        <label>앞당김 시간</label><input value="120">
+        <p class="description">초 단위로 입력합니다.</p>
+      </section>
+      <section class="config-section">
+        <header class="section-head"><span class="section-num">03</span><h3>후처리</h3><span class="section-tag">Post</span></header>
+        <label>자동 후처리</label><select><option>ON</option></select>
+        <p class="description">녹화 완료 후 파일을 자동으로 처리합니다.</p>
+        <label>원본 삭제</label><select><option>OFF</option></select>
+        <p class="description">처리 성공 후 원본을 삭제합니다.</p>
+        <label>이동 경로</label><input value="/app/chzzk/processed">
+        <p class="description">완료한 파일을 이동할 경로입니다.</p>
+        <label>파일명 규칙</label><input value="{channel_name}_{recording_time}">
+        <p class="description">채널명과 녹화 시작 시간을 조합합니다.</p>
+      </section>
+      <section class="config-section">
+        <header class="section-head"><span class="section-num">04</span><h3>분할녹화</h3><span class="section-tag">Split</span></header>
+        <label>분할녹화</label><select><option>OFF</option></select>
+        <p class="description">지정 시간마다 파일을 나눕니다.</p>
+        <label>분할 시간</label><input value="3600">
+        <p class="description">초 단위로 입력합니다.</p>
+      </section>
+      <section class="config-section">
+        <header class="section-head"><span class="section-num">05</span><h3>알림</h3><span class="section-tag">Notify</span></header>
+        <label>Discord 알림</label><select><option>ON</option></select>
+        <p class="description">녹화 시작과 종료 결과를 전송합니다.</p>
+      </section>
+      <section class="config-section">
+        <header class="section-head"><span class="section-num">06</span><h3>고급</h3><span class="section-tag">Advanced</span></header>
+        <label>재탐색 주기</label><input value="120">
+        <p class="description">방송 상태를 다시 확인하는 간격입니다.</p>
+        <label>재시도 횟수</label><input value="3">
+        <p class="description">실패 시 자동 재시도 횟수입니다.</p>
+      </section>
+      <button type="submit">설정 저장</button>
+    </form>
+  </main>
+</body>
+</html>

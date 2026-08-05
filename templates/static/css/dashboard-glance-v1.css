@@ -218,43 +218,131 @@ body.page-index .dash-v4-section-copy p {
   font-size: 11.5px !important;
 }
 
+/* Flatten the old storage + resource split into four compact cards. */
 body.page-index .dash-sys-grid {
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
   gap: 12px !important;
+  align-items: start !important;
 }
 
-body.page-index .dash-storage,
 body.page-index .dash-meters {
-  min-height: 196px !important;
-  padding: 18px 20px !important;
+  display: contents !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
   box-shadow: none !important;
 }
 
-body.page-index .dash-storage .card-head,
-body.page-index .dash-meters .card-head {
-  min-height: 31px !important;
-  margin-bottom: 12px !important;
-  padding-bottom: 10px !important;
+body.page-index .dash-meters > .card-head {
+  display: none !important;
+}
+
+body.page-index .dash-storage,
+body.page-index .dash-meter {
+  min-width: 0 !important;
+  min-height: 124px !important;
+  height: auto !important;
+  margin: 0 !important;
+  padding: 14px 15px !important;
+  border: 1px solid var(--lar-line) !important;
+  border-radius: 16px !important;
+  background: var(--lar-surface) !important;
+  box-shadow: none !important;
+}
+
+body.page-index .dash-storage .card-head {
+  min-height: 26px !important;
+  margin-bottom: 10px !important;
+  padding-bottom: 8px !important;
 }
 
 body.page-index .dash-storage .eyebrow,
-body.page-index .dash-meters .eyebrow {
-  font-size: 14px !important;
+body.page-index .dash-meter-label {
+  color: var(--lar-text) !important;
+  font-size: 12px !important;
+  font-weight: 800 !important;
+}
+
+body.page-index .dash-storage .chip {
+  max-width: 120px;
+  overflow: hidden;
+  font-size: 9.5px !important;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 body.page-index .stor-num {
-  margin-top: 3px !important;
+  display: flex !important;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 3px 5px !important;
+  margin: 0 0 9px !important;
 }
 
 body.page-index .stor-used {
-  font-size: clamp(27px, 2.7vw, 34px) !important;
+  color: var(--lar-text) !important;
+  font-size: clamp(21px, 2vw, 25px) !important;
+  line-height: 1 !important;
+}
+
+body.page-index .stor-sep,
+body.page-index .stor-total {
+  color: var(--lar-muted) !important;
+  font-size: 11.5px !important;
+}
+
+body.page-index .stor-pct {
+  margin-left: auto !important;
+  font-size: 10px !important;
+}
+
+body.page-index .stor-vols {
+  display: none !important;
 }
 
 body.page-index .dash-meter {
-  padding: 8px 0 !important;
+  display: flex !important;
+  flex-direction: column;
+  justify-content: space-between;
 }
 
 body.page-index .dash-meter-top {
-  margin-bottom: 7px !important;
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 8px !important;
+  align-items: start !important;
+  margin: 0 0 10px !important;
+}
+
+body.page-index .dash-meter-sub {
+  grid-column: 1 / -1;
+  overflow: hidden;
+  color: var(--lar-muted) !important;
+  font-size: 9.5px !important;
+  line-height: 1.3 !important;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+body.page-index .dash-meter-val {
+  color: var(--lar-text) !important;
+  font-size: 20px !important;
+  font-weight: 850 !important;
+  line-height: 1 !important;
+}
+
+body.page-index #tile-net .dash-meter-sub {
+  display: none !important;
+}
+
+body.page-index #tile-net .dash-meter-val {
+  grid-column: 1 / -1;
+  margin-top: 6px;
+  font-size: 11.5px !important;
+  line-height: 1.3 !important;
+  white-space: nowrap;
 }
 
 body.page-index .dash-two {
@@ -278,6 +366,10 @@ body.page-index .dash-two {
     padding: 2px 7px 8px !important;
     border-right: 0;
     border-bottom: 1px solid var(--lar-line);
+  }
+
+  body.page-index .dash-sys-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
   }
 }
 
@@ -330,10 +422,13 @@ body.page-index .dash-two {
   body.page-index .dock-item {
     min-height: 56px !important;
   }
-}
 
-@media (max-width: 390px) {
-  body.page-index .dash-dock {
+  body.page-index .dash-sys-grid {
     grid-template-columns: 1fr !important;
+  }
+
+  body.page-index .dash-storage,
+  body.page-index .dash-meter {
+    min-height: 112px !important;
   }
 }

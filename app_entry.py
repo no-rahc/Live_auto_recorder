@@ -156,6 +156,9 @@ class ConsoleAssetsMiddleware(BaseHTTPMiddleware):
             '<link rel="stylesheet" href="/static/css/dashboard-glance-v1.css?v='
             + version
             + '" data-lar-dashboard-glance-v1>'
+            '<link rel="stylesheet" href="/static/css/config-density-v1.css?v='
+            + version
+            + '" data-lar-config-density-v1>'
             '<link rel="stylesheet" href="/static/css/recording-density-v1.css?v='
             + version
             + '" data-lar-recording-density-v1>'
@@ -179,6 +182,9 @@ class ConsoleAssetsMiddleware(BaseHTTPMiddleware):
             '<script src="/static/js/app-ui-v3.js?v='
             + version
             + '" defer data-lar-ui-v3></script>'
+            '<script src="/static/js/config-density-v1.js?v='
+            + version
+            + '" defer data-lar-config-density-v1></script>'
             '<script src="/static/js/operations-v2.js?v='
             + version
             + '" defer data-lar-operations-v2></script>'

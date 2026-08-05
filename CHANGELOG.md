@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.1.9 - 2026-08-05
+
+- Replaced the dashboard's stretched storage/resource split with four compact cards for storage, CPU, memory, and live network traffic.
+- Removed the redundant empty volume section from the dashboard storage card.
+- Added a responsive settings-card masonry layout so sections keep their natural height instead of inheriting blank space from taller neighboring cards.
+- Tightened settings-card spacing and preserved a single ordered column on tablet and mobile screens.
+- Added automated UI checks for dashboard system-card height and settings-page gap packing.
+
 ## v1.1.8 - 2026-08-05
 
 - Reorganized the dashboard around a compact glance-first hierarchy with status, key counts, quick navigation, system metrics, and activity in that order.
