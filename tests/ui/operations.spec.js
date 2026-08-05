@@ -9,6 +9,10 @@ test('operations console remains readable without horizontal overflow', async ({
   await expect(page.locator('.ops-health-card').first()).toContainText('테스트 채널');
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow).toBeLessThanOrEqual(1);
+
+  // The legacy base stylesheet animates direct content children for 450 ms.
+  // Capture the settled interface instead of a transient semi-transparent frame.
+  await page.waitForTimeout(650);
   await page.screenshot({ path: testInfo.outputPath(`operations-${testInfo.project.name}.png`), fullPage: true });
 });
 
