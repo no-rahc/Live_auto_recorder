@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#f2f4f6">
+    <title>녹화현황</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='css/style.css') }}?v={{ program_version|default('') }}">
+</head>
+<body class="page-recording">
+    <div class="navbar-container">
+      <div class="navbar">
+        <button class="menu-icon"
+                type="button"
+                aria-controls="mySidenav"
+                aria-expanded="false"
+                aria-label="메뉴 열기">&#9776;</button>
+        <div class="brand">
+          <span class="rec-dot" aria-hidden="true"></span>
+          <div class="brand-text">
+            <h2>Live Auto Recorder</h2>
+            <span class="brand-sub">Control Console</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 슬라이드 메뉴 -->
+    <div id="mySidenav" class="sidenav">
+        <a href="javascript:void(0)" class="closebtn">&times;</a>
+
+        {% if loginMode %}
+            {% if request.session.get('logged_in') %}
+                <a href="/">메인화면</a>
+                <a href="/recording" class="restricted-menu">녹화현황</a>
+                <a href="/config" class="restricted-menu">설정관리</a>
+                <a href="/channels" class="restricted-menu">채널관리</a>
+                <a href="/cookies" class="restricted-menu">쿠키관리</a>
+                <a href="/files" class="restricted-menu">파일관리</a>
+                <div id="user-info">
+                    <p id="username-display">{{ request.session.get('username', '사용자') }}</p>
+                    <a href="/logout" id="logout-btn" class="logout-btn">로그아웃</a>
+                </div>
+            {% else %}
+                <a href="/">메인화면</a>
+                <a href="/register" class="restricted-menu">계정생성</a>
+            {% endif %}
+        {% else %}
+            <a href="/">메인화면</a>
+            <a href="/recording" class="restricted-menu">녹화현황</a>
+            <a href="/config" class="restricted-menu">설정관리</a>
+            <a href="/channels" class="restricted-menu">채널관리</a>
+            <a href="/cookies" class="restricted-menu">쿠키관리</a>
+            <a href="/files" class="restricted-menu">파일관리</a>
+            <div id="user-info">
+                <p id="username-display">{{ request.session.get('username', '사용자') }}</p>
+                <a href="/logout" id="logout-btn" class="logout-btn">로그아웃</a>
+            </div>
+        {% endif %}
+    </div>
+
+
+    <div id="content">
+        <h1>녹화 현황</h1>
+
+        <!-- 대시보드 섹션 -->
+        <section id="sys-dashboard" class="sys-dashboard">
+          <!-- 1행: CPU / 메모리 / 네트워크 -->
+          <div class="row row-main">
+            <div class="tile" id="tile-cpu">
+              <div class="tile-head">
+                <span class="tile-title">CPU</span>
+                <span class="tile-sub" id="cpu-name">-</span>
+              </div>
+              <div class="tile-value"><span id="cpu-percent">0</span>%</div>
+              <div class="progress"><div id="cpu-bar" class="progress-bar" style="width:0%"></div></div>
+            </div>
+
+            <div class="tile" id="tile-mem">
+              <div class="tile-head">
+                <span class="tile-title">메모리</span>
+                <span class="tile-sub" id="mem-brief">-</span>
+              </div>
+              <div class="tile-value"><span id="mem-percent">0</span>%</div>
+              <div class="progress"><div id="mem-bar" class="progress-bar" style="width:0%"></div></div>
+            </div>
+
+            <div class="tile" id="tile-net">
+              <div class="tile-head">
+                <span class="tile-title">네트워크</span>
+                <span class="tile-sub" id="net-brief">누적</span>
+              </div>
+              <div class="tile-value" id="net-rate">↑ 0.00 MB/s · ↓ 0.00 MB/s</div>
+              <div class="progress"><div id="net-bar" class="progress-bar" style="width:0%"></div></div>
+            </div>
+          </div>
+
+          <!-- 2행/3행: 디스크 5칸씩 동적 타일 -->
+          <div class="row row-disks" id="disk-row-1"></div>
+          <div class="row row-disks" id="disk-row-2"></div>
+        </section>
+
+        <!-- 모두 녹화 시작 및 중지 버튼 -->
+        <div class="global-buttons">
+            <button id="start-all-recording">모두 녹화시작</button>
+            <button id="stop-all-recording">모두 녹화중지</button>
+        </div>
+
+        <!-- 필터링을 위한 드롭다운 메뉴 및 검색 입력 -->
+        <div class="filter-container">
+            <!-- 채널 필터 -->
+            <div>
+                <label for="channel-filter">채널 필터</label>
+                <select id="channel-filter">
+                    <option value="all">모든 채널</option>
+                    <option value="recording">녹화 중인 채널</option>
+                    <option value="reserved">예약 녹화 중인 채널</option>
+                </select>
+            </div>
+
+            <!-- 채널 검색 -->
+            <div>
+                <label for="channel-search">채널 검색</label>
+                <input type="text" id="channel-search" placeholder="채널 이름 입력">
+            </div>
+        </div>
+
+        <!-- 녹화 현황 리스트 -->
+        <div id="channel-list">
+            {% for channel in channels %}
+                <div class="channel {% if not channel.record_enabled %}channel-disabled{% endif %}"
+                     data-channel-id="{{ channel.id }}" data-platform="{{ channel.platform }}">
+
+                    <div class="channel-thumbnail-container">
+                        {% if channel.platform == 'youtube' %}
+                            <img src="/static/img/youtube_thumbnail.png" alt="{{ channel.name | default('채널 이름 없음') }} 썸네일" class="channel-thumbnail" id="thumbnail-{{ channel.id }}">
+                            <img src="/static/img/youtube_icon.png" alt="YouTube Icon" class="platform-icon">
+                        {% elif channel.platform == 'chzzk' %}
+                            <img src="/static/img/default_thumbnail.png" alt="{{ channel.name | default('채널 이름 없음') }} 썸네일" class="channel-thumbnail" id="thumbnail-{{ channel.id }}">
+                            <img src="/static/img/chzzk_icon.png" alt="Chzzk Icon" class="platform-icon">
+                        {% else %}
+                            <img src="/static/img/default_thumbnail.png" alt="{{ channel.name | default('채널 이름 없음') }} 썸네일" class="channel-thumbnail" id="thumbnail-{{ channel.id }}">
+                        {% endif %}
+
+                        <!-- 채널별 반복녹화/재탐색 on-off 버튼 표시 -->
+                        <label class="switch toggle-top-left">
+                            <input type="checkbox" class="toggle-record-enabled"
+                                   data-channel-id="{{ channel.id }}"
+                                   {% if channel.record_enabled %}checked{% endif %}>
+                            <span class="slider round"></span>
+                        </label>
+
+                        <!-- 같이보기만 녹화 옵션이 활성화된 채널이면 표시 -->
+                        {% if channel.recordWatchParty %}
+                          <div class="watchparty-badge">같이보기만 녹화 ON</div>
+                        {% endif %}
+                    </div>
+                    <div class="channel-info">
+                        <!-- 채널 이름이 비어 있지 않을 경우 기존 이름을 유지, 비어 있을 경우 '채널 이름 없음'을 출력 -->
+                        <h2 class="channel-name" id="channel-status-{{ channel.id }}" data-channel-name="{{ channel.name }}">
+                            {{ channel.name if channel.name else "채널 이름 없음" }} ({{ channel.status }})
+                        </h2>
+                        <p id="title-{{ channel.id }}">
+                            {{ channel.live_title }}
+                            {% if channel.adult %}
+                                (연령제한)
+                            {% endif %}
+                        </p>
+                        <p id="category-{{ channel.id }}"><strong>카테고리</strong>: {{ channel.category }}</p>
+                        <p id="timing-{{ channel.id }}">
+                            {% if channel.status == "녹화 중" %}
+                                <strong>녹화시간</strong>: 00:00:00
+                            {% else %}
+                                <strong>녹화 OFF</strong>: 00:00:00
+                            {% endif %}
+                        </p>
+
+                        <!-- 녹화 상태에 따른 파일명 및 버튼 표시 -->
+                        {% if channel.status == "녹화 중" or channel.status == "예약녹화 중" %}
+                            <p id="filename-{{ channel.id }}">녹화 파일명: {{ channel.filename }}</p>
+                            <!-- 녹화 중인 경우, 중지 버튼 표시 -->
+                            <button id="button-stop-{{ channel.id }}" class="stop-recording" data-channel-id="{{ channel.id }}">녹화 중지</button>
+                        {% else %}
+                            <p id="filename-{{ channel.id }}">녹화가 시작되지 않았습니다.</p>
+                            <!-- 대기 상태인 경우, 시작 버튼 표시 -->
+                            <button id="button-start-{{ channel.id }}" class="start-recording" data-channel-id="{{ channel.id }}">녹화 시작</button>
+                        {% endif %}
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+
+        <!-- 녹화 이력 -->
+        <section class="config-section" style="margin-top:32px;">
+          <header class="section-head">
+            <span class="section-num">📋</span>
+            <h3>녹화 이력</h3>
+            <span class="section-tag">History</span>
+          </header>
+          <div id="recording-history-stats" class="description" style="margin-bottom:8px;"></div>
+          <div style="overflow-x:auto;">
+            <table class="history-table" id="recording-history-table" style="width:100%;border-collapse:collapse;font-size:0.85rem;">
+              <thead>
+                <tr style="border-bottom:2px solid var(--border,#333);text-align:left;">
+                  <th style="padding:8px 6px;">시간</th>
+                  <th style="padding:8px 6px;">채널</th>
+                  <th style="padding:8px 6px;">플랫폼</th>
+                  <th style="padding:8px 6px;">이벤트</th>
+                  <th style="padding:8px 6px;">파일</th>
+                  <th style="padding:8px 6px;">녹화시간</th>
+                </tr>
+              </thead>
+              <tbody id="recording-history-body">
+                <tr><td colspan="6" style="padding:16px;text-align:center;opacity:0.5;">불러오는 중...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+    </div>
+
+    <script src="{{ url_for('static', path='js/script.js') }}?v={{ program_version|default('') }}"></script>
+    <script>
+    // ── 녹화 이력 로드 ──
+    (function(){
+      var EVENT_LABELS = {
+        'recording_started':  '🔴 녹화 시작',
+        'recording_stopped':  '⏹ 녹화 종료',
+        'recording_failed':   '❌ 녹화 실패',
+        'postprocess_done':   '✅ 후처리 완료',
+        'postprocess_failed': '⚠️ 후처리 실패'
+      };
+      function loadHistory(){
+        fetch('/api/recording_history?limit=50')
+          .then(r=>r.json())
+          .then(d=>{
+            if(d.status!=='success') return;
+            var stats = d.stats||{};
+            var statsEl = document.getElementById('recording-history-stats');
+            if(statsEl) statsEl.textContent = '오늘 녹화 '+stats.today_recordings+'건 · 실패 '+stats.today_failures+'건 · 전체 이력 '+stats.total_entries+'건';
+            var tbody = document.getElementById('recording-history-body');
+            if(!tbody) return;
+            if(!d.history || !d.history.length){
+              tbody.innerHTML = '<tr><td colspan="6" style="padding:16px;text-align:center;opacity:0.5;">아직 녹화 이력이 없습니다.</td></tr>';
+              return;
+            }
+            tbody.innerHTML = d.history.map(function(h){
+              var evLabel = EVENT_LABELS[h.event]||h.event;
+              var evColor = h.event==='recording_failed'||h.event==='postprocess_failed' ? 'var(--red,#ed4245)' : '';
+              return '<tr style="border-bottom:1px solid var(--border-subtle,#222);">'
+                +'<td style="padding:6px;font-family:var(--font-mono,monospace);white-space:nowrap;">'+h.ts+'</td>'
+                +'<td style="padding:6px;">'+(h.channel_name||'-')+'</td>'
+                +'<td style="padding:6px;text-transform:uppercase;">'+(h.platform||'-')+'</td>'
+                +'<td style="padding:6px;'+(evColor?'color:'+evColor:'')+'">'+evLabel+'</td>'
+                +'<td style="padding:6px;font-family:var(--font-mono,monospace);font-size:0.8rem;max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="'+(h.filename||'')+'">'+(h.filename||'-')+'</td>'
+                +'<td style="padding:6px;font-family:var(--font-mono,monospace);">'+(h.duration||'-')+'</td>'
+                +'</tr>';
+            }).join('');
+          })
+          .catch(function(e){ console.warn('history load failed', e); });
+      }
+      loadHistory();
+      setInterval(loadHistory, 30000); // 30초마다 갱신
+    })();
+
+    // ── WebSocket 실시간 대시보드 ──
+    (function(){
+      var wsProto = location.protocol==='https:' ? 'wss:' : 'ws:';
+      var wsUrl = wsProto+'//'+location.host+'/ws/sys_metrics';
+      var ws = null;
+      var reconnectTimer = null;
+
+      function fmtBytes(b){
+        if(b>=1073741824) return (b/1073741824).toFixed(1)+' GB';
+        if(b>=1048576) return (b/1048576).toFixed(0)+' MB';
+        return (b/1024).toFixed(0)+' KB';
+      }
+      function fmtRate(bps){
+        if(bps>=1048576) return (bps/1048576).toFixed(2)+' MB/s';
+        if(bps>=1024) return (bps/1024).toFixed(1)+' KB/s';
+        return bps.toFixed(0)+' B/s';
+      }
+
+      function applyMetrics(d){
+        // CPU
+        var cpuPct = document.getElementById('cpu-percent');
+        var cpuBar = document.getElementById('cpu-bar');
+        var cpuName = document.getElementById('cpu-name');
+        if(cpuPct) cpuPct.textContent = Math.round(d.cpu_percent);
+        if(cpuBar) cpuBar.style.width = d.cpu_percent+'%';
+        if(cpuName && d.cpu_name) cpuName.textContent = d.cpu_name;
+
+        // MEM
+        var memPct = document.getElementById('mem-percent');
+        var memBar = document.getElementById('mem-bar');
+        var memBrief = document.getElementById('mem-brief');
+        if(memPct) memPct.textContent = Math.round(d.mem_percent);
+        if(memBar) memBar.style.width = d.mem_percent+'%';
+        if(memBrief) memBrief.textContent = fmtBytes(d.mem_used)+' / '+fmtBytes(d.mem_total);
+
+        // NET
+        var netRate = document.getElementById('net-rate');
+        var netBar = document.getElementById('net-bar');
+        if(netRate) netRate.textContent = '↑ '+fmtRate(d.net_up_bps)+' · ↓ '+fmtRate(d.net_down_bps);
+        if(netBar){
+          var netPct = Math.min(100, (d.net_up_bps+d.net_down_bps)/1048576*10);
+          netBar.style.width = netPct+'%';
+        }
+
+        // DISK
+        if(d.disks && d.disks.length){
+          var row1 = document.getElementById('disk-row-1');
+          var row2 = document.getElementById('disk-row-2');
+          if(row1 && row2){
+            var html = d.disks.map(function(dk){
+              var color = dk.percent>=90 ? 'var(--red,#ed4245)' : dk.percent>=75 ? 'var(--amber,#fee75c)' : 'var(--green,#57f287)';
+              return '<div class="tile tile-disk">'
+                +'<div class="tile-head"><span class="tile-title">'+(dk.label||dk.mountpoint)+'</span>'
+                +'<span class="tile-sub">'+dk.mountpoint+'</span></div>'
+                +'<div class="tile-value" style="font-size:1.1rem;">'+dk.percent.toFixed(0)+'%</div>'
+                +'<div class="progress"><div class="progress-bar" style="width:'+dk.percent+'%;background:'+color+'"></div></div>'
+                +'<div class="tile-sub" style="margin-top:4px;">'+fmtBytes(dk.free)+' 남음 / '+fmtBytes(dk.total)+'</div>'
+                +'</div>';
+            });
+            var half = Math.ceil(html.length/2);
+            row1.innerHTML = html.slice(0,half).join('');
+            row2.innerHTML = html.slice(half).join('');
+          }
+        }
+      }
+
+      function connect(){
+        try { ws = new WebSocket(wsUrl); } catch(e){ scheduleReconnect(); return; }
+        ws.onmessage = function(ev){
+          try { applyMetrics(JSON.parse(ev.data)); } catch(e){}
+        };
+        ws.onclose = function(){ scheduleReconnect(); };
+        ws.onerror = function(){ if(ws) ws.close(); };
+      }
+      function scheduleReconnect(){
+        if(reconnectTimer) return;
+        reconnectTimer = setTimeout(function(){ reconnectTimer=null; connect(); }, 3000);
+      }
+      connect();
+    })();
+    </script>
+</body>
+</html>

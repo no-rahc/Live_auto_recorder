@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#f2f4f6">
+    <title>{{ program_name }} {{ program_version }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='css/style.css') }}?v={{ program_version|default('') }}">
+</head>
+<body data-login-mode="{{ loginMode | tojson }}" class="page-index">
+    <div class="navbar-container">
+      <div class="navbar">
+        <button class="menu-icon"
+                type="button"
+                aria-controls="mySidenav"
+                aria-expanded="false"
+                aria-label="메뉴 열기">&#9776;</button>
+        <div class="brand">
+          <span class="rec-dot" aria-hidden="true"></span>
+          <div class="brand-text">
+            <h2>Live Auto Recorder</h2>
+            <span class="brand-sub">Control Console</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 슬라이드 메뉴 -->
+    <div id="mySidenav" class="sidenav">
+        <a href="javascript:void(0)" class="closebtn">&times;</a>
+
+        {% if loginMode %}
+            {% if request.session.get('logged_in') %}
+                <a href="/">메인화면</a>
+                <a href="/recording" class="restricted-menu">녹화현황</a>
+                <a href="/config" class="restricted-menu">설정관리</a>
+                <a href="/channels" class="restricted-menu">채널관리</a>
+                <a href="/cookies" class="restricted-menu">쿠키관리</a>
+                <a href="/files" class="restricted-menu">파일관리</a>
+                <div id="user-info">
+                    <p id="username-display">{{ request.session.get('username', '사용자') }}</p>
+                    <a href="/logout" id="logout-btn" class="logout-btn">로그아웃</a>
+                </div>
+            {% else %}
+                <a href="/">메인화면</a>
+                <a href="/register" class="restricted-menu">계정생성</a>
+            {% endif %}
+        {% else %}
+            <a href="/">메인화면</a>
+            <a href="/recording" class="restricted-menu">녹화현황</a>
+            <a href="/config" class="restricted-menu">설정관리</a>
+            <a href="/channels" class="restricted-menu">채널관리</a>
+            <a href="/cookies" class="restricted-menu">쿠키관리</a>
+            <a href="/files" class="restricted-menu">파일관리</a>
+            <div id="user-info">
+                <p id="username-display">{{ request.session.get('username', '사용자') }}</p>
+                <a href="/logout" id="logout-btn" class="logout-btn">로그아웃</a>
+            </div>
+        {% endif %}
+    </div>
+
+    <div id="content" class="page-index">
+        {% if config.loginMode and not request.session.get('logged_in') %}
+            <!-- 로그인되지 않은 상태에서 로그인 모드가 활성화된 경우 -->
+            <div class="login-form">
+                <h2>로그인</h2>
+
+                {% if error_message %}
+                    <p class="error-message">{{ error_message }}</p>
+                {% endif %}
+
+                <form id="loginForm" action="/login" method="POST" class="login-form">
+                    <label for="username">사용자명</label>
+                    <input type="text" id="username" name="username" required>
+
+                    <label for="password">비밀번호</label>
+                    <input type="password" id="password" name="password" required>
+
+                    <input type="submit" value="로그인">
+
+                    <a href="/register" class="account-create-link">계정 생성</a>
+                </form>
+            </div>
+        {% else %}
+            <!-- 로그인된 상태 또는 로그인 모드가 비활성화된 경우 -->
+
+            <!-- ── 상태 히어로 ── -->
+            <header class="dash-hero">
+              <div class="dash-hero-left">
+                <span class="dash-greeting" id="dash-greeting">안녕하세요</span>
+                <h1 class="dash-title">녹화 관제 보드</h1>
+                <div class="dash-statusline">
+                  <span class="dash-autopill" id="auto-rec-pill">
+                    <span class="strip-dot" id="auto-rec-dot"></span>
+                    <strong id="auto-rec-state">--</strong>
+                    <span class="dash-autopill-label">자동녹화</span>
+                  </span>
+                  <span class="dash-ver mono">{{ program_version|default('') }}</span>
+                </div>
+              </div>
+              <div class="dash-hero-right">
+                <div class="dash-clock" id="clock">--:--:--</div>
+                <div class="dash-date" id="dash-date">&nbsp;</div>
+              </div>
+            </header>
+
+            <!-- ── 빠른 이동 독 ── -->
+            <nav class="dash-dock" aria-label="빠른 이동">
+              <a href="/recording" class="dock-item">
+                <span class="dock-ico">📡</span>
+                <span class="dock-label">녹화현황</span>
+              </a>
+              <a href="/config" class="dock-item">
+                <span class="dock-ico">⚙️</span>
+                <span class="dock-label">설정관리</span>
+              </a>
+              <a href="/channels" class="dock-item">
+                <span class="dock-ico">📺</span>
+                <span class="dock-label">채널관리</span>
+              </a>
+              <a href="/cookies" class="dock-item">
+                <span class="dock-ico">🍪</span>
+                <span class="dock-label">쿠키관리</span>
+              </a>
+              <a href="/files" class="dock-item">
+                <span class="dock-ico">📁</span>
+                <span class="dock-label">파일관리</span>
+              </a>
+            </nav>
+
+            <!-- ── 시스템 대시보드 (비대칭 그리드) ── -->
+            <section id="sys-dashboard" class="sys-dashboard dash-sys">
+              <div class="dash-sys-grid">
+
+                <!-- 저장소 히어로 -->
+                <div class="card dash-storage">
+                  <header class="card-head">
+                    <div class="eyebrow">녹화 저장소</div>
+                    <span class="chip" id="stor-mount">/app/chzzk</span>
+                  </header>
+                  <div class="stor-num">
+                    <span class="stor-used" id="stor-used">--</span>
+                    <span class="stor-sep">/</span>
+                    <span class="stor-total" id="stor-total">--</span>
+                    <span class="stor-pct" id="stor-pct">--%</span>
+                  </div>
+                  <div class="progress progress--big"><div id="stor-bar" class="progress-bar" style="width:0%"></div></div>
+                  <div class="stor-vols">
+                    <span class="stor-vols-label">볼륨</span>
+                    <div class="row row-disks" id="disk-row-1"></div>
+                    <div class="row row-disks" id="disk-row-2"></div>
+                  </div>
+                </div>
+
+                <!-- 리소스 미터 -->
+                <div class="card dash-meters">
+                  <header class="card-head">
+                    <div class="eyebrow">리소스 사용량</div>
+                    <span class="chip chip--live"><span class="live-dot"></span>실시간</span>
+                  </header>
+                  <div class="dash-meter" id="tile-cpu">
+                    <div class="dash-meter-top">
+                      <span class="dash-meter-label">CPU</span>
+                      <span class="dash-meter-sub" id="cpu-name">-</span>
+                      <span class="dash-meter-val"><span id="cpu-percent">0</span><small>%</small></span>
+                    </div>
+                    <div class="progress"><div id="cpu-bar" class="progress-bar" style="width:0%"></div></div>
+                  </div>
+                  <div class="dash-meter" id="tile-mem">
+                    <div class="dash-meter-top">
+                      <span class="dash-meter-label">메모리</span>
+                      <span class="dash-meter-sub" id="mem-brief">-</span>
+                      <span class="dash-meter-val"><span id="mem-percent">0</span><small>%</small></span>
+                    </div>
+                    <div class="progress"><div id="mem-bar" class="progress-bar" style="width:0%"></div></div>
+                  </div>
+                  <div class="dash-meter" id="tile-net">
+                    <div class="dash-meter-top">
+                      <span class="dash-meter-label">네트워크</span>
+                      <span class="dash-meter-sub" id="net-brief">누적</span>
+                      <span class="dash-meter-val dash-net-val mono" id="net-rate">↑ 0.00 MB/s · ↓ 0.00 MB/s</span>
+                    </div>
+                    <div class="progress"><div id="net-bar" class="progress-bar" style="width:0%"></div></div>
+                  </div>
+                </div>
+
+              </div>
+            </section>
+
+            <!-- ── 채널 현황 + 최근 이력 ── -->
+            <div class="dash-two">
+              <section class="card index-section">
+                <header class="card-head">
+                  <div class="eyebrow">채널 현황</div>
+                  <span class="chip" id="ch-count">0개 채널</span>
+                </header>
+                <div id="ch-list" class="ch-list">
+                  <div class="ch-empty">채널 정보를 불러오는 중...</div>
+                </div>
+              </section>
+
+              <section class="card index-section">
+                <header class="card-head">
+                  <div class="eyebrow">최근 녹화 이력</div>
+                  <span class="chip" id="hist-stats">--</span>
+                </header>
+                <div class="table-wrap">
+                  <table class="data-table" id="hist-table">
+                    <thead>
+                      <tr>
+                        <th>시간</th>
+                        <th>채널</th>
+                        <th>이벤트</th>
+                        <th>파일</th>
+                        <th>녹화시간</th>
+                      </tr>
+                    </thead>
+                    <tbody id="hist-body">
+                      <tr><td colspan="5" class="ch-empty">이력을 불러오는 중...</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+            </div>
+
+        {% endif %}
+    </div>
+
+    <script src="{{ url_for('static', path='js/script.js') }}?v={{ program_version|default('') }}"></script>
+    <script>
+    (function() {
+      if (!document.getElementById('sys-dashboard')) return;
+
+      // 시스템 대시보드 (script.js의 setupSysDashboard 재사용)
+      if (typeof setupSysDashboard === 'function') setupSysDashboard();
+
+      // ── 시계 + 날짜 + 인사말 ──
+      const clockEl = document.getElementById('clock');
+      const dateEl = document.getElementById('dash-date');
+      const greetEl = document.getElementById('dash-greeting');
+      function tickClock() {
+        const now = new Date();
+        if (clockEl) clockEl.textContent = now.toLocaleTimeString('ko-KR', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        if (dateEl) dateEl.textContent = now.toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'long' });
+        if (greetEl) {
+          const h = now.getHours();
+          greetEl.textContent = h < 6 ? '늦은 밤이에요' : h < 12 ? '좋은 아침이에요' : h < 18 ? '활기찬 오후예요' : '편안한 저녁이에요';
+        }
+      }
+      tickClock();
+      setInterval(tickClock, 1000);
+
+      // ── 자동녹화 모드 ──
+      const autoDot = document.getElementById('auto-rec-dot');
+      const autoVal = document.getElementById('auto-rec-state');
+      const autoPill = document.getElementById('auto-rec-pill');
+      async function refreshAutoRec() {
+        try {
+          const r = await fetch('/api/config', { cache: 'no-store' });
+          if (!r.ok) return;
+          const cfg = await r.json();
+          const on = !!(cfg.autoRecordingMode);
+          if (autoDot) autoDot.className = 'strip-dot ' + (on ? 'dot-on' : 'dot-off');
+          if (autoVal) autoVal.textContent = on ? 'ON' : 'OFF';
+          if (autoPill) autoPill.classList.toggle('is-on', on);
+        } catch (e) {}
+      }
+      refreshAutoRec();
+      setInterval(refreshAutoRec, 30000);
+
+      // ── 저장소 히어로 (CIFS 녹화 볼륨 우선) ──
+      const storUsed = document.getElementById('stor-used');
+      const storTotal = document.getElementById('stor-total');
+      const storPct = document.getElementById('stor-pct');
+      const storBar = document.getElementById('stor-bar');
+      const storMount = document.getElementById('stor-mount');
+      const fmtB = (typeof _fmtBytes === 'function') ? _fmtBytes : function(n) { return (n/1e9).toFixed(1) + ' GB'; };
+      async function refreshStorage() {
+        try {
+          const r = await fetch('/api/sys_metrics', { cache: 'no-store' });
+          if (!r.ok) return;
+          const m = await r.json();
+          const disks = m.disks || [];
+          let d = disks.find(function(x) { return (x.fstype || '').toLowerCase() === 'cifs'; });
+          if (!d) d = disks.reduce(function(a, b) { return (b.total || 0) > ((a && a.total) || 0) ? b : a; }, null);
+          if (!d || !d.total) return;
+          if (storUsed) storUsed.textContent = fmtB(d.used || 0);
+          if (storTotal) storTotal.textContent = fmtB(d.total);
+          if (storPct) storPct.textContent = (d.percent || 0).toFixed(1) + '%';
+          if (storBar) storBar.style.width = Math.max(0, Math.min(100, d.percent || 0)) + '%';
+          if (storMount) storMount.textContent = d.mountpoint || '/app/chzzk';
+        } catch (e) {}
+      }
+      refreshStorage();
+      setInterval(refreshStorage, 2000);
+
+      // ── 디스크 타일 노이즈 제거 (0바이트 / 중복 바인드마운트 숨김) ──
+      function filterDiskTiles() {
+        const seen = new Set();
+        document.querySelectorAll('#disk-row-1 .tile.disk, #disk-row-2 .tile.disk').forEach(function(tile) {
+          const titleEl = tile.querySelector('.tile-title');
+          const briefEl = tile.querySelector('.tile-brief');
+          const title = titleEl ? titleEl.textContent.trim() : '';
+          const brief = briefEl ? briefEl.textContent.trim() : '';
+          // 0바이트 볼륨
+          if (/0(\.0+)?\s*B\s*\/\s*0(\.0+)?\s*B/.test(brief)) { tile.style.display = 'none'; return; }
+          // /etc, /dev 바인드마운트
+          if (/^\/(etc|dev)\//.test(title)) { tile.style.display = 'none'; return; }
+          // 동일 용량 시그니처 중복 제거
+          if (brief && seen.has(brief)) { tile.style.display = 'none'; return; }
+          if (brief) seen.add(brief);
+          tile.style.display = '';
+        });
+      }
+      const diskObs = new MutationObserver(filterDiskTiles);
+      ['disk-row-1', 'disk-row-2'].forEach(function(id) {
+        const el = document.getElementById(id);
+        if (el) diskObs.observe(el, { childList: true });
+      });
+      filterDiskTiles();
+
+      // ── 채널 현황 ──
+      const chList = document.getElementById('ch-list');
+      const chCount = document.getElementById('ch-count');
+
+      async function refreshChannels() {
+        try {
+          const [metaRes, statusRes] = await Promise.all([
+            fetch('/api/channels', { cache: 'no-store' }),
+            fetch('/status', { cache: 'no-store' })
+          ]);
+          if (!metaRes.ok || !statusRes.ok) return;
+          const channels = await metaRes.json();
+          const statuses = await statusRes.json();
+
+          if (chCount) chCount.textContent = channels.length + '개 채널';
+
+          if (!channels.length) {
+            chList.innerHTML = '<div class="ch-empty">등록된 채널이 없습니다.</div>';
+            return;
+          }
+
+          chList.innerHTML = '';
+          channels.forEach(function(ch) {
+            const cid = ch.id;
+            const st = statuses[cid] || {};
+            const isRec = !!st.recording;
+            const isReserved = !!st.reserved;
+            const isYt = (ch.platform || '').toLowerCase() === 'youtube';
+
+            const row = document.createElement('div');
+            row.className = 'ch-row' + (isRec ? ' ch-row--rec' : '');
+
+            const ico = document.createElement('span');
+            ico.className = 'ch-ico ' + (isYt ? 'ch-ico--yt' : 'ch-ico--chzzk');
+            ico.textContent = isYt ? '▶' : '치';
+
+            const main = document.createElement('div');
+            main.className = 'ch-main';
+            const name = document.createElement('span');
+            name.className = 'ch-name';
+            name.textContent = ch.channel_name || ch.name || cid;
+            const title = document.createElement('span');
+            title.className = 'ch-title';
+            title.textContent = (ch.live_title && ch.live_title !== '불러오는 중...') ? ch.live_title : (isRec || isReserved ? '방송 준비 중' : '라이브 종료');
+            main.appendChild(name);
+            main.appendChild(title);
+
+            const side = document.createElement('div');
+            side.className = 'ch-side';
+            const pill = document.createElement('span');
+            pill.className = 'status-pill ' + (isRec ? 'pill-rec' : isReserved ? 'pill-warn' : 'pill-idle');
+            pill.textContent = isRec ? '녹화 중' : isReserved ? '예약녹화' : '대기';
+            side.appendChild(pill);
+            if (isRec && st.duration) {
+              const dur = document.createElement('span');
+              dur.className = 'ch-dur mono';
+              dur.textContent = st.duration;
+              side.appendChild(dur);
+            }
+
+            row.appendChild(ico);
+            row.appendChild(main);
+            row.appendChild(side);
+            chList.appendChild(row);
+          });
+        } catch (e) {}
+      }
+      refreshChannels();
+      setInterval(refreshChannels, 5000);
+
+      // ── 최근 녹화 이력 ──
+      const histBody = document.getElementById('hist-body');
+      const histStats = document.getElementById('hist-stats');
+      const EVT_LABEL = { start: '시작', stop: '종료', fail: '실패', postprocess: '후처리' };
+      const EVT_CLASS = { start: 'evt-start', stop: 'evt-stop', fail: 'evt-fail', postprocess: 'evt-pp' };
+
+      async function refreshHistory() {
+        try {
+          const r = await fetch('/api/recording_history?limit=8', { cache: 'no-store' });
+          if (!r.ok) return;
+          const data = await r.json();
+          const items = data.history || [];
+          const stats = data.stats || {};
+
+          if (histStats) {
+            histStats.textContent = '오늘 ' + (stats.today_recordings || 0) + '건 · 실패 ' + (stats.today_failures || 0) + '건';
+          }
+
+          if (!items.length) {
+            histBody.innerHTML = '<tr><td colspan="5" class="ch-empty">아직 녹화 이력이 없습니다.</td></tr>';
+            return;
+          }
+
+          histBody.innerHTML = '';
+          items.forEach(function(h) {
+            const tr = document.createElement('tr');
+
+            const tdTime = document.createElement('td');
+            tdTime.className = 'mono';
+            tdTime.textContent = (h.ts || '').replace('T', ' ').slice(5, 16);
+
+            const tdCh = document.createElement('td');
+            tdCh.textContent = h.channel_name || '-';
+
+            const tdEvt = document.createElement('td');
+            const badge = document.createElement('span');
+            badge.className = 'evt-badge ' + (EVT_CLASS[h.event] || '');
+            badge.textContent = EVT_LABEL[h.event] || h.event;
+            tdEvt.appendChild(badge);
+
+            const tdFile = document.createElement('td');
+            tdFile.className = 'mono td-file';
+            tdFile.textContent = h.filename || '-';
+            tdFile.title = h.filename || '';
+
+            const tdDur = document.createElement('td');
+            tdDur.className = 'mono';
+            tdDur.textContent = h.duration || '-';
+
+            tr.appendChild(tdTime);
+            tr.appendChild(tdCh);
+            tr.appendChild(tdEvt);
+            tr.appendChild(tdFile);
+            tr.appendChild(tdDur);
+            histBody.appendChild(tr);
+          });
+        } catch (e) {}
+      }
+      refreshHistory();
+      setInterval(refreshHistory, 30000);
+    })();
+    </script>
+</body>
+</html>

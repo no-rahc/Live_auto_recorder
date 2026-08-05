@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#f2f4f6">
+    <title>설정관리</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='css/style.css') }}?v={{ program_version|default('') }}">
+</head>
+<body class="page-config" data-account-exists="{{ 1 if account else 0 }}">
+    <div class="navbar-container">
+      <div class="navbar">
+        <button class="menu-icon"
+                type="button"
+                aria-controls="mySidenav"
+                aria-expanded="false"
+                aria-label="메뉴 열기">&#9776;</button>
+        <div class="brand">
+          <span class="rec-dot" aria-hidden="true"></span>
+          <div class="brand-text">
+            <h2>Live Auto Recorder</h2>
+            <span class="brand-sub">Control Console</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+        var savedPreset = "{{ config.preset }}";
+    </script>
+
+    <!-- 슬라이드 메뉴 -->
+    <div id="mySidenav" class="sidenav">
+        <a href="javascript:void(0)" class="closebtn">&times;</a>
+
+        {% if loginMode %}
+            {% if request.session.get('logged_in') %}
+                <a href="/">메인화면</a>
+                <a href="/recording" class="restricted-menu">녹화현황</a>
+                <a href="/config" class="restricted-menu">설정관리</a>
+                <a href="/channels" class="restricted-menu">채널관리</a>
+                <a href="/cookies" class="restricted-menu">쿠키관리</a>
+                <a href="/files" class="restricted-menu">파일관리</a>
+
+                <div id="user-info">
+                    <p id="username-display">{{ request.session.get('username', '사용자') }}</p>
+                    <a href="/logout" id="logout-btn" class="logout-btn">로그아웃</a>
+                </div>
+            {% else %}
+                <a href="/">메인화면</a>
+                <a href="/register" class="restricted-menu">계정생성</a>
+            {% endif %}
+        {% else %}
+            <a href="/">메인화면</a>
+            <a href="/recording" class="restricted-menu">녹화현황</a>
+            <a href="/config" class="restricted-menu">설정관리</a>
+            <a href="/channels" class="restricted-menu">채널관리</a>
+            <a href="/cookies" class="restricted-menu">쿠키관리</a>
+            <a href="/files" class="restricted-menu">파일관리</a>
+
+            <div id="user-info">
+                <p id="username-display">{{ request.session.get('username', '사용자') }}</p>
+                <a href="/logout" id="logout-btn" class="logout-btn">로그아웃</a>
+            </div>
+        {% endif %}
+    </div>
+
+
+    <div id="content">
+        <h1>설정 관리</h1>
+        <div class="warning-banner">녹화 도중에는 설정을 변경할 수 없습니다</div>
+
+        <!-- 설정 업데이트 폼 -->
+        <form id="configForm"
+              data-has-account="{{ 1 if account else 0 }}" action="{{ request.url_for('updateConfig') }}" method="POST">
+
+            <!-- ① 일반 -->
+            <section class="config-section">
+              <header class="section-head">
+                <span class="section-num">01</span>
+                <h3>일반</h3>
+                <span class="section-tag">General</span>
+              </header>
+
+              <label for="autoRecordingMode">자동녹화 모드 사용 [치지직/유튜브]</label>
+              <select id="autoRecordingMode" name="autoRecordingMode">
+                  <option value="true" {% if config.autoRecordingMode %}selected{% endif %}>ON</option>
+                  <option value="false" {% if not config.autoRecordingMode %}selected{% endif %}>OFF</option>
+              </select>
+              <p class="description">
+                  자동녹화 모드가 활성화되면 프로그램 시작 시 모든 채널의 녹화를 자동으로 시작합니다.
+                  <br><strong>(프로그램 재시작 필요)</strong>
+              </p>
+
+              <label for="enableTray">최소화 시스템 트레이 사용</label>
+              <select id="enableTray" name="enableTray">
+                  <option value="false" {{ 'selected' if not config.enableTray else '' }}>OFF</option>
+                  <option value="true"  {{ 'selected' if config.enableTray  else '' }}>ON</option>
+              </select>
+              <p class="description">
+                  프로그램 시작시 명령창을 최소화 상태로 시작하고 제어가능 트레이 아이콘이 생성됩니다.
+                  <br><strong>(프로그램 재시작 필요)</strong>
+              </p>
+            </section>
+
+            <!-- ② 플러그인 -->
+            <section class="config-section">
+              <header class="section-head">
+                <span class="section-num">02</span>
+                <h3>플러그인</h3>
+                <span class="section-tag">CHZZK Plugin</span>
+              </header>
+
+              <label for="plugin_type">플러그인 선택 [치지직]</label>
+              <select id="plugin_type" name="plugin_type">
+                  <option value="basic" {% if config.plugin_type == "basic" %}selected{% endif %}>기본 플러그인</option>
+                  <option value="timemachine_plus" {% if config.plugin_type == "timemachine_plus" %}selected{% endif %}>타임머신 플러스 플러그인</option>
+              </select>
+              <p class="description">원하는 플러그인을 선택하세요.</p>
+
+              <table class="description">
+                  <thead>
+                      <tr>
+                          <th>플러그인</th>
+                          <th>설명</th>
+                      </tr>
+                  </thead>
+                  <tbody>
+                      <tr>
+                          <td>기본 플러그인</td>
+                          <td>타임머신 시프트 최대 6초 및 1회 녹화에 9시간 녹화 제한</td>
+                      </tr>
+                      <tr>
+                          <td>타임머신 플러스 플러그인</td>
+                          <td>타임머신 시프트 최대 1시간(3600초) 및<br>9시간이상 한 파일로 연속녹화가 가능</td>
+                      </tr>
+                  </tbody>
+              </table>
+
+              <label for="timemachine_time_shift">타임머신 시프트 앞당김 시간(초) [치지직]</label>
+              <input type="text" id="timemachine_time_shift" name="timemachine_time_shift" value="{{ config.timemachine_time_shift }}">
+              <p class="description">타임머신 플러스 사용시 현재 라이브 시간보다 n초 앞선<br>시점부터 녹화를 시작하도록 설정할 수 있습니다.<br>(입력예 : 최대 3600 최소 1)</p>
+            </section>
+
+            <!-- ③ 후처리 -->
+            <section class="config-section">
+              <header class="section-head">
+                <span class="section-num">03</span>
+                <h3>후처리 · 파일명</h3>
+                <span class="section-tag">Post-Processing</span>
+              </header>
+
+              <label for="autoPostProcessing">녹화 완료 후 자동 후처리 [치지직]</label>
+              <select id="autoPostProcessing" name="autoPostProcessing">
+                  <option value="true" {% if config.autoPostProcessing %}selected{% endif %}>ON</option>
+                  <option value="false" {% if not config.autoPostProcessing %}selected{% endif %}>OFF</option>
+              </select>
+              <p class="description">녹화 완료 후 자동 후처리 여부를 설정합니다.</p>
+
+              <label for="deleteAfterPostProcessing">후처리 완료 후 원본파일 삭제 [치지직]</label>
+              <select id="deleteAfterPostProcessing" name="deleteAfterPostProcessing">
+                  <option value="true" {% if config.deleteAfterPostProcessing %}selected{% endif %}>ON</option>
+                  <option value="false" {% if not config.deleteAfterPostProcessing %}selected{% endif %}>OFF</option>
+              </select>
+              <p class="description">후처리 후 원본 파일을 삭제할지 여부를 설정합니다.</p>
+
+              <label for="removeFixedPrefix">후처리 완료파일 fixed_ 접두사 제거 [치지직]</label>
+              <select id="removeFixedPrefix" name="removeFixedPrefix">
+                  <option value="true" {% if config.removeFixedPrefix %}selected{% endif %}>ON</option>
+                  <option value="false" {% if not config.removeFixedPrefix %}selected{% endif %}>OFF</option>
+              </select>
+              <p class="description">후처리 후 파일 이름에서 'fixed_' 접두사를 제거할지 여부를 설정합니다.</p>
+
+              <label for="moveAfterProcessingEnabled">후처리 완료 파일 자동이동 [치지직/유튜브]</label>
+              <select id="moveAfterProcessingEnabled" name="moveAfterProcessingEnabled">
+                  <option value="true" {% if config.moveAfterProcessingEnabled %}selected{% endif %}>ON</option>
+                  <option value="false" {% if not config.moveAfterProcessingEnabled %}selected{% endif %}>OFF</option>
+              </select>
+              <p class="description">후처리/병합 완료파일을 지정된 경로로 자동 이동할지 설정합니다.</p>
+
+              <label for="moveAfterProcessing">후처리 완료 파일 이동할 경로 직접입력 [치지직]</label>
+              <input type="text" id="moveAfterProcessing" name="moveAfterProcessing" value="{{ config.moveAfterProcessing }}">
+              <p class="description">자동 이동할 경로 (예: D:/test)</p>
+
+              <label for="postNewWindow">후처리 명령창을 새창으로 열기 [치지직]</label>
+              <select id="postNewWindow" name="postNewWindow">
+                  <option value="true" {% if config.postNewWindow %}selected{% endif %}>ON</option>
+                  <option value="false" {% if not config.postNewWindow %}selected{% endif %}>OFF</option>
+              </select>
+              <p class="description">후처리 작업 명령창을 항상 메인창이 아닌 새창에서 실행하도록 합니다.</p>
+
+              <label for="recheckInterval">방송 재탐색 주기(초) [치지직/유튜브]</label>
+              <input type="text" id="recheckInterval" name="recheckInterval" value="{{ config.recheckInterval }}">
+              <p class="description">등록된 채널의 방송이 시작되었는지 재탐색하는 간격을 설정합니다.<br>타임머신 플러그인 사용시 가능하면 120초 이상으로 권장합니다.<br><br>※ 간격이 너무 짧으면 IP밴이나 채널이 패싱되는 경우가 있습니다</p>
+
+              <label for="filenamePattern">파일명 생성규칙 [치지직/유튜브]</label>
+              <input type="text" id="filenamePattern" name="filenamePattern" value="{{ config.filenamePattern }}">
+              <table class="description">
+                  <thead>
+                      <tr>
+                          <th>설정 값</th>
+                          <th>설명</th>
+                      </tr>
+                  </thead>
+                  <tbody>
+                      <tr><td><code>{recording_time}</code></td><td>녹화시작시간 (예: 240801_183507)</td></tr>
+                      <tr><td><code>{start_time}</code></td><td>방송 시작 날짜 (예: 2024-08-01)</td></tr>
+                      <tr><td><code>{safe_live_title}</code></td><td>방송 제목</td></tr>
+                      <tr><td><code>{channel_name}</code></td><td>스트리머 채널명</td></tr>
+                      <tr><td><code>{record_quality}</code></td><td>녹화 해상도</td></tr>
+                      <tr><td><code>{frame_rate}</code></td><td>녹화 프레임</td></tr>
+                      <tr><td><code>{file_extension}</code></td><td>파일 확장자</td></tr>
+                  </tbody>
+              </table>
+            </section>
+
+            <!-- ④ 분할녹화 -->
+            <section class="config-section">
+              <header class="section-head">
+                <span class="section-num">04</span>
+                <h3>분할녹화</h3>
+                <span class="section-tag">Split Recording</span>
+              </header>
+
+              <label for="splitRecordingMode">분할녹화 모드 사용 [치지직]</label>
+              <select id="splitRecordingMode" name="splitRecordingMode">
+                  <option value="true" {% if config.splitRecordingMode %}selected{% endif %}>ON</option>
+                  <option value="false" {% if not config.splitRecordingMode %}selected{% endif %}>OFF</option>
+              </select>
+              <p class="description">
+                  사용자가 지정한 분할녹화 시간만큼 파일을 나누어 녹화합니다.<br>
+                  3600초를 지정하면 녹화파일이 1시간씩 나누어 생성됩니다.
+              </p>
+
+              <label for="splitPostProcessing">분할녹화 완료 후 자동 후처리 [치지직]</label>
+              <select id="splitPostProcessing" name="splitPostProcessing"
+                      {{ '' if (config and config.splitRecordingMode) else 'disabled' }}>
+                <option value="true"  {% if config.splitPostProcessing %}selected{% endif %}>ON</option>
+                <option value="false" {% if not config.splitPostProcessing %}selected{% endif %}>OFF</option>
+              </select>
+              <p class="description">분할녹화 완료 후 자동 후속 후처리 여부를 설정합니다.</p>
+
+              <label for="autoStopInterval">분할녹화 시간 (초) [치지직]</label>
+              <input type="text" id="autoStopInterval" name="autoStopInterval" value="{{ config.autoStopInterval }}" {% if not config.splitRecordingMode %}disabled{% endif %}>
+              <p class="description">분할녹화 모드 사용시, 분할녹화 시간 가격을 설정합니다.</p>
+
+              <label for="splitOverlapSec">분할 파일간 오버랩 시간(초) [치지직]</label>
+              <input type="number" id="splitOverlapSec" name="splitOverlapSec" min="0" max="30" step="1" value="{{ (config.splitOverlapSec or 0) if config else 0 }}"
+                     {{ '' if (config and config.splitRecordingMode) else 'disabled' }}>
+              <p class="description">분할녹화시 분할 파일 사이의 누락된 부분이 없도록 앞/뒤 영상에 겹치는 시간을 설정합니다.
+              <br>권장 겹침시간 : 6 ~ 10초, 0 이면 겹침 없음.</p>
+            </section>
+
+            <!-- ⑤ 인코딩 -->
+            <section class="config-section">
+              <header class="section-head">
+                <span class="section-num">05</span>
+                <h3>인코딩</h3>
+                <span class="section-tag">Encoder</span>
+              </header>
+
+              <label for="stream_copy">후처리 방식 선택 (스트림복사/열화인코딩) [치지직]</label>
+              <select id="stream_copy" name="stream_copy">
+                  <option value="true" {% if config.stream_copy %}selected{% endif %}>스트림복사</option>
+                  <option value="false" {% if not config.stream_copy %}selected{% endif %}>열화인코딩</option>
+              </select>
+              <p class="description">원본유지(스트림복사) 또는 용량절약(열화인코딩) 중 선택합니다.</p>
+
+              <label for="video_codec">인코딩 비디오 코덱 종류 [치지직]</label>
+              <select id="video_codec" name="video_codec">
+                  <option value="libx264" {% if config.video_codec == 'libx264' %}selected{% endif %}>x264 CPU만 사용</option>
+                  <option value="libx265" {% if config.video_codec == 'libx265' %}selected{% endif %}>HEVC CPU만 사용</option>
+                  <option value="h264_qsv" {% if config.video_codec == 'h264_qsv' %}selected{% endif %}>h264 인텔 GPU 가속</option>
+                  <option value="hevc_qsv" {% if config.video_codec == 'hevc_qsv' %}selected{% endif %}>HEVC 인텔 GPU 가속</option>
+                  <option value="h264_nvenc" {% if config.video_codec == 'h264_nvenc' %}selected{% endif %}>h264 지포스 GPU 가속</option>
+                  <option value="hevc_nvenc" {% if config.video_codec == 'hevc_nvenc' %}selected{% endif %}>HEVC 지포스 GPU 가속</option>
+                  <option value="h264_amf" {% if config.video_codec == 'h264_amf' %}selected{% endif %}>h264 라데온 GPU 가속</option>
+                  <option value="hevc_amf" {% if config.video_codec == 'hevc_amf' %}selected{% endif %}>HEVC 라데온 GPU 가속</option>
+              </select>
+              <p class="description">사용할 비디오 코덱을 선택합니다.</p>
+
+              <label for="preset">비디오 인코딩 프리셋 [치지직]</label>
+              <select id="preset" name="preset"></select>
+              <table class="description">
+                  <thead>
+                      <tr>
+                          <th>코덱</th>
+                          <th>사용 가능한 인코딩 프리셋</th>
+                      </tr>
+                  </thead>
+                  <tbody>
+                      <tr>
+                          <td><b>[x264 / HEVC]</b> CPU만 사용</td>
+                          <td>ultrafast / superfast / veryfast / faster / fast / medium / slow / slower / veryslow / placebo</td>
+                      </tr>
+                      <tr>
+                          <td class="c-intel"><b>[h264 / HEVC]</b> 인텔 GPU</td>
+                          <td>veryfast / faster / fast / medium / slow / slower</td>
+                      </tr>
+                      <tr>
+                          <td class="c-nv"><b>[h264 / HEVC]</b> 지포스 GPU<br>(NVENC 7세대 이상)</td>
+                          <td>p1 (ultrafast) / p2 (superfast) / p3 (veryfast) / p4 (faster) / p5 (fast) / p6 (medium) / p7 (slow)</td>
+                      </tr>
+                      <tr>
+                          <td class="c-nv"><b>[h264 / HEVC]</b> 지포스 GPU<br>(NVENC 6세대 이하)</td>
+                          <td>default / slow / medium / fast / hp / hq / bd / ll / llhq / llhp / lossless / losslesshp</td>
+                      </tr>
+                      <tr>
+                          <td class="c-amd"><b>[h264 / HEVC]</b> 라데온 GPU</td>
+                          <td>balanced / speed / quality</td>
+                      </tr>
+                  </tbody>
+              </table>
+              <p class="description">
+                  * NVENC 7세대 이상 지포스 GPU 가속 :<br>16, 20, 30, 40, 50 시리즈 이상만 지원 (GTX 1650 GDDR5 제외)<br><br>
+                  * NVENC 6세대 이하 지포스 GPU 가속 :<br>지포스600~900, 1000, GTX 1650 GDDR5 한정
+              </p>
+
+              <label for="use_bitrate_mode">화질 및 용량 비율 제어 방식 (비트레이트/퀄리티 모드) [치지직]</label>
+              <select id="use_bitrate_mode" name="use_bitrate_mode">
+                  <option value="true" {% if config.use_bitrate_mode %}selected{% endif %}>비트레이트 모드</option>
+                  <option value="false" {% if not config.use_bitrate_mode %}selected{% endif %}>퀄리티 모드</option>
+              </select>
+              <p class="description">비트레이트 모드와 퀄리티 모드 중 선택합니다.</p>
+
+              <label for="video_quality">비디오 퀄리티 모드 값 (퀄리티 모드 사용 시 입력) [치지직]</label>
+              <input type="text" id="video_quality" name="video_quality" value="{{ config.video_quality }}">
+              <table class="description">
+                  <thead>
+                      <tr>
+                          <th>퀄리티 모드 값 (예시)</th>
+                          <th>설명</th>
+                      </tr>
+                  </thead>
+                  <tbody>
+                      <tr><td>23~24</td><td>5~10% 화질저하, 약간의 용량 절약</td></tr>
+                      <tr><td>26~28</td><td>15~25% 화질저하, 용량 절약</td></tr>
+                      <tr><td>32~35</td><td>30~40% 화질저하, 용량 절약</td></tr>
+                  </tbody>
+              </table>
+              <p class="description">퀄리티 값이 낮을수록 화질은 좋아지지만 파일 용량은 커집니다.<br>표는 x264 CPU 기준 추정치이며, GPU 가속이나 HEVC에서는 다를 수 있습니다.</p>
+
+              <label for="video_bitrate">평균 비트레이트 값 (비트레이트 모드 사용 시 입력) [치지직]</label>
+              <input type="text" id="video_bitrate" name="video_bitrate" value="{{ config.video_bitrate }}">
+              <p class="description">평균 비트레이트 값을 설정합니다. 값이 낮을수록<br>화질이 떨어지고 용량이 줄어듭니다.<br>치지직 1080P 기준 8000k 값입니다.<br><br>(예: 5000k)</p>
+
+              <label for="vbv_maxrate">최대 비트레이트 값 (비트레이트 모드 사용 시 입력) [치지직]</label>
+              <input type="text" id="vbv_maxrate" name="vbv_maxrate" value="{{ config.vbv_maxrate }}">
+              <p class="description">인코딩시 비트레이트 가변 폭의 최대값을 지정합니다.<br><br>(예: 7500k, 권장: 평균 비트레이트 값의 1.5~2배)</p>
+
+              <label for="vbv_bufsize">비트레이트 버퍼 값 (비트레이트 모드 사용 시 입력) [치지직]</label>
+              <input type="text" id="vbv_bufsize" name="vbv_bufsize" value="{{ config.vbv_bufsize }}">
+              <p class="description">인코딩 시 화려하거나 복잡한 장면이 갑자기<br>늘어나거나 줄어드는 것을 부드럽게 관리하기<br>위한 임시 저장공간의 크기를 입력합니다.<br><br>(예: 15000k, 권장: 평균 비트레이트 값의 3~4배)</p>
+
+              <label for="extra_ffmpeg_options">추가 인코딩 명령어 입력</label>
+              <input type="text" id="extra_ffmpeg_options" name="extra_ffmpeg_options" value="{{ config.extra_ffmpeg_options }}">
+              <p class="description">
+                • <b>Look-ahead</b>: 다음 프레임을 사전 확인하여 인코딩 압축 효율을 높입니다.<br>
+                • 장점: <b>선명도</b>가 상승하고 <b>용량</b>이 줄어듭니다.<br>
+                • 단점: 인코딩 속도가 <b>느려집니다.</b>
+              </p>
+
+              <table class="description">
+                <thead>
+                  <tr>
+                    <th>GPU</th>
+                    <th>사용 인코더</th>
+                    <th>낮은 압축효율 예시</th>
+                    <th>높은 압축효율 예시</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td class="c-intel"><b>인텔</b></td>
+                    <td><code>h264_qsv</code> / <code>hevc_qsv</code></td>
+                    <td><code>-look_ahead 1 -bf 2</code></td>
+                    <td><code>-look_ahead 1 -look_ahead_depth 20 -bf 5</code></td>
+                  </tr>
+                  <tr>
+                    <td class="c-nv"><b>지포스</b></td>
+                    <td><code>h264_nvenc</code> / <code>hevc_nvenc</code></td>
+                    <td><code>-rc-lookahead 10 -bf 2</code></td>
+                    <td><code>-rc-lookahead 20 -bf 3</code></td>
+                  </tr>
+                  <tr>
+                    <td class="c-amd"><b>라데온</b></td>
+                    <td><code>h264_amf</code> / <code>hevc_amf</code></td>
+                    <td><code>-preanalysis true -pa_lookahead_buffer_depth 10 -bf 2</code></td>
+                    <td><code>-preanalysis true -pa_lookahead_buffer_depth 20 -bf 3</code></td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <p class="description">
+                • 비교적 빠른 인코딩 속도와 적당한 화질 향상을 원한다면 <b>낮은 압축효율</b><br>
+                • 인코딩 속도가 느려져도 더 높은 화질 향상을 원한다면 <b>높은 압축효율</b><br><br>
+                • <b>B-프레임이 0</b>이면 look-ahead 효과가 거의 없습니다. 보통 <code>-bf 2~4</code> 권장.<br>
+                • 일부 구형/특수 모델은 제한이 있습니다(예: 지포스 GTX 1630, 1650 GDDR5 등 B-프레임 제한).<br>
+                • 인텔 QSV는 6세대(Skylake) 이상 지원(효율은 <b>7세대+</b> 권장), 라데온은 RX 6000 이상 권장.
+              </p>
+
+              <label for="audio_codec">오디오 코덱 종류 [치지직]</label>
+              <select id="audio_codec" name="audio_codec">
+                  <option value="aac" {% if config.audio_codec == 'aac' %}selected{% endif %}>AAC</option>
+                  <option value="mp3" {% if config.audio_codec == 'mp3' %}selected{% endif %}>MP3</option>
+              </select>
+              <p class="description">오디오 코덱을 선택합니다.<br>치지직 기본 오디오 코덱은 AAC 입니다.</p>
+
+              <label for="audio_bitrate">오디오 비트레이트 값 [치지직]</label>
+              <select id="audio_bitrate" name="audio_bitrate">
+                  <option value="copy" {% if config.audio_bitrate == 'copy' %}selected{% endif %}>스트림복사(원본유지)</option>
+                  <option value="64k" {% if config.audio_bitrate == '64k' %}selected{% endif %}>64k</option>
+                  <option value="96k" {% if config.audio_bitrate == '96k' %}selected{% endif %}>96k</option>
+                  <option value="128k" {% if config.audio_bitrate == '128k' %}selected{% endif %}>128k</option>
+                  <option value="160k" {% if config.audio_bitrate == '160k' %}selected{% endif %}>160k</option>
+                  <option value="192k" {% if config.audio_bitrate == '192k' %}selected{% endif %}>192k</option>
+                  <option value="224k" {% if config.audio_bitrate == '224k' %}selected{% endif %}>224k</option>
+                  <option value="256k" {% if config.audio_bitrate == '256k' %}selected{% endif %}>256k</option>
+                  <option value="320k" {% if config.audio_bitrate == '320k' %}selected{% endif %}>320k</option>
+              </select>
+              <p class="description">오디오 비트레이트 값을 선택합니다.<br>치지직 오디오 비트레이트 최대값은 192k(원본) 입니다.</p>
+            </section>
+
+            <!-- ⑥ 텔레그램 -->
+            <section class="config-section">
+              <header class="section-head">
+                <span class="section-num">06</span>
+                <h3>텔레그램 알림 설정</h3>
+                <span class="section-tag">Telegram</span>
+              </header>
+
+              <label for="telegram_enabled">텔레그램 알림 사용:</label>
+              <select id="telegram_enabled" name="telegram_enabled">
+                <option value="true" {% if config.telegram_enabled %}selected{% endif %}>ON</option>
+                <option value="false" {% if not config.telegram_enabled %}selected{% endif %}>OFF</option>
+              </select>
+              <p class="description">이 옵션을 활성화하면 녹화 상태 변화(녹화 시작/중지 등)를 텔레그램으로 알림받을 수 있습니다.</p>
+
+              <label for="telegram_bot_token">텔레그램 봇 토큰:</label>
+              <input type="text" id="telegram_bot_token" name="telegram_bot_token" value="{{ telegram.telegram_bot_token if telegram.telegram_bot_token is defined else '' }}">
+              <p class="description">
+                <strong>※ 텔레그램 봇 토큰값은 웹페이지에서 암호화된 값으로 표시됩니다</strong><br><br><br>
+                (1) 텔레그램 앱에서 누르고 <strong>@BotFather</strong>를 검색하여 대화를 시작합니다.<br><br>
+                (2) /newbot 명령어를 입력하고, <strong>①봇이름</strong>을 정합니다<br><br>
+                (3) 이어서 <strong>②사용자명</strong>을 정합니다. <strong>봇이름_bot</strong> 으로 입력합니다(_bot)<br><br>
+                 - 단, <strong>봇이름</strong>은 다른 이용자와 중복된 이름으로 지을 수 없으니 주의<br><br>
+                 - 잘 모르겠으면, 일반 웹사이트 ID처럼 영문자+숫자 사용하는걸 추천<br><br>
+                (4) BotFather가 HTTP API: 봇 토큰을 제공하면, 복사하여 입력란에 붙여넣으세요
+              </p>
+
+              <label for="telegram_chat_id">텔레그램 봇 채팅방 ID:</label>
+              <input type="text" id="telegram_chat_id" name="telegram_chat_id" value="{{ telegram.telegram_chat_id if telegram.telegram_chat_id is defined else '' }}">
+              <p class="description">
+                (5) 봇 토큰을 제공한 채팅내용 상단에 t.me/봇이름_bot을 접속합니다<br><br>
+                (6) 새롭게 접속한 봇 채팅방에 시작(start)를 누르면 자동으로 /start가 입력됩니다<br><br>
+                (7) /start 가 자동 입력된 뒤 아무 메시지나 봇 채팅방에 입력합니다.<br><br>
+                (8) 웹브라우저(크롬 등)을 열어 주소창에 본인 토큰값을 적용하여 입력합니다.<br><br>
+                 <strong>https://api.telegram.org/bot토큰값/getUpdates</strong><br><br>
+                (9) API 내용에서 <strong>from":{"id":값,</strong> 에서 ID값 문자를 복사하여 입력칸에 붙여넣으세요<br><br>
+                (10) "설정 업데이트" 를 눌러 저장한 뒤 "테스트 메시지 전송" 버튼을 눌러주세요
+              </p>
+
+              <!-- 테스트 메시지 전송 버튼 -->
+              <button type="button" id="testTelegramBtn" class="btn-block-center">테스트 메시지 전송</button>
+              <p class="description">설정이 올바르게 적용되었는지 확인하기 위해 테스트 메시지를 전송합니다.</p>
+            </section>
+
+            <!-- ⑦ Discord 알림 -->
+            <section class="config-section">
+              <header class="section-head">
+                <span class="section-num">07</span>
+                <h3>Discord 알림 설정</h3>
+                <span class="section-tag">Discord</span>
+              </header>
+
+              <label for="discord_enabled">Discord 웹훅 알림 사용:</label>
+              <select id="discord_enabled" name="discord_enabled">
+                <option value="true" {% if config.discord_enabled %}selected{% endif %}>ON</option>
+                <option value="false" {% if not config.discord_enabled %}selected{% endif %}>OFF</option>
+              </select>
+              <p class="description">
+                활성화하면 녹화 시작/종료/예약 전환 이벤트를 Discord 채널로 알림받습니다.
+                텔레그램과 동시에 사용할 수 있습니다.
+              </p>
+
+              <label for="discord_webhook_url">Discord 웹훅 URL:</label>
+              <input type="text" id="discord_webhook_url" name="discord_webhook_url"
+                     value="{{ config.discord_webhook_url if config.discord_webhook_url is defined else '' }}"
+                     placeholder="https://discord.com/api/webhooks/...">
+              <p class="description">
+                (1) Discord 서버 설정 → <strong>연동</strong> → <strong>웹훅</strong> → <strong>새 웹훅</strong><br><br>
+                (2) 알림을 받을 채널을 선택하고 <strong>웹훅 URL 복사</strong>를 클릭<br><br>
+                (3) 복사한 URL을 위 입력란에 붙여넣으세요
+              </p>
+
+              <button type="button" id="testDiscordBtn" class="btn-block-center">테스트 메시지 전송</button>
+              <p class="description">설정이 올바르게 적용되었는지 확인하기 위해 테스트 메시지를 전송합니다.</p>
+            </section>
+
+            <!-- ⑧ 파일 관리 -->
+            <section class="config-section">
+              <header class="section-head">
+                <span class="section-num">08</span>
+                <h3>파일 관리(웹 파일매니저)</h3>
+                <span class="section-tag">File Manager</span>
+              </header>
+
+              <label for="fileManagerEnabled">파일매니저 사용</label>
+              <select id="fileManagerEnabled" name="fileManagerEnabled">
+                <option value="true"  {% if config.fileManagerEnabled %}selected{% endif %}>ON</option>
+                <option value="false" {% if not config.fileManagerEnabled %}selected{% endif %}>OFF</option>
+              </select>
+              <p class="description">
+                로그인 모드가 ON일 때만 활성화됩니다. 기본값은 <b>블랙리스트(시스템 주요 경로만 제외, 나머지 전부 허용)</b>입니다.
+              </p>
+
+              <!-- ① 경로 모드 선택: 기본 blacklist -->
+              <label for="fileManagerMode">파일매니저 경로 모드</label>
+              <select id="fileManagerMode" name="fileManagerMode">
+                {% set fm_mode = (config.fileManagerMode if config.fileManagerMode is defined else 'blacklist') %}
+                <option value="blacklist" {% if fm_mode == 'blacklist' %}selected{% endif %}>블랙리스트(오픈)</option>
+                <option value="whitelist" {% if fm_mode == 'whitelist' %}selected{% endif %}>화이트리스트(허용 경로만)</option>
+              </select>
+              <p class="description">
+                • 블랙리스트: 시스템 핵심 폴더만 차단하고 나머지를 모두 탐색/삭제/이동 허용<br>
+                • 화이트리스트: 아래 "허용 경로" 목록에 포함된 경로만 접근 허용
+              </p>
+
+              <!-- ② 읽기전용 모드 -->
+              <label for="fileManagerReadOnly">읽기전용 모드</label>
+              <select id="fileManagerReadOnly" name="fileManagerReadOnly">
+                <option value="true"  {% if config.fileManagerReadOnly %}selected{% endif %}>ON</option>
+                <option value="false" {% if not config.fileManagerReadOnly %}selected{% endif %}>OFF</option>
+              </select>
+              <p class="description">ON이면 생성/이름변경/이동/삭제가 모두 차단됩니다.</p>
+
+              <!-- ③ 휴지통 사용 -->
+              <label for="trashEnabled">휴지통(소프트 삭제) 사용</label>
+              <select id="trashEnabled" name="trashEnabled">
+                <option value="true"  {% if config.trashEnabled is not defined or config.trashEnabled %}selected{% endif %}>ON</option>
+                <option value="false" {% if config.trashEnabled is defined and not config.trashEnabled %}selected{% endif %}>OFF</option>
+              </select>
+              <p class="description">
+                ON: 삭제 시 같은 루트의 <code>.trash</code>로 이동(복구 가능) / OFF: 즉시 완전삭제
+              </p>
+
+              <!-- ④ 허용 경로: 화이트리스트 모드에서만 표시 -->
+              <div id="fm-roots-section" style="display: {% if fm_mode == 'whitelist' %}block{% else %}none{% endif %};">
+                <label>허용 경로 (여러 개 가능)</label>
+                <div id="fm-roots">
+                  <div id="fm-roots-list">
+                    {% set roots = config.fileManagerRoots or [] %}
+                    {% if roots|length == 0 %}
+                      <div class="fm-root-row">
+                        <input type="text" name="fileManagerRoots" placeholder="예: C:/Live Auto Recorder/record">
+                        <button type="button" class="rm-root">삭제</button>
+                      </div>
+                    {% else %}
+                      {% for r in roots %}
+                        <div class="fm-root-row">
+                          <input type="text" name="fileManagerRoots" value="{{ r }}">
+                          <button type="button" class="rm-root">삭제</button>
+                        </div>
+                      {% endfor %}
+                    {% endif %}
+                  </div>
+                  <button type="button" id="add-fm-root">경로 추가</button>
+                </div>
+              </div>
+            </section>
+
+            <!-- ⑨ 로그인 -->
+            <section class="config-section">
+              <header class="section-head">
+                <span class="section-num">09</span>
+                <h3>로그인 관련 설정</h3>
+                <span class="section-tag">Login</span>
+              </header>
+
+              <label for="loginMode">로그인 모드 사용</label>
+              <select id="loginMode" name="loginMode">
+                  <option value="true" {% if config.loginMode %}selected{% endif %}>ON</option>
+                  <option value="false" {% if not config.loginMode %}selected{% endif %}>OFF</option>
+              </select>
+              <p class="description">로그인한 사용자만 사용하도록 설정</p>
+
+              <input type="submit" value="설정 업데이트">
+            </section>
+        </form>
+
+        <!-- 계정 관리 폼 (configForm과 분리 — 중첩 form은 브라우저가 무시하므로 별도 배치) -->
+        <div id="account-fields" style="display: {% if config.loginMode %}block{% else %}none{% endif %};">
+          <section class="config-section">
+            <header class="section-head">
+              <span class="section-num">10</span>
+              <h3>계정 정보 관리</h3>
+              <span class="section-tag">Account</span>
+            </header>
+            {% if account %}
+            <div class="account-management">
+              <form id="updateAccountForm" action="/updateAccount" method="POST">
+                <input type="hidden" name="action" value="update">
+                <label for="username">사용자명:</label>
+                <input type="text" id="username" name="username" value="{{ account['username'] }}"
+                       {% if not config.loginMode %}disabled{% else %}required{% endif %}>
+                <label for="current_password">기존 비밀번호:</label>
+                <input type="password" id="current_password" name="current_password"
+                       {% if not config.loginMode %}disabled{% else %}required{% endif %}>
+                <label for="new_password">새 비밀번호:</label>
+                <input type="password" id="new_password" name="new_password"
+                       {% if not config.loginMode %}disabled{% else %}required{% endif %}>
+                <label for="new_password_confirm">새 비밀번호 확인:</label>
+                <input type="password" id="new_password_confirm" name="new_password_confirm"
+                       {% if not config.loginMode %}disabled{% else %}required{% endif %}>
+                <input type="submit" value="계정 수정" class="submit-button">
+              </form>
+              <form action="/updateAccount" method="POST" class="delete-form">
+                <input type="hidden" name="action" value="delete">
+                <input type="hidden" name="username" id="delete-username" value="{{ account['username'] }}">
+                <input type="password" name="current_password" id="delete-current_password" placeholder="기존 비밀번호 입력"
+                       {% if not config.loginMode %}disabled{% else %}required{% endif %}>
+                <input type="submit" value="계정 삭제" class="delete-button">
+              </form>
+            </div>
+            {% else %}
+            <p>현재 저장된 계정이 없습니다.</p>
+            <button onclick="window.location.href='/register'">계정 생성</button>
+            {% endif %}
+          </section>
+        </div>
+
+        <!-- ⑪ 설정 백업/복원 (configForm 밖 — 별도 API 사용) -->
+        <section class="config-section">
+          <header class="section-head">
+            <span class="section-num">11</span>
+            <h3>설정 백업 / 복원</h3>
+            <span class="section-tag">Backup</span>
+          </header>
+          <p class="description">
+            전체 설정 + 채널 목록 + 텔레그램 설정을 JSON 파일로 내보내거나, 백업 파일에서 복원합니다.
+          </p>
+          <div class="backup-actions" style="display:flex;gap:12px;flex-wrap:wrap;margin-top:8px;">
+            <button type="button" id="btn-config-export" class="btn-block-center">⬇ 설정 내보내기 (JSON)</button>
+            <label class="btn-block-center" style="cursor:pointer;">
+              ⬆ 설정 가져오기
+              <input type="file" id="config-import-file" accept=".json" style="display:none;">
+            </label>
+          </div>
+          <div id="config-backup-status" class="description" style="margin-top:8px;"></div>
+        </section>
+
+        <!-- ⑫ 파일 정리 (Retention) -->
+        <section class="config-section">
+          <header class="section-head">
+            <span class="section-num">12</span>
+            <h3>녹화 파일 정리</h3>
+            <span class="section-tag">Cleanup</span>
+          </header>
+          <p class="description">
+            지정 경로의 녹화 파일을 조건에 따라 정리합니다. 먼저 <b>미리보기(삭제 없음)</b>로 확인 후 실행하세요.
+          </p>
+
+          <label for="cleanup-path">대상 경로</label>
+          <input type="text" id="cleanup-path" value="/recordings" placeholder="/recordings">
+
+          <label for="cleanup-mode">정리 방식</label>
+          <select id="cleanup-mode">
+            <option value="age">날짜 기준 (N일 이전 삭제)</option>
+            <option value="size">용량 기준 (초과분 오래된 것부터 삭제)</option>
+          </select>
+
+          <div id="cleanup-age-opts">
+            <label for="cleanup-age-days">보존 기간 (일)</label>
+            <input type="number" id="cleanup-age-days" value="30" min="1" max="3650">
+          </div>
+          <div id="cleanup-size-opts" style="display:none;">
+            <label for="cleanup-max-size">최대 보존 용량 (GB)</label>
+            <input type="number" id="cleanup-max-size" value="500" min="1" step="10">
+          </div>
+
+          <div class="backup-actions" style="display:flex;gap:12px;flex-wrap:wrap;margin-top:12px;">
+            <button type="button" id="btn-cleanup-preview" class="btn-block-center">🔍 미리보기</button>
+            <button type="button" id="btn-cleanup-run" class="delete-button" style="display:none;">🗑 삭제 실행</button>
+          </div>
+          <div id="cleanup-result" class="description" style="margin-top:12px;white-space:pre-wrap;"></div>
+        </section>
+
+    </div>
+    <script src="{{ url_for('static', path='js/script.js') }}?v={{ program_version|default('') }}"></script>
+    <script>
+    // ── Discord 테스트 버튼 ──
+    (function(){
+      var btn = document.getElementById('testDiscordBtn');
+      if(!btn) return;
+      btn.addEventListener('click', function(){
+        var url = (document.getElementById('discord_webhook_url')||{}).value || '';
+        if(!url.startsWith('https://')){ alert('Discord 웹훅 URL을 먼저 입력하세요.'); return; }
+        btn.disabled = true; btn.textContent = '전송 중...';
+        fetch('/api/discord_test', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({webhook_url: url})
+        }).then(r=>r.json()).then(d=>{
+          alert(d.status==='success' ? '✅ 테스트 메시지 전송 성공!' : '❌ 실패: '+(d.message||''));
+        }).catch(e=>alert('오류: '+e)).finally(()=>{btn.disabled=false;btn.textContent='테스트 메시지 전송';});
+      });
+    })();
+
+    // ── 설정 백업/복원 ──
+    (function(){
+      var expBtn = document.getElementById('btn-config-export');
+      if(expBtn) expBtn.addEventListener('click', function(){
+        window.location.href = '/api/config_export';
+      });
+      var impFile = document.getElementById('config-import-file');
+      var statusEl = document.getElementById('config-backup-status');
+      if(impFile) impFile.addEventListener('change', function(){
+        var file = impFile.files[0];
+        if(!file) return;
+        if(!confirm('백업 파일로 현재 설정을 덮어씁니다. 계속할까요?')) { impFile.value=''; return; }
+        var reader = new FileReader();
+        reader.onload = function(){
+          try {
+            var data = JSON.parse(reader.result);
+            fetch('/api/config_import', {
+              method:'POST', headers:{'Content-Type':'application/json'},
+              body: JSON.stringify(data)
+            }).then(r=>r.json()).then(d=>{
+              statusEl.textContent = d.status==='success' ? '✅ 복원 완료! 페이지를 새로고침합니다.' : '❌ '+d.message;
+              if(d.status==='success') setTimeout(()=>location.reload(), 1500);
+            }).catch(e=>{ statusEl.textContent='❌ 오류: '+e; });
+          } catch(e){ statusEl.textContent='❌ 유효하지 않은 JSON 파일입니다.'; }
+        };
+        reader.readAsText(file);
+        impFile.value='';
+      });
+    })();
+
+    // ── 파일 정리 ──
+    (function(){
+      var modeSelect = document.getElementById('cleanup-mode');
+      var ageOpts = document.getElementById('cleanup-age-opts');
+      var sizeOpts = document.getElementById('cleanup-size-opts');
+      var previewBtn = document.getElementById('btn-cleanup-preview');
+      var runBtn = document.getElementById('btn-cleanup-run');
+      var resultEl = document.getElementById('cleanup-result');
+      var lastPayload = null;
+
+      if(modeSelect) modeSelect.addEventListener('change', function(){
+        ageOpts.style.display = this.value==='age' ? '' : 'none';
+        sizeOpts.style.display = this.value==='size' ? '' : 'none';
+      });
+
+      function buildPayload(dryRun){
+        return {
+          mode: modeSelect.value,
+          age_days: parseInt(document.getElementById('cleanup-age-days').value)||30,
+          max_size_gb: parseFloat(document.getElementById('cleanup-max-size').value)||500,
+          path: document.getElementById('cleanup-path').value.trim()||'/recordings',
+          dry_run: dryRun
+        };
+      }
+
+      if(previewBtn) previewBtn.addEventListener('click', function(){
+        resultEl.textContent = '조회 중...';
+        runBtn.style.display='none';
+        fetch('/api/file_cleanup', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify(buildPayload(true))
+        }).then(r=>r.json()).then(d=>{
+          if(d.status!=='success'){ resultEl.textContent='❌ '+d.message; return; }
+          var lines = ['📊 전체 파일: '+d.total_files+'개 ('+d.total_size_gb+' GB)'];
+          lines.push('🎯 삭제 대상: '+d.to_delete_count+'개 ('+d.to_delete_size_gb+' GB)');
+          if(d.candidates && d.candidates.length){
+            lines.push('');
+            d.candidates.forEach(function(c){ lines.push('  '+c.date+'  '+c.size_mb+'MB  '+c.name); });
+            if(d.to_delete_count > d.candidates.length) lines.push('  ... 외 '+(d.to_delete_count-d.candidates.length)+'개');
+          }
+          resultEl.textContent = lines.join('\n');
+          lastPayload = buildPayload(false);
+          runBtn.style.display = d.to_delete_count > 0 ? '' : 'none';
+        }).catch(e=>{ resultEl.textContent='❌ 오류: '+e; });
+      });
+
+      if(runBtn) runBtn.addEventListener('click', function(){
+        if(!lastPayload) return;
+        if(!confirm('정말 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.')) return;
+        runBtn.disabled=true; runBtn.textContent='삭제 중...';
+        fetch('/api/file_cleanup', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify(lastPayload)
+        }).then(r=>r.json()).then(d=>{
+          if(d.status!=='success'){ resultEl.textContent='❌ '+d.message; return; }
+          resultEl.textContent = '✅ '+d.deleted.length+'개 파일 삭제 완료.'+(d.errors.length?' ('+d.errors.length+'개 실패)':'');
+          runBtn.style.display='none';
+        }).catch(e=>{ resultEl.textContent='❌ 오류: '+e; })
+        .finally(()=>{ runBtn.disabled=false; runBtn.textContent='🗑 삭제 실행'; });
+      });
+    })();
+    </script>
+</body>
+</html>

@@ -1,0 +1,30 @@
+# Runtime state and secrets
+json/
+logs/
+.env
+.env.*
+!.env.example
+*.env
+*token*.json
+*client_secret*.json
+*credentials*.json
+*cookie*.json
+*cookie*.txt
+
+# Python
+__pycache__/
+*.py[cod]
+*.so
+.venv/
+venv/
+
+# Local/editor files
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Runtime artifacts
+*.log
+*.lock
+*.part

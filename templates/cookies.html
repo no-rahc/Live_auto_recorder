@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#f2f4f6">
+    <title>쿠키관리</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='css/style.css') }}?v={{ program_version|default('') }}">
+</head>
+<body class="page-cookies">
+    <div class="navbar-container">
+      <div class="navbar">
+        <button class="menu-icon"
+                type="button"
+                aria-controls="mySidenav"
+                aria-expanded="false"
+                aria-label="메뉴 열기">&#9776;</button>
+        <div class="brand">
+          <span class="rec-dot" aria-hidden="true"></span>
+          <div class="brand-text">
+            <h2>Live Auto Recorder</h2>
+            <span class="brand-sub">Control Console</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 슬라이드 메뉴 -->
+    <div id="mySidenav" class="sidenav">
+        <a href="javascript:void(0)" class="closebtn">&times;</a>
+
+        {% if loginMode %}
+            {% if request.session.get('logged_in') %}
+                <a href="/">메인화면</a>
+                <a href="/recording" class="restricted-menu">녹화현황</a>
+                <a href="/config" class="restricted-menu">설정관리</a>
+                <a href="/channels" class="restricted-menu">채널관리</a>
+                <a href="/cookies" class="restricted-menu">쿠키관리</a>
+                <a href="/files" class="restricted-menu">파일관리</a>
+
+                <div id="user-info">
+                    <p id="username-display">{{ request.session.get('username', '사용자') }}</p>
+                    <a href="/logout" id="logout-btn" class="logout-btn">로그아웃</a>
+                </div>
+            {% else %}
+                <a href="/">메인화면</a>
+                <a href="/register" class="restricted-menu">계정생성</a>
+            {% endif %}
+        {% else %}
+            <a href="/">메인화면</a>
+            <a href="/recording" class="restricted-menu">녹화현황</a>
+            <a href="/config" class="restricted-menu">설정관리</a>
+            <a href="/channels" class="restricted-menu">채널관리</a>
+            <a href="/cookies" class="restricted-menu">쿠키관리</a>
+            <a href="/files" class="restricted-menu">파일관리</a>
+
+            <div id="user-info">
+                <p id="username-display">{{ request.session.get('username', '사용자') }}</p>
+                <a href="/logout" id="logout-btn" class="logout-btn">로그아웃</a>
+            </div>
+        {% endif %}
+    </div>
+
+
+    <div id="content">
+        <h1>치지직 쿠키 관리</h1>
+
+        <div class="notice">
+            <strong>치지직 쿠키 추출 방법:</strong><br>
+            1. 웹 브라우저에서 네이버 페이지를 열고 로그인합니다.<br>
+            2. F12키를 열고 콘솔페이지에서 상단 Application 탭을 클릭합니다.<br>
+            3. 좌측 메뉴에서 Cookies - http://www.naver.com를 선택합니다.<br>
+            4. NID_SES, NID_AUT 값을 복사하여 쿠키를 업데이트 합니다.<br>
+        </div>
+
+        <!-- 치지직 쿠키 업데이트 폼 -->
+        <form id="updateCookiesForm" method="post" class="card">
+            {% for key, value in cookies.items() %}
+                {% if key %}
+                    <label for="{{ key }}">{{ key }}:</label>
+                    <input type="text" id="{{ key }}" name="{{ key }}" value="{{ value }}">
+                {% endif %}
+            {% endfor %}
+            <input type="submit" value="쿠키 업데이트">
+        </form>
+
+        <div class="last-modified">
+        </div>
+
+        <!-- 유튜브 쿠키 관리 섹션 -->
+        <h2>유튜브 쿠키 관리</h2>
+        <div class="notice">
+            ※ 유튜브 쿠키는 아래 크롬 확장 프로그램을 사용하여 추출합니다.<br>
+            <a href="https://chrome.google.com/webstore/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc" target="_blank">Get cookies.txt LOCALLY</a> 확장 프로그램을 설치하세요.<br><br>
+            <strong>사용 방법:</strong><br>
+            1. 크롬 브라우저에서 유튜브에 로그인합니다.<br>
+            2. 유튜브 페이지에서 확장 프로그램을 실행합니다.<br>
+            3. <b>"Copy"</b> 버튼을 눌러 쿠키 값을 복사합니다.<br>
+            4. <code>Live Auto Recorder/json/ycookie.txt</code> 파일을 열어 붙여넣기 후에 저장합니다.<br>
+        </div>
+    </div>
+    <script src="{{ url_for('static', path='js/script.js') }}?v={{ program_version|default('') }}"></script>
+</body>
+</html>
