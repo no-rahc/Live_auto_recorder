@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'app_entry.py'
+      - 'module/operations_*.py'
       - 'VERSION'
       - 'templates/**'
       - 'tests/ui/**'
@@ -14,6 +15,7 @@ on:
     branches: [main]
     paths:
       - 'app_entry.py'
+      - 'module/operations_*.py'
       - 'VERSION'
       - 'templates/**'
       - 'tests/ui/**'
@@ -40,11 +42,12 @@ jobs:
       - name: Validate source files
         shell: bash
         run: |
-          python3 -m py_compile app_entry.py
+          python3 -m py_compile app_entry.py module/operations_common.py module/operations_health.py module/operations_backup.py module/operations_v2.py
           node --check templates/static/js/system-metrics-v2.js
           node --check templates/static/js/sidebar-v3.js
           node --check templates/static/js/dashboard-v4.js
           node --check templates/static/js/app-ui-v3.js
+          node --check templates/static/js/operations-v2.js
           python3 - <<'PY'
           import re
           from pathlib import Path
@@ -53,9 +56,10 @@ jobs:
           if not re.fullmatch(r'v\d+\.\d+\.\d+(?:[.-][0-9A-Za-z.-]+)?', version):
               raise SystemExit(f'invalid VERSION: {version}')
 
-          css = Path('templates/static/css/app-v3.css').read_text(encoding='utf-8')
-          if css.count('{') != css.count('}'):
-              raise SystemExit('unbalanced CSS braces')
+          for css_path in ('templates/static/css/app-v3.css', 'templates/static/css/operations-v2.css'):
+              css = Path(css_path).read_text(encoding='utf-8')
+              if css.count('{') != css.count('}'):
+                  raise SystemExit(f'unbalanced CSS braces: {css_path}')
           PY
 
       - name: Install test dependencies
