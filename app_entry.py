@@ -58,7 +58,7 @@ class ConsoleAssetsMiddleware(BaseHTTPMiddleware):
 
         version = escape(str(PROGRAM_VERSION), quote=True)
         head_assets = (
-            '<meta name="color-scheme" content="light dark">'
+            '<meta name="color-scheme" content="light">'
             '<link rel="stylesheet" href="/static/css/console-v2.css?v='
             + version
             + '" data-lar-console-v2>'
@@ -83,6 +83,9 @@ class ConsoleAssetsMiddleware(BaseHTTPMiddleware):
             '<link rel="stylesheet" href="/static/css/carrot-ui-v1.css?v='
             + version
             + '" data-lar-carrot-ui-v1>'
+            '<link rel="stylesheet" href="/static/css/light-layout-v2.css?v='
+            + version
+            + '" data-lar-light-layout-v2>'
             '<script src="/static/js/system-metrics-v2.js?v='
             + version
             + '" data-lar-metrics-v2></script>'
@@ -103,6 +106,9 @@ class ConsoleAssetsMiddleware(BaseHTTPMiddleware):
             '<script src="/static/js/carrot-ui-v1.js?v='
             + version
             + '" defer data-lar-carrot-ui-v1></script>'
+            '<script src="/static/js/light-layout-v2.js?v='
+            + version
+            + '" defer data-lar-light-layout-v2></script>'
         )
 
         if "data-lar-console-v2" not in html:
