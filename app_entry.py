@@ -158,6 +158,7 @@ class ConsoleAssetsMiddleware(BaseHTTPMiddleware):
             '<link rel="stylesheet" href="/static/css/config-workspace-v1.css?v=' + version + '" data-lar-config-workspace-v1>'
             '<link rel="stylesheet" href="/static/css/project-ui-audit-v1.css?v=' + version + '" data-lar-project-ui-audit-v1>'
             '<link rel="stylesheet" href="/static/css/project-ui-audit-fixes-v1.css?v=' + version + '" data-lar-project-ui-audit-fixes-v1>'
+            '<link rel="stylesheet" href="/static/css/operations-controls-v1.css?v=' + version + '" data-lar-operations-controls-v1>'
             '<style data-lar-ui-v3-critical>@media (min-width:1100px){body.lar-sidebar-v3 .menu-icon{display:none!important}}</style>'
             '<script src="/static/js/system-metrics-v2.js?v=' + version + '" data-lar-metrics-v2></script>'
         )
@@ -170,6 +171,7 @@ class ConsoleAssetsMiddleware(BaseHTTPMiddleware):
             '<script src="/static/js/config-workspace-v1.js?v=' + version + '" defer data-lar-config-workspace-v1></script>'
             '<script src="/static/js/project-ui-audit-v1.js?v=' + version + '" defer data-lar-project-ui-audit-v1></script>'
             '<script src="/static/js/operations-v2.js?v=' + version + '" defer data-lar-operations-v2></script>'
+            '<script src="/static/js/operations-controls-v1.js?v=' + version + '" defer data-lar-operations-controls-v1></script>'
         )
 
         if "data-lar-ui-v3" not in html:
