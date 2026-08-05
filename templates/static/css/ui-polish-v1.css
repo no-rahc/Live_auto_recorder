@@ -2,10 +2,10 @@
 
 @media (min-width: 1100px) {
   body.lar-sidebar-v3 .navbar-container {
-    left: var(--lar-sidebar-current) !important;
-    right: 0 !important;
-    width: auto !important;
-    margin-left: 0 !important;
+    left: auto !important;
+    right: auto !important;
+    width: calc(100% - var(--lar-sidebar-current)) !important;
+    margin-left: var(--lar-sidebar-current) !important;
   }
 
   body.lar-sidebar-v3 .navbar {
