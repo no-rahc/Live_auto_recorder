@@ -20,20 +20,7 @@ docker compose build
 docker compose up -d
 ```
 
-애플리케이션은 설정과 인증정보를 별도의 runtime 볼륨으로 마운트하는 방식으로 동작합니다. 기본 설정 파일을 준비한 뒤 웹 UI 또는 runtime JSON 볼륨을 통해 채널과 알림 설정을 구성하세요.
-
-## 설정 시 주의사항
-
-다음 정보는 이 저장소에 포함하지 마세요.
-
-- CHZZK 채널 ID와 개인 채널 설정
-- 녹화 경로 및 CIFS 마운트 정보
-- Telegram 봇 토큰과 채팅방 ID
-- Discord 웹훅 URL
-- OAuth 토큰 및 client secret
-- 호스트명, 사설 IP, 사용자별 경로
-
-runtime 상태와 비밀값은 `json/`, `.env`, 쿠키·토큰 파일 등으로 별도 관리하며, `.gitignore`에 의해 Git 추적에서 제외됩니다.
+애플리케이션 설정은 runtime 환경에 맞게 구성한 뒤 웹 UI를 통해 채널과 알림 설정을 관리할 수 있습니다.
 
 ## 프로젝트 구조
 
