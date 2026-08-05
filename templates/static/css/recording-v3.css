@@ -1,0 +1,248 @@
+/* Recording page v3: responsive cards with visible, accessible channel details. */
+body.page-recording #content {
+  width: min(1480px, calc(100% - 48px)) !important;
+  max-width: 1480px !important;
+}
+
+body.page-recording #channel-list {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)) !important;
+  align-items: start !important;
+  gap: 18px !important;
+  margin-top: 22px !important;
+}
+
+body.page-recording #channel-list > .channel {
+  display: flex !important;
+  flex-direction: column !important;
+  align-self: start !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  height: auto !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  border: 1px solid var(--shell-border, var(--line)) !important;
+  border-radius: 20px !important;
+  background: var(--shell-surface, var(--panel)) !important;
+  color: var(--shell-text, var(--text)) !important;
+  box-shadow: var(--shell-shadow, var(--shadow)) !important;
+  opacity: 1 !important;
+  filter: none !important;
+  transform: none;
+}
+
+body.page-recording #channel-list > .channel:hover {
+  transform: translateY(-3px) !important;
+  border-color: color-mix(in srgb, var(--shell-primary, var(--brand)) 36%, var(--shell-border, var(--line))) !important;
+  box-shadow: 0 18px 42px rgba(13, 21, 37, 0.14) !important;
+}
+
+body.page-recording #channel-list > .channel.channel-disabled {
+  opacity: 0.76 !important;
+  filter: saturate(0.72) !important;
+}
+
+body.page-recording .channel-thumbnail-container {
+  position: relative !important;
+  float: none !important;
+  width: 100% !important;
+  max-width: none !important;
+  aspect-ratio: 16 / 9 !important;
+  overflow: hidden !important;
+  border-radius: 0 !important;
+  background: #05070b !important;
+}
+
+body.page-recording .channel-thumbnail {
+  display: block !important;
+  width: 100% !important;
+  height: 100% !important;
+  aspect-ratio: auto !important;
+  object-fit: cover !important;
+  opacity: 1 !important;
+}
+
+body.page-recording .channel:hover .channel-thumbnail {
+  transform: scale(1.018) !important;
+}
+
+body.page-recording .platform-icon {
+  right: 12px !important;
+  bottom: 12px !important;
+  width: 34px !important;
+  height: 34px !important;
+  padding: 5px !important;
+  border: 1px solid rgba(255, 255, 255, 0.62) !important;
+  border-radius: 10px !important;
+  background: rgba(8, 13, 22, 0.78) !important;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.28) !important;
+}
+
+body.page-recording .toggle-top-left {
+  top: 14px !important;
+  left: 14px !important;
+  width: 46px !important;
+  height: 26px !important;
+}
+
+body.page-recording .watchparty-badge {
+  left: 14px !important;
+  bottom: 14px !important;
+  padding: 5px 10px !important;
+  color: #7ff0ba !important;
+  border-color: rgba(91, 224, 161, 0.44) !important;
+  background: rgba(8, 18, 15, 0.78) !important;
+  backdrop-filter: blur(10px);
+}
+
+body.page-recording .channel-info {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  gap: 9px !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 20px !important;
+  color: var(--shell-text, var(--text)) !important;
+  background: var(--shell-surface, var(--panel)) !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+body.page-recording .channel-info,
+body.page-recording .channel-info * {
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+body.page-recording .channel-info .channel-name {
+  display: block !important;
+  width: 100% !important;
+  margin: 0 0 3px !important;
+  padding: 0 !important;
+  color: var(--shell-text, var(--text)) !important;
+  font-size: 18px !important;
+  font-weight: 850 !important;
+  line-height: 1.38 !important;
+  letter-spacing: -0.025em !important;
+  white-space: normal !important;
+  overflow-wrap: anywhere !important;
+}
+
+body.page-recording .channel-info p {
+  display: block !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  color: var(--shell-muted, var(--muted)) !important;
+  font-size: 13px !important;
+  line-height: 1.58 !important;
+  white-space: normal !important;
+  overflow-wrap: anywhere !important;
+}
+
+body.page-recording .channel-info p strong {
+  color: var(--shell-text, var(--text)) !important;
+  font-weight: 750 !important;
+}
+
+body.page-recording .channel-info p[id^="title-"] {
+  display: -webkit-box !important;
+  min-height: 42px !important;
+  color: var(--shell-text, var(--text)) !important;
+  font-size: 14px !important;
+  font-weight: 650 !important;
+  line-height: 1.5 !important;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden !important;
+}
+
+body.page-recording .channel-info p[id^="category-"] {
+  padding-top: 9px !important;
+  border-top: 1px solid var(--shell-border, var(--line)) !important;
+}
+
+body.page-recording .channel-info p[id^="timing-"],
+body.page-recording .channel-info p[id^="filename-"] {
+  padding: 9px 11px !important;
+  border: 1px solid var(--shell-border, var(--line)) !important;
+  border-radius: 10px !important;
+  background: var(--shell-surface-soft, var(--panel2)) !important;
+  color: var(--shell-muted, var(--muted)) !important;
+  font-family: var(--mono, monospace) !important;
+  font-size: 12px !important;
+}
+
+body.page-recording .channel-info .start-recording,
+body.page-recording .channel-info .stop-recording,
+body.page-recording .channel > .start-recording,
+body.page-recording .channel > .stop-recording {
+  width: 100% !important;
+  min-height: 44px !important;
+  margin: 5px 0 0 !important;
+  padding: 10px 16px !important;
+  border-radius: 11px !important;
+  font-size: 13px !important;
+  font-weight: 800 !important;
+}
+
+body.page-recording .channel-info .start-recording,
+body.page-recording .channel > .start-recording {
+  color: #ffffff !important;
+  border-color: var(--shell-success, #1aa374) !important;
+  background: var(--shell-success, #1aa374) !important;
+}
+
+body.page-recording .channel-info .stop-recording,
+body.page-recording .channel > .stop-recording {
+  color: #ffffff !important;
+  border-color: var(--shell-danger, #e34d64) !important;
+  background: var(--shell-danger, #e34d64) !important;
+}
+
+body.page-recording .global-buttons {
+  padding: 12px !important;
+  border-radius: 16px !important;
+}
+
+body.page-recording .filter-container {
+  padding: 16px !important;
+  border-radius: 16px !important;
+}
+
+body.page-recording .history-table th,
+body.page-recording .history-table td,
+body.page-recording #recording-history-stats {
+  color: var(--shell-text, var(--text)) !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+@media (max-width: 1100px) {
+  body.page-recording #channel-list {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@media (max-width: 720px) {
+  body.page-recording #content {
+    width: calc(100% - 24px) !important;
+  }
+
+  body.page-recording #channel-list {
+    gap: 14px !important;
+  }
+
+  body.page-recording .channel-info {
+    padding: 17px !important;
+  }
+
+  body.page-recording .global-buttons {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+  }
+}
