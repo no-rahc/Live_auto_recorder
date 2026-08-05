@@ -11,10 +11,12 @@
     tabs().forEach(function (tab) {
       const selected = tab === active || (!active && tab.classList.contains("is-active"));
       const panel = document.querySelector(`[data-ops-panel="${CSS.escape(tab.dataset.opsTab || "")}"]`);
+      tab.classList.toggle("is-active", selected);
       tab.setAttribute("role", "tab");
       tab.setAttribute("aria-selected", String(selected));
       tab.tabIndex = selected ? 0 : -1;
       if (panel) {
+        panel.classList.toggle("is-active", selected);
         panel.setAttribute("role", "tabpanel");
         panel.setAttribute("aria-hidden", String(!selected));
         panel.tabIndex = 0;
@@ -45,7 +47,7 @@
       if (event.key === "End") next = items[items.length - 1];
       if (event.key === "ArrowLeft") next = items[(index - 1 + items.length) % items.length];
       if (event.key === "ArrowRight") next = items[(index + 1) % items.length];
-      next.click();
+      syncTabs(next);
       next.focus();
     });
   }
