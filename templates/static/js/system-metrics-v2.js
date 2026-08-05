@@ -327,8 +327,12 @@
         ? String(disk.fstype).toUpperCase()
         : disk.mountpoint || "";
     }
+    const total = number(disk.total);
+    const used = disk.used != null
+      ? number(disk.used)
+      : Math.max(0, total - number(disk.free));
     if (value) value.textContent = Math.round(percent) + "%";
-    if (brief) brief.textContent = fmtBytes(disk.used) + " / " + fmtBytes(disk.total);
+    if (brief) brief.textContent = fmtBytes(used) + " / " + fmtBytes(total);
     if (bar) bar.style.width = percent.toFixed(2) + "%";
   }
 
