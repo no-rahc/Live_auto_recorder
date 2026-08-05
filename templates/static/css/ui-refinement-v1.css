@@ -1,0 +1,420 @@
+/* Final proportional and interaction refinements found during the v1.1.16 visual audit. */
+
+/* Page-specific working widths: dense data pages need more room than forms. */
+body.page-index #content,
+body.page-operations #content {
+  width: min(1440px, calc(100% - 48px)) !important;
+  max-width: 1440px !important;
+}
+
+body.page-recording #content,
+body.page-files #content {
+  width: min(1480px, calc(100% - 48px)) !important;
+  max-width: 1480px !important;
+}
+
+body.page-config #content {
+  width: min(1240px, calc(100% - 48px)) !important;
+  max-width: 1240px !important;
+}
+
+/* Authentication is a separate shell, not an empty management console. */
+body.lar-auth-mode .navbar-container,
+body.lar-auth-mode .sidenav,
+body.lar-auth-mode .lar-backdrop {
+  display: none !important;
+}
+
+body.lar-auth-mode {
+  min-height: 100dvh;
+  background:
+    radial-gradient(circle at 20% 12%, rgba(255, 111, 15, .10), transparent 34%),
+    linear-gradient(180deg, #fffaf6 0%, var(--lar-bg) 58%) !important;
+}
+
+body.lar-auth-mode #content,
+body.page-register #content {
+  min-height: 100dvh !important;
+  margin: 0 auto !important;
+  padding: 32px 0 !important;
+}
+
+body.lar-auth-mode .lar-auth-card,
+body.page-register .register-form {
+  box-shadow: 0 18px 48px rgba(33, 33, 36, .08) !important;
+}
+
+/* Dashboard: reduce hero dominance and keep system information scannable. */
+body.page-index .dash-v5-top .dash-hero {
+  min-height: 184px !important;
+}
+
+body.page-index .dash-storage,
+body.page-index .dash-meter {
+  min-height: 112px !important;
+}
+
+/* Recording: bounded cards avoid a stretched final card on wide monitors. */
+body.page-recording #channel-list {
+  grid-template-columns: repeat(auto-fill, minmax(300px, 420px)) !important;
+  justify-content: start !important;
+}
+
+body.page-recording .lar-recording-filter-toggle {
+  display: none;
+}
+
+body.page-recording .lar-recording-section-head {
+  display: none;
+}
+
+/* Settings: the fixed action bar only exists while there is work to save. */
+body.page-config .lar-config-savebar:not(.is-dirty) {
+  display: none !important;
+}
+
+body.page-config .lar-config-savebar {
+  min-height: 68px !important;
+  padding-top: 9px !important;
+  padding-bottom: 9px !important;
+}
+
+body.page-config .lar-config-savebar span {
+  max-width: 430px;
+}
+
+body.page-config.lar-virtual-keyboard .lar-config-savebar {
+  display: none !important;
+}
+
+/* Cookie cards have different information density; match their natural weight. */
+body.page-cookies .lar-cookie-workspace {
+  grid-template-columns: minmax(0, 1.65fr) minmax(280px, .85fr) !important;
+}
+
+/* File controls: one primary action, neutral navigation, explicit danger. */
+body.page-files .lar-toolbar-actions > button,
+body.page-files .mobile-actionbar > button {
+  border: 1px solid var(--lar-line-strong) !important;
+  background: var(--lar-surface) !important;
+  color: var(--lar-text-soft) !important;
+  box-shadow: none !important;
+}
+
+body.page-files .lar-file-action-primary {
+  border-color: var(--lar-orange) !important;
+  background: var(--lar-orange) !important;
+  color: #fff !important;
+}
+
+body.page-files .lar-file-action-primary:hover:not(:disabled) {
+  border-color: var(--lar-orange-hover) !important;
+  background: var(--lar-orange-hover) !important;
+  color: #fff !important;
+}
+
+body.page-files .lar-file-action-danger {
+  border-color: #f0b9bb !important;
+  background: #fff !important;
+  color: var(--lar-danger) !important;
+}
+
+body.page-files .lar-file-action-danger:hover:not(:disabled) {
+  border-color: var(--lar-danger) !important;
+  background: var(--lar-danger) !important;
+  color: #fff !important;
+}
+
+body.page-files .mobile-actionbar:not(.lar-has-selection) {
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transform: translateY(18px);
+}
+
+body.page-files .mobile-actionbar {
+  transition: opacity .16s ease, transform .16s ease, visibility .16s ease !important;
+}
+
+/* Operations: make the fifth mobile KPI intentional and signal horizontal tabs. */
+body.page-operations .ops-tabs {
+  position: relative;
+}
+
+body.page-operations .ops-tabs.lar-can-scroll::after {
+  content: "";
+  position: sticky;
+  right: 0;
+  width: 34px;
+  min-width: 34px;
+  align-self: stretch;
+  pointer-events: none;
+  background: linear-gradient(90deg, rgba(255,255,255,0), rgba(255,255,255,.98));
+}
+
+/* Small English eyebrow labels are secondary, not competing page headings. */
+.ops-eyebrow,
+.eyebrow,
+.lar-workspace-kicker {
+  font-size: 9px !important;
+  letter-spacing: .1em !important;
+  opacity: .8;
+}
+
+@media (max-width: 900px) {
+  body.page-cookies .lar-cookie-workspace {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@media (max-width: 700px) {
+  body.page-index #content,
+  body.page-recording #content,
+  body.page-files #content,
+  body.page-operations #content,
+  body.page-config #content {
+    width: min(100% - 28px, 1480px) !important;
+  }
+
+  /* Dashboard compactness */
+  body.page-index .dash-v5-top .dash-hero {
+    min-height: 170px !important;
+    padding: 18px !important;
+  }
+
+  body.page-index .dash-title {
+    font-size: 29px !important;
+  }
+
+  body.page-index .dash-v4-subtitle {
+    margin-bottom: 13px !important;
+  }
+
+  body.page-index .dash-hero-right {
+    margin-top: 12px !important;
+  }
+
+  body.page-index .dash-clock {
+    font-size: 27px !important;
+  }
+
+  body.page-index .dash-sys-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+  }
+
+  body.page-index .dash-storage,
+  body.page-index .dash-meter {
+    min-height: 92px !important;
+    padding: 11px 12px !important;
+    border-radius: 14px !important;
+  }
+
+  body.page-index .dash-storage .card-head,
+  body.page-index .dash-meter-top {
+    margin-bottom: 6px !important;
+  }
+
+  body.page-index .stor-used,
+  body.page-index .dash-meter-val {
+    font-size: 18px !important;
+  }
+
+  body.page-index #tile-net .dash-meter-val {
+    font-size: 10px !important;
+    white-space: normal !important;
+  }
+
+  /* Recording priority: controls and channels first, compact system panel second. */
+  body.page-recording .lar-recording-filter-toggle {
+    width: 100%;
+    min-height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 10px 0;
+    padding: 0 13px;
+    border: 1px solid var(--lar-line-strong) !important;
+    border-radius: 11px !important;
+    background: var(--lar-surface) !important;
+    color: var(--lar-text-soft) !important;
+  }
+
+  body.page-recording .filter-container.lar-mobile-collapsed {
+    display: none !important;
+  }
+
+  body.page-recording .filter-container {
+    margin: 0 0 12px !important;
+    padding: 12px !important;
+  }
+
+  body.page-recording .global-buttons {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px !important;
+  }
+
+  body.page-recording .global-buttons > button {
+    width: 100% !important;
+    min-height: 42px !important;
+    margin: 0 !important;
+    padding: 8px !important;
+    font-size: 11.5px !important;
+  }
+
+  body.page-recording #channel-list {
+    grid-template-columns: minmax(0, 1fr) !important;
+    margin-top: 12px !important;
+  }
+
+  body.page-recording .channel-thumbnail-container {
+    aspect-ratio: 2 / 1 !important;
+  }
+
+  body.page-recording .lar-recording-section-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 22px 0 8px;
+  }
+
+  body.page-recording .lar-recording-section-head strong {
+    color: var(--lar-text);
+    font-size: 15px;
+    font-weight: 850;
+  }
+
+  body.page-recording .lar-recording-section-head span {
+    color: var(--lar-muted);
+    font-size: 10px;
+  }
+
+  body.page-recording #sys-dashboard {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px !important;
+    margin-top: 0 !important;
+  }
+
+  body.page-recording #sys-dashboard .row-main,
+  body.page-recording #sys-dashboard .row-disks {
+    display: contents !important;
+  }
+
+  body.page-recording #sys-dashboard .tile {
+    min-width: 0 !important;
+    min-height: 86px !important;
+    margin: 0 !important;
+    padding: 10px !important;
+    border-radius: 13px !important;
+  }
+
+  body.page-recording #sys-dashboard .tile-value {
+    font-size: 17px !important;
+  }
+
+  body.page-recording #sys-dashboard .tile-sub,
+  body.page-recording #sys-dashboard .tile-brief {
+    overflow: hidden;
+    font-size: 9px !important;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* Settings dirty bar */
+  body.page-config {
+    padding-bottom: 82px !important;
+  }
+
+  body.page-config .lar-config-savebar {
+    min-height: 68px !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 10px !important;
+    padding: 9px 14px max(9px, env(safe-area-inset-bottom)) !important;
+  }
+
+  body.page-config .lar-config-savebar > div:first-child {
+    flex: 1;
+  }
+
+  body.page-config .lar-config-savebar span {
+    display: none !important;
+  }
+
+  body.page-config .lar-config-save-actions {
+    display: flex !important;
+    grid-template-columns: none !important;
+    gap: 6px !important;
+  }
+
+  body.page-config .lar-config-save-actions button {
+    min-height: 38px !important;
+    padding: 7px 10px !important;
+  }
+
+  /* Channel registration progressive disclosure */
+  body.page-channels .lar-channel-advanced-toggle {
+    grid-column: 1 / -1;
+    width: 100%;
+    min-height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 12px;
+    border: 1px solid var(--lar-line) !important;
+    border-radius: 11px !important;
+    background: var(--lar-surface-soft) !important;
+    color: var(--lar-text-soft) !important;
+  }
+
+  body.page-channels .lar-channel-advanced-fields {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  body.page-channels .lar-channel-advanced-fields[hidden] {
+    display: none !important;
+  }
+
+  /* File actions */
+  body.page-files .lar-toolbar-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  body.page-files .mobile-actionbar {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+
+  /* Operations KPI and tabs */
+  body.page-operations .ops-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  body.page-operations .ops-summary > .ops-kpi:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
+
+  body.page-operations .ops-tabs {
+    padding-right: 0 !important;
+  }
+
+  .ops-eyebrow,
+  .eyebrow,
+  .lar-workspace-kicker {
+    display: none !important;
+  }
+}
+
+@media (max-width: 430px) {
+  body.page-recording #sys-dashboard .tile-value {
+    font-size: 15px !important;
+  }
+
+  body.page-recording #net-rate {
+    font-size: 9px !important;
+  }
+}
