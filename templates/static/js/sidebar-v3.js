@@ -35,6 +35,11 @@
       hint: "저장소 탐색",
       icon: "folder",
     },
+    "/operations": {
+      label: "운영 관리",
+      hint: "상태와 정책",
+      icon: "operations",
+    },
     "/register": {
       label: "계정 생성",
       hint: "관리자 등록",
@@ -49,6 +54,7 @@
     channels: '<rect x="3" y="5" width="18" height="14" rx="3"/><path d="m8 2 4 3 4-3M8 10h3v4H8zm6 0h2m-2 4h2"/>',
     key: '<circle cx="8" cy="15" r="4"/><path d="m11 12 8-8m-3 3 2 2m-5 1 2 2"/>',
     folder: '<path d="M3 6.5A2.5 2.5 0 0 1 5.5 4H10l2 2h6.5A2.5 2.5 0 0 1 21 8.5v8A2.5 2.5 0 0 1 18.5 19h-13A2.5 2.5 0 0 1 3 16.5Z"/><path d="M3 9h18"/>',
+    operations: '<path d="M4 18v-5m0-4V6m8 12v-8m0-4V4m8 14v-3m0-4V6"/><path d="M2 13h4m4-3h4m4 5h4"/>',
     userPlus: '<circle cx="9" cy="8" r="4"/><path d="M3 21a6 6 0 0 1 12 0m4-9v6m-3-3h6"/>',
     logout: '<path d="M10 5H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4"/><path d="m15 8 4 4-4 4m4-4H9"/>',
     chevron: '<path d="m9 18 6-6-6-6"/>',
@@ -161,18 +167,17 @@
   }
 
   function enhancePrimaryLink(link, activePath) {
-    const oldIcon = link.querySelector(".lar-nav-icon");
-    if (oldIcon) oldIcon.remove();
-
     const targetPath = normalizedPath(link.href);
-    const fallbackLabel = link.textContent.trim() || "메뉴";
+    const fallbackLabel = link.dataset.navLabel || link.textContent.trim() || "메뉴";
     const meta = navMeta[targetPath] || {
       label: fallbackLabel,
       hint: "메뉴",
       icon: "home",
     };
 
+    link.querySelector(".lar-nav-icon")?.remove();
     link.classList.add("lar-sidebar-link");
+    link.dataset.larSidebarLink = "1";
     link.dataset.navLabel = meta.label;
     link.title = meta.label;
     link.innerHTML =
@@ -192,6 +197,36 @@
     link.classList.toggle("lar-active", isActive);
     if (isActive) link.setAttribute("aria-current", "page");
     else link.removeAttribute("aria-current");
+  }
+
+  function integrateSidebarLink(link, navList, activePath) {
+    if (!link?.matches?.("a[href]:not(.closebtn)")) return;
+    if (link.id === "logout-btn" || link.classList.contains("lar-sidebar-brand")) return;
+
+    if (link.dataset.larSidebarLink !== "1") {
+      enhancePrimaryLink(link, activePath);
+    }
+    if (link.parentElement !== navList) {
+      navList.appendChild(link);
+    }
+  }
+
+  function watchLateSidebarLinks(nav, navList, activePath) {
+    if (nav.dataset.larSidebarObserver === "1") return;
+    nav.dataset.larSidebarObserver = "1";
+
+    const observer = new MutationObserver(function (mutations) {
+      mutations.forEach(function (mutation) {
+        mutation.addedNodes.forEach(function (node) {
+          if (!(node instanceof Element)) return;
+          if (node.matches("a[href]")) integrateSidebarLink(node, navList, activePath);
+          node.querySelectorAll?.("a[href]").forEach(function (link) {
+            integrateSidebarLink(link, navList, activePath);
+          });
+        });
+      });
+    });
+    observer.observe(nav, { childList: true, subtree: true });
   }
 
   function enhanceUserCard(userInfo) {
@@ -265,8 +300,7 @@
 
     const activePath = currentPath();
     primaryLinks.forEach(function (link) {
-      enhancePrimaryLink(link, activePath);
-      navList.appendChild(link);
+      integrateSidebarLink(link, navList, activePath);
     });
 
     nav.prepend(header);
@@ -275,6 +309,7 @@
     enhanceUserCard(userInfo);
 
     if (userInfo && userInfo.parentElement === nav) nav.appendChild(userInfo);
+    watchLateSidebarLinks(nav, navList, activePath);
   }
 
   function enhanceTopbarContext() {

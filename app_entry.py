@@ -164,6 +164,7 @@ class ConsoleAssetsMiddleware(BaseHTTPMiddleware):
             '<script src="/static/js/dashboard-v4.js?v=' + version + '" defer data-lar-dashboard-v4></script>'
             '<script src="/static/js/dashboard-channel-modal-v1.js?v=' + version + '" defer data-lar-dashboard-channel-modal-v1></script>'
             '<script src="/static/js/app-ui-v3.js?v=' + version + '" defer data-lar-ui-v3></script>'
+            '<script src="/static/js/recording-live-meta-v1.js?v=' + version + '" defer data-lar-recording-live-meta-v1></script>'
             '<script src="/static/js/config-workspace-v1.js?v=' + version + '" defer data-lar-config-workspace-v1></script>'
             '<script src="/static/js/operations-v2.js?v=' + version + '" defer data-lar-operations-v2></script>'
         )

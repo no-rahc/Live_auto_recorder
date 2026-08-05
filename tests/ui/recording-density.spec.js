@@ -1,11 +1,34 @@
 const { test, expect } = require('@playwright/test');
 
-test('recording cards use a compact responsive grid', async ({ page, viewport }, testInfo) => {
+test('recording cards use a compact responsive grid and refresh active live metadata', async ({ page, viewport }, testInfo) => {
+  let metadataRequests = 0;
+  await page.route('**/api/update_metadata/*', async (route) => {
+    metadataRequests += 1;
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        status: 'success',
+        from_cache: false,
+        fresh: true,
+        metadata: {
+          status: 'OPEN',
+          is_live: true,
+          live_title: '실제 방송 제목',
+          category: '라이브 토크',
+        },
+      }),
+    });
+  });
+
   await page.goto('/tests/ui/fixtures/recording.html');
   await page.waitForTimeout(550);
 
   const cards = page.locator('#channel-list > .channel');
   await expect(cards).toHaveCount(2);
+  await expect(page.locator('#title-b')).toHaveText('실제 방송 제목');
+  await expect(page.locator('#category-b')).toContainText('라이브 토크');
+  expect(metadataRequests).toBeGreaterThanOrEqual(1);
 
   const first = await cards.nth(0).boundingBox();
   const second = await cards.nth(1).boundingBox();

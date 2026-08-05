@@ -1,5 +1,5 @@
-import asyncio 
-import time 
+import asyncio
+import time
 import random
 from typing import Any, Dict, List, Callable, Awaitable, Tuple, Optional
 
@@ -7,15 +7,44 @@ from module.common_errors import debugThrottle
 
 
 # 기본 주기
-FAST_TTL      = 20       # 라이브(OPEN/is_live=True)일 때 메타 TTL
-OFFLINE_TTL   = 90       # 종료 상태일 때 메타 TTL
-THUMB_TTL     = 300      # 썸네일 TTL (5분)
-BACKOFF_STEPS = [30, 60, 120, 300]  # 에러 시 지수 백오프
-JITTER_SEC    = 3
+FAST_TTL        = 20       # 라이브 메타 TTL
+PLACEHOLDER_TTL = 5        # 라이브인데 제목이 준비/기본 문구인 경우 빠른 재확인
+OFFLINE_TTL     = 90       # 종료 상태일 때 메타 TTL
+THUMB_TTL       = 300      # 썸네일 TTL (5분)
+BACKOFF_STEPS   = [30, 60, 120, 300]  # 에러 시 지수 백오프
+JITTER_SEC      = 3
+
+PLACEHOLDER_TITLES = {
+    "",
+    "방송 준비 중",
+    "방송 제목 없음",
+    "불러오는 중...",
+    "정보 없음",
+}
 
 
 def _now() -> float:
     return time.time()
+
+
+def _first_value(data: Optional[Dict[str, Any]], keys: tuple[str, ...], default: Any = None) -> Any:
+    for key in keys:
+        value = data.get(key) if isinstance(data, dict) else None
+        if value is not None and value != "":
+            return value
+    return default
+
+
+def _live_title(data: Optional[Dict[str, Any]]) -> str:
+    return str(_first_value(data, ("live_title", "liveTitle", "video_title", "title"), "") or "").strip()
+
+
+def _metadata_ttl(platform: str, data: Optional[Dict[str, Any]]) -> int:
+    if not isOpen(platform, data):
+        return OFFLINE_TTL
+    if _live_title(data) in PLACEHOLDER_TITLES:
+        return PLACEHOLDER_TTL
+    return FAST_TTL
 
 
 # app.state에 캐시 관련 상태를 보장
@@ -29,13 +58,14 @@ def ensure(app) -> None:
 
 
 def isOpen(platform: str, data: Optional[Dict[str, Any]]) -> bool:
-    if not data: return False
+    if not data:
+        return False
     p = (platform or "").lower()
     if p == "chzzk":
-        return data.get("status") == "OPEN"
+        return str(data.get("status") or "").upper() == "OPEN" or data.get("is_live") is True
     if p == "youtube":
         return bool(data.get("is_live"))
-    return False
+    return bool(data.get("is_live"))
 
 
 async def getCached(app, cid: str) -> Optional[Dict[str, Any]]:
@@ -43,8 +73,14 @@ async def getCached(app, cid: str) -> Optional[Dict[str, Any]]:
         return app.state.meta_cache.get(cid)
 
 
-async def setCached(app, cid: str, data: Optional[Dict[str, Any]] = None, touch_meta: bool = False, touch_thumb: bool = False,
-                    clear_error: bool = False,) -> None:
+async def setCached(
+    app,
+    cid: str,
+    data: Optional[Dict[str, Any]] = None,
+    touch_meta: bool = False,
+    touch_thumb: bool = False,
+    clear_error: bool = False,
+) -> None:
     async with app.state.meta_lock:
         ent = app.state.meta_cache.get(cid) or {"data": None, "ts_meta": 0.0, "ts_thumb": 0.0, "err": 0}
         if data is not None:
@@ -69,123 +105,156 @@ async def bumpError(app, cid: str) -> None:
 def mergeChannelFields(real: Dict[str, Any], data: Dict[str, Any]) -> bool:
     changed = False
     mapping = [
-        ("live_title",    "live_title",    "방송 제목 없음"),
-        ("category",      "category",      "카테고리 없음"),
-        ("thumbnail_url", "thumbnail_url", "/static/img/default_thumbnail.png"),
+        ("live_title", ("live_title", "liveTitle", "video_title", "title"), "방송 제목 없음"),
+        ("category", ("category", "liveCategoryValue", "category_name", "game_name"), "카테고리 없음"),
+        ("thumbnail_url", ("thumbnail_url", "thumbnailUrl", "thumbnail"), "/static/img/default_thumbnail.png"),
     ]
-    for dst, src, default in mapping:
-        nv = data.get(src, default)
-        if not nv:
+
+    for dst, sources, default in mapping:
+        value = _first_value(data, sources, default)
+        if not value:
             continue
+
         old = real.get(dst)
-
-        # 기존 값이 있고, 신규 값이 플레이스홀더라면 덮어쓰지 않음
-        if old and nv == default:
+        if dst == "live_title" and old and str(value).strip() in PLACEHOLDER_TITLES and str(old).strip() not in PLACEHOLDER_TITLES:
             continue
-
-        if old != nv:
-            real[dst] = nv
+        if old and value == default:
+            continue
+        if old != value:
+            real[dst] = value
             changed = True
+
     return changed
 
 
-async def refreshOneChannel(app, channel: Dict[str, Any], fetcher: Callable[[Dict[str, Any]], Awaitable[Optional[Dict[str, Any]]]],
-                            saveChannels: Callable[[List[Dict[str, Any]]], None], channels_lock: asyncio.Lock, need_meta: bool = True,
-                            need_thumb: bool = True,) -> None:
+async def _fetchAndCacheNow(
+    app,
+    channel: Dict[str, Any],
+    fetcher: Callable[[Dict[str, Any]], Awaitable[Optional[Dict[str, Any]]]],
+    channels_lock: asyncio.Lock,
+    *,
+    need_meta: bool,
+    need_thumb: bool,
+) -> Optional[Dict[str, Any]]:
     cid = channel["id"]
     try:
         data = await fetcher(channel)
-        if data:
-            await setCached(app, cid, data, touch_meta=need_meta, touch_thumb=need_thumb, clear_error=True)
-
-            # 채널 리스트에도 반영하되, 디스크 저장은 하지 않음(메모리만 갱신)
-            async with channels_lock:
-                real = next((c for c in app.state.channels if c["id"] == cid), None)
-                if real:
-                    mergeChannelFields(real, data)  
-        else:
+        if not data:
             await bumpError(app, cid)
+            return None
 
+        await setCached(
+            app,
+            cid,
+            data,
+            touch_meta=need_meta,
+            touch_thumb=need_thumb,
+            clear_error=True,
+        )
+
+        async with channels_lock:
+            real = next((c for c in app.state.channels if c["id"] == cid), None)
+            if real:
+                mergeChannelFields(real, data)
+        return data
     except Exception:
         await bumpError(app, cid)
+        return None
 
+
+async def refreshOneChannel(
+    app,
+    channel: Dict[str, Any],
+    fetcher: Callable[[Dict[str, Any]], Awaitable[Optional[Dict[str, Any]]]],
+    saveChannels: Callable[[List[Dict[str, Any]]], None],
+    channels_lock: asyncio.Lock,
+    need_meta: bool = True,
+    need_thumb: bool = True,
+) -> None:
+    try:
+        await _fetchAndCacheNow(
+            app,
+            channel,
+            fetcher,
+            channels_lock,
+            need_meta=need_meta,
+            need_thumb=need_thumb,
+        )
     finally:
-        app.state.refreshing.discard(cid)
+        app.state.refreshing.discard(channel["id"])
 
 
-async def refreshLoop(app, fetcher: Callable[[Dict[str, Any]], Awaitable[Optional[Dict[str, Any]]]], saveChannels: Callable[[List[Dict[str, Any]]], None],
-                      channels_lock: asyncio.Lock,) -> None:
+async def refreshLoop(
+    app,
+    fetcher: Callable[[Dict[str, Any]], Awaitable[Optional[Dict[str, Any]]]],
+    saveChannels: Callable[[List[Dict[str, Any]]], None],
+    channels_lock: asyncio.Lock,
+) -> None:
     # 주기적으로 채널 메타/썸네일 캐시 갱신
     ensure(app)
     while True:
         async with channels_lock:
             chs = list(app.state.channels)
         now = _now()
+
         for ch in chs:
             cid = ch["id"]
             platform = (ch.get("platform") or "").lower()
             ent = await getCached(app, cid) or {"data": None, "ts_meta": 0.0, "ts_thumb": 0.0, "err": 0}
             data = ent["data"]
-            open_state = isOpen(platform, data)
-            ttl_meta = FAST_TTL if open_state else OFFLINE_TTL
-            ttl_thumb = THUMB_TTL
-            backoff = BACKOFF_STEPS[min(ent.get("err", 0), len(BACKOFF_STEPS)-1)] if ent.get("err", 0) > 0 else 0
+            ttl_meta = _metadata_ttl(platform, data)
+            backoff = BACKOFF_STEPS[min(ent.get("err", 0), len(BACKOFF_STEPS) - 1)] if ent.get("err", 0) > 0 else 0
 
-            need_meta  = (now - ent["ts_meta"]  > max(ttl_meta,  backoff))
-            need_thumb = (now - ent["ts_thumb"] > max(ttl_thumb, backoff))
+            need_meta = now - ent["ts_meta"] > max(ttl_meta, backoff)
+            need_thumb = now - ent["ts_thumb"] > max(THUMB_TTL, backoff)
+            if not (need_meta or need_thumb) or cid in app.state.refreshing:
+                continue
 
-            if not (need_meta or need_thumb):
-                continue
-            if cid in app.state.refreshing:
-                continue
             app.state.refreshing.add(cid)
             asyncio.create_task(
                 refreshOneChannel(app, ch, fetcher, saveChannels, channels_lock, need_meta, need_thumb)
             )
+
         await asyncio.sleep(3 + random.uniform(-JITTER_SEC, JITTER_SEC))
 
 
-# meta_cache.py
-async def getMetadataCached(app, channel_id: str, platform: str, fetcher: Callable[[Dict[str, Any]], Awaitable[Optional[Dict[str, Any]]]],
-                            saveChannels: Callable[[List[Dict[str, Any]]], None], channels_lock: asyncio.Lock,) -> Tuple[Dict[str, Any], bool, bool]:
-
+async def getMetadataCached(
+    app,
+    channel_id: str,
+    platform: str,
+    fetcher: Callable[[Dict[str, Any]], Awaitable[Optional[Dict[str, Any]]]],
+    saveChannels: Callable[[List[Dict[str, Any]]], None],
+    channels_lock: asyncio.Lock,
+) -> Tuple[Dict[str, Any], bool, bool]:
     ensure(app)
     ent = await getCached(app, channel_id)
     data = ent["data"] if ent else None
     now = _now()
-    open_state = isOpen(platform, data)
-    ttl = FAST_TTL if open_state else OFFLINE_TTL
-    fresh = bool(ent and (now - ent["ts_meta"] <= ttl))
+    ttl = _metadata_ttl(platform, data)
+    fresh = bool(ent and now - ent["ts_meta"] <= ttl)
 
-    # 캐시 미스면 "즉시 1회" 동기 수집
-    if data is None:
+    # 캐시 미스 또는 stale이면 요청 중에 한 번 즉시 수집한다.
+    if data is None or not fresh:
         async with channels_lock:
             ch = next((c for c in app.state.channels if c["id"] == channel_id), None)
-        if ch:
-            if channel_id not in app.state.refreshing:
-                app.state.refreshing.add(channel_id)
-                try:
-                    res = await fetcher(ch)
-                    if res:
-                        await setCached(... )
 
-                        # 채널 필드 병합 (런타임 메모리만)
-                        async with channels_lock:
-                            real = next((c for c in app.state.channels if c["id"] == channel_id), None)
-                            if real:
-                                mergeChannelFields(real, res)
-                        return res, False, True
-
-                finally:
-                    app.state.refreshing.discard(channel_id)
-
-        # 즉시 수집 실패 → 백그라운드 예약만 걸고 기본값 반환
-        if ch and (channel_id not in app.state.refreshing):
+        if ch and channel_id not in app.state.refreshing:
             app.state.refreshing.add(channel_id)
-            asyncio.create_task(
-                refreshOneChannel(app, ch, fetcher, saveChannels, channels_lock, need_meta=True, need_thumb=False)
-            )
+            try:
+                refreshed = await _fetchAndCacheNow(
+                    app,
+                    ch,
+                    fetcher,
+                    channels_lock,
+                    need_meta=True,
+                    need_thumb=data is None,
+                )
+                if refreshed:
+                    return refreshed, False, True
+            finally:
+                app.state.refreshing.discard(channel_id)
 
+    if data is None:
         default = {
             "live_title": "방송 제목 없음",
             "category": "카테고리 없음",
@@ -194,57 +263,62 @@ async def getMetadataCached(app, channel_id: str, platform: str, fetcher: Callab
         }
         return default, False, False
 
-    # (2) 데이터는 있으나 stale이면 백그라운드 갱신만
-    if not fresh and (channel_id not in app.state.refreshing):
-        async with channels_lock:
-            ch = next((c for c in app.state.channels if c["id"] == channel_id), None)
-        if ch:
-            app.state.refreshing.add(channel_id)
-            asyncio.create_task(
-                refreshOneChannel(app, ch, fetcher, saveChannels, channels_lock, need_meta=True, need_thumb=False)
-            )
-
-    # (3) 캐시값 반환
     return data, True, fresh
 
 
-
 # 각 채널 썸네일 URL 리스트 반환
-async def getThumbnailsCached(app, channels: List[Dict[str, Any]], fetcher: Callable[[Dict[str, Any]], Awaitable[Optional[Dict[str, Any]]]],
-                              saveChannels: Callable[[List[Dict[str, Any]]], None], channels_lock: asyncio.Lock,) -> List[Dict[str, Any]]:
-
+async def getThumbnailsCached(
+    app,
+    channels: List[Dict[str, Any]],
+    fetcher: Callable[[Dict[str, Any]], Awaitable[Optional[Dict[str, Any]]]],
+    saveChannels: Callable[[List[Dict[str, Any]]], None],
+    channels_lock: asyncio.Lock,
+) -> List[Dict[str, Any]]:
     ensure(app)
     out = []
     now = _now()
+
     for ch in channels:
         cid = ch["id"]
         platform = (ch.get("platform") or "").lower()
         ent = await getCached(app, cid)
         data = ent["data"] if ent else None
-        fresh_thumb = bool(ent and (now - ent["ts_thumb"] <= THUMB_TTL))
+        fresh_thumb = bool(ent and now - ent["ts_thumb"] <= THUMB_TTL)
 
-        if not fresh_thumb and (cid not in app.state.refreshing):
+        if not fresh_thumb and cid not in app.state.refreshing:
             app.state.refreshing.add(cid)
             asyncio.create_task(
                 refreshOneChannel(app, ch, fetcher, saveChannels, channels_lock, need_meta=False, need_thumb=True)
             )
 
         if data and isinstance(data, dict):
-            thumb = data.get("thumbnail_url")
+            thumb = _first_value(data, ("thumbnail_url", "thumbnailUrl", "thumbnail"))
         else:
             thumb = "/static/img/youtube_thumbnail.png" if platform == "youtube" else "/static/img/default_thumbnail.png"
 
-        # 썸네일 URL 로그 (실제 URL일 때만, 채널/플랫폼별 60초에 1번)
         if isinstance(thumb, str) and thumb.startswith("http"):
             debugThrottle(
                 f"thumb:{platform}:{cid}",
                 f"Generated thumbnail URL: {thumb}",
-                min_secs=60.0
+                min_secs=60.0,
             )
 
-        out.append({"id": cid, "thumbnail_url": thumb})
+        status = str(_first_value(data, ("status",), "") or "")
+        is_live = _first_value(data, ("is_live", "isLive", "live", "online"), None)
+        if is_live is None and status:
+            is_live = status.upper() == "OPEN"
 
-    # 채널 객체에도 반영
+        out.append({
+            "id": cid,
+            "platform": platform,
+            "thumbnail_url": thumb,
+            "live_title": _live_title(data),
+            "category": _first_value(data, ("category", "liveCategoryValue", "category_name", "game_name"), ""),
+            "is_live": is_live,
+            "status": status,
+            "adult": bool(data.get("adult", False)) if isinstance(data, dict) else False,
+        })
+
     async with channels_lock:
         changed = False
         for item in out:
