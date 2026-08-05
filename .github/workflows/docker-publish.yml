@@ -26,7 +26,7 @@ jobs:
           test -n "${{ secrets.DOCKERHUB_TOKEN }}" || (echo "Missing DOCKERHUB_TOKEN" && exit 1)
 
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Read application version
         id: version
