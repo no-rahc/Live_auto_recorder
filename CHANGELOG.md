@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.1.5 - 2026-08-05
+
+- Standardized version updates around the root `VERSION` file and a reusable release helper.
+- Added automated checks for synchronized release metadata and Conventional Commit PR titles.
+- Added a consistent pull request template and documented the full release workflow.
+- Reorganized the README into a deployment-focused product page with quick start, updates, storage, operations, troubleshooting, and security guidance.
+- Added a Docker publish preflight check so inconsistent release metadata cannot be published.
+
 ## v1.1.4
 
 - Consolidated the layered dashboard overrides into one light-first UI stylesheet and one interaction controller.
