@@ -12,7 +12,7 @@
 [![Docker pulls](https://img.shields.io/docker/pulls/no-rahc/live-auto-recorder?label=Docker%20pulls)](https://hub.docker.com/r/no-rahc/live-auto-recorder)
 [![License](https://img.shields.io/github/license/no-rahc/Live_auto_recorder)](LICENSE)
 
-[빠른 시작](#빠른-시작) · [운영 관리](#운영-관리) · [업데이트](#업데이트) · [배포 설정](#배포-설정) · [문제 해결](#문제-해결)
+[빠른 시작](#빠른-시작) · [운영 관리](#운영-관리) · [업데이트](#업데이트) · [배포 설정](#배포-설정) · [개발 구조](#개발-구조) · [문제 해결](#문제-해결)
 
 </div>
 
@@ -101,7 +101,7 @@ docker compose up -d --force-recreate
 특정 버전을 고정하려면 `.env`를 수정합니다.
 
 ```env
-LIVE_AUTO_RECORDER_IMAGE=no-rahc/live-auto-recorder:v1.1.6
+LIVE_AUTO_RECORDER_IMAGE=no-rahc/live-auto-recorder:v1.1.16
 ```
 
 `latest`는 최신 배포본, `vX.Y.Z`는 고정 릴리스입니다.
@@ -185,11 +185,30 @@ python app_entry.py
 ### 검사
 
 ```bash
+python -m compileall -q app_entry.py lar_app module
+python -m unittest discover -s tests -p 'test_*_v1.py' -v
 python -m unittest discover -s tests -p 'test_operations_v2.py' -v
 npm install
 npm run test:ui
 python scripts/release.py check
 ```
+
+## 개발 구조
+
+실행 진입점과 애플리케이션 조립 코드를 분리해 각 폴더의 책임을 명확히 유지합니다.
+
+```text
+app_entry.py       실행과 호환 export
+lar_app/           버전, 서버 설정, 앱 조립, 웹 미들웨어와 자산 매니페스트
+module/            녹화·플랫폼·저장·운영 도메인 로직
+templates/         Jinja 템플릿과 브라우저 자산
+tests/             Python 단위 검사와 Playwright 반응형 검사
+docs/              운영·릴리스·개발 구조 문서
+```
+
+새 전역 CSS나 JavaScript는 `app_entry.py`에 문자열로 추가하지 않고 `lar_app/web/assets.py`의 매니페스트에 등록합니다. 미들웨어와 서버 환경 처리는 `lar_app/`, 실제 녹화 기능은 `module/`에 둡니다.
+
+세부 의존 방향과 리팩터링 규칙은 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)를 확인하세요.
 
 ## Docker Hub 자동 게시
 
@@ -222,7 +241,7 @@ python scripts/release.py check
 ```text
 feat(operations): add recording safety center
 fix(storage): protect active recording files
-chore(release): v1.1.6
+chore(release): v1.1.16
 ```
 
 자세한 절차는 [`docs/RELEASE.md`](docs/RELEASE.md)를 확인하세요.
