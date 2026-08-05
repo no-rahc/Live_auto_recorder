@@ -168,6 +168,9 @@ class ConsoleAssetsMiddleware(BaseHTTPMiddleware):
             '<link rel="stylesheet" href="/static/css/operations-v2.css?v='
             + version
             + '" data-lar-operations-v2>'
+            '<link rel="stylesheet" href="/static/css/ui-polish-v1.css?v='
+            + version
+            + '" data-lar-ui-polish-v1>'
             '<style data-lar-ui-v3-critical>'
             '@media (min-width:1100px){body.lar-sidebar-v3 .menu-icon{display:none!important}}'
             '</style>'
