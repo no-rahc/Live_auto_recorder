@@ -3,6 +3,8 @@ name: UI layout checks
 on:
   pull_request:
     paths:
+      - 'app_entry.py'
+      - 'VERSION'
       - 'templates/**'
       - 'tests/ui/**'
       - 'package.json'
@@ -11,6 +13,8 @@ on:
   push:
     branches: [main]
     paths:
+      - 'app_entry.py'
+      - 'VERSION'
       - 'templates/**'
       - 'tests/ui/**'
       - 'package.json'
@@ -31,6 +35,27 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+
+      - name: Validate source files
+        shell: bash
+        run: |
+          python3 -m py_compile app_entry.py
+          node --check templates/static/js/system-metrics-v2.js
+          node --check templates/static/js/sidebar-v3.js
+          node --check templates/static/js/dashboard-v4.js
+          node --check templates/static/js/app-ui-v3.js
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+
+          version = Path('VERSION').read_text(encoding='utf-8').strip()
+          if not re.fullmatch(r'v\d+\.\d+\.\d+(?:[.-][0-9A-Za-z.-]+)?', version):
+              raise SystemExit(f'invalid VERSION: {version}')
+
+          css = Path('templates/static/css/app-v3.css').read_text(encoding='utf-8')
+          if css.count('{') != css.count('}'):
+              raise SystemExit('unbalanced CSS braces')
+          PY
 
       - name: Install test dependencies
         run: npm install
