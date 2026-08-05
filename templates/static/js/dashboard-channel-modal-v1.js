@@ -47,12 +47,12 @@
   overlay.setAttribute("aria-hidden", "true");
   overlay.innerHTML = [
     '<div class="lar-channel-modal-backdrop" data-modal-close></div>',
-    '<section class="lar-channel-dialog" role="dialog" aria-modal="true" aria-labelledby="lar-channel-dialog-title">',
+    '<section class="lar-channel-dialog" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="lar-channel-dialog-title">',
     '  <header class="lar-channel-dialog-head">',
     '    <div class="lar-channel-dialog-identity">',
     '      <span class="lar-channel-dialog-icon" id="lar-channel-dialog-icon">치</span>',
     '      <div>',
-    '        <div class="lar-channel-dialog-kicker" id="lar-channel-dialog-kicker">채널 세부 설정</div>',
+    '        <div class="lar-channel-dialog-kicker">채널 세부 설정</div>',
     '        <h2 id="lar-channel-dialog-title">채널</h2>',
     '        <p id="lar-channel-dialog-subtitle">채널 정보를 불러오는 중입니다.</p>',
     '      </div>',
@@ -188,15 +188,20 @@
     message.dataset.tone = tone || "";
   }
 
+  function syncTagsEnabled() {
+    fields.tags.disabled = !state.editing || fields.watchParty.value !== "true";
+  }
+
   function setEditing(editing) {
     state.editing = !!editing;
     form.classList.toggle("is-view", !state.editing);
     form.classList.toggle("is-editing", state.editing);
 
-    [fields.name, fields.outputDir, fields.quality, fields.extension, fields.watchParty, fields.recordEnabled, fields.tags]
+    [fields.name, fields.outputDir, fields.quality, fields.extension, fields.watchParty, fields.recordEnabled]
       .forEach(function (field) { field.disabled = !state.editing; });
     fields.platform.disabled = true;
     fields.id.readOnly = true;
+    syncTagsEnabled();
 
     editButton.hidden = state.editing;
     cancelButton.hidden = !state.editing;
@@ -237,7 +242,6 @@
     fields.tags.value = tagsValue(channel.watchPartyExcludeTags);
     state.originalRecordEnabled = channel.record_enabled !== false;
     fields.recordEnabled.checked = state.originalRecordEnabled;
-    fields.tags.disabled = !state.editing || fields.watchParty.value !== "true";
 
     manageLink.href = "/channels#" + encodeURIComponent(String(channel.id));
     setEditing(false);
@@ -254,7 +258,7 @@
       state.channels = Array.isArray(values[0]) ? values[0] : [];
       state.statuses = values[1] || {};
       decorateRows();
-      if (state.selectedId && !overlay.hidden) renderChannel();
+      if (state.selectedId && !overlay.hidden && !state.editing) renderChannel();
     } catch (error) {
       console.error("채널 정보를 불러오지 못했습니다.", error);
       if (!overlay.hidden) setMessage(error.message, "error");
@@ -389,9 +393,7 @@
   fields.quality.addEventListener("change", function () {
     syncFormatOptions(fields.quality.value, fields.extension.value);
   });
-  fields.watchParty.addEventListener("change", function () {
-    fields.tags.disabled = !state.editing || fields.watchParty.value !== "true";
-  });
+  fields.watchParty.addEventListener("change", syncTagsEnabled);
 
   document.addEventListener("keydown", function (event) {
     if (event.key === "Escape" && !overlay.hidden) closeModal(false);
