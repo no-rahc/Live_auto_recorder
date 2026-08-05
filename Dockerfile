@@ -9,7 +9,8 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates git \
     && rm -rf /var/lib/apt/lists/*
 
-RUN git clone --depth 1 --branch "${YTARCHIVE_VERSION}" \
+RUN mkdir -p /out \
+    && git clone --depth 1 --branch "${YTARCHIVE_VERSION}" \
         https://github.com/Kethsar/ytarchive.git /src/ytarchive \
     && cd /src/ytarchive \
     && CGO_ENABLED=0 GOOS="${TARGETOS}" GOARCH="${TARGETARCH}" \
