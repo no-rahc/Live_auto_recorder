@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="ko" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Live Auto Recorder UI fixture</title>
+  <link rel="stylesheet" href="/templates/static/css/app-v3.css">
+</head>
+<body class="page-recording lar-sidebar-v3 lar-desktop-nav lar-ui-v3">
+  <div class="navbar-container">
+    <div class="navbar">
+      <button class="menu-icon" aria-label="메뉴 열기">☰</button>
+      <div class="lar-topbar-context">
+        <span class="lar-topbar-context-icon">●</span>
+        <span><small>Live Auto Recorder</small><strong>녹화 현황</strong></span>
+      </div>
+    </div>
+  </div>
+
+  <aside id="mySidenav" class="sidenav">
+    <div class="lar-sidenav-head">
+      <a class="lar-sidebar-brand" href="#">
+        <span class="lar-sidebar-logo">◉</span>
+        <span class="lar-sidebar-brand-copy"><strong>Live Auto Recorder</strong><small>v1.1.4</small></span>
+      </a>
+      <button class="lar-sidebar-collapse">◀</button>
+    </div>
+    <div class="lar-sidebar-section-label">메뉴</div>
+    <nav class="lar-sidebar-list">
+      <a class="lar-sidebar-link" href="#"><span class="lar-sidebar-link-icon">⌂</span><span class="lar-sidebar-link-copy"><strong>대시보드</strong><small>전체 상태</small></span><span class="lar-sidebar-link-arrow">›</span></a>
+      <a class="lar-sidebar-link lar-active" href="#"><span class="lar-sidebar-link-icon">◉</span><span class="lar-sidebar-link-copy"><strong>녹화 현황</strong><small>세션 제어</small></span><span class="lar-sidebar-link-arrow">›</span></a>
+      <a class="lar-sidebar-link" href="#"><span class="lar-sidebar-link-icon">⚙</span><span class="lar-sidebar-link-copy"><strong>설정 관리</strong><small>자동화 구성</small></span><span class="lar-sidebar-link-arrow">›</span></a>
+      <a class="lar-sidebar-link" href="#"><span class="lar-sidebar-link-icon">▣</span><span class="lar-sidebar-link-copy"><strong>채널 관리</strong><small>녹화 대상</small></span><span class="lar-sidebar-link-arrow">›</span></a>
+    </nav>
+  </aside>
+
+  <main id="content">
+    <h1>녹화 현황</h1>
+    <p class="lar-page-intro">현재 녹화 상태와 시스템 사용량을 확인하고 채널별 녹화를 제어합니다.</p>
+
+    <section id="sys-dashboard" class="sys-dashboard">
+      <div class="row row-main">
+        <article class="tile"><div class="tile-head"><span class="tile-title">CPU</span><span class="tile-sub">사용률</span></div><div class="tile-value">5%</div><div class="progress"><div class="progress-bar" style="width:5%"></div></div></article>
+        <article class="tile"><div class="tile-head"><span class="tile-title">메모리</span><span class="tile-sub">3.59 GB / 11.11 GB</span></div><div class="tile-value">32%</div><div class="progress"><div class="progress-bar" style="width:32%"></div></div></article>
+        <article class="tile"><div class="tile-head"><span class="tile-title">네트워크</span><span class="tile-sub">실시간 송수신</span></div><div class="tile-value" id="net-rate">↑ 0.00 MB/s · ↓ 0.00 MB/s</div><div class="progress"><div class="progress-bar" style="width:8%"></div></div></article>
+      </div>
+      <div class="row row-disks" id="disk-row-1"><article class="tile disk lar-primary-storage"><div class="tile-head"><span class="tile-title">녹화 저장소</span><span class="tile-sub">/app/chzzk</span></div><div class="tile-value">1%</div><div class="progress"><div class="progress-bar" style="width:1%"></div></div><div class="tile-brief">112.53 GB / 10.83 TB</div></article></div>
+      <div id="disk-row-2"></div>
+    </section>
+
+    <div class="global-buttons"><button id="start-all-recording">모두 녹화시작</button><button id="stop-all-recording">모두 녹화중지</button></div>
+    <div class="filter-container"><div><label>채널 필터</label><select><option>모든 채널</option></select></div><div><label>채널 검색</label><input type="search" placeholder="채널 이름 입력"></div></div>
+
+    <section id="channel-list">
+      <article class="channel">
+        <div class="channel-thumbnail-container"><div class="channel-thumbnail" style="background:linear-gradient(135deg,#121212,#252525);display:grid;place-items:center;color:white;font-size:24px;font-weight:800">CHZZK LIVE</div></div>
+        <div class="channel-info"><h2 class="channel-name">테스트 채널 A (대기)</h2><p id="title-a">라이브 방송 제목이 여기에 표시됩니다.</p><p><strong>카테고리</strong>: 게임</p><p id="timing-a">녹화 OFF: 00:00:00</p><p id="filename-a">/app/chzzk/very-long-recording-file-name-example.ts</p><button class="start-recording">녹화 시작</button></div>
+      </article>
+      <article class="channel">
+        <div class="channel-thumbnail-container"><div class="channel-thumbnail" style="background:linear-gradient(135deg,#121212,#252525);display:grid;place-items:center;color:white;font-size:24px;font-weight:800">CHZZK LIVE</div></div>
+        <div class="channel-info"><h2 class="channel-name">테스트 채널 B (녹화 중)</h2><p id="title-b">다른 라이브 방송 제목입니다.</p><p><strong>카테고리</strong>: 토크</p><p id="timing-b">녹화시간: 01:24:18</p><p id="filename-b">/app/chzzk/another-long-file-name-example.ts</p><button class="stop-recording">녹화 중지</button></div>
+      </article>
+    </section>
+  </main>
+</body>
+</html>
