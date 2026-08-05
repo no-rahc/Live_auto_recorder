@@ -1,0 +1,70 @@
+/* Compact settings workspace: five focused groups, progressive disclosure, sticky save actions. */
+body.page-config { padding-bottom: 104px !important; }
+body.page-config #content { width: min(1180px, calc(100% - 48px)) !important; padding-top: 30px !important; }
+body.page-config #content > h1 { margin-bottom: 6px !important; }
+body.page-config .warning-banner { margin: 14px 0 18px !important; padding: 11px 14px !important; border: 1px solid #ffe0c7 !important; border-radius: 12px !important; background: #fff8f2 !important; color: #8a4b16 !important; font-size: 12px !important; }
+body.page-config #configForm { display: block !important; }
+body.page-config .lar-config-workspace { display: grid; gap: 14px; }
+body.page-config .lar-config-tabs { position: sticky; top: 80px; z-index: 22; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; padding: 8px; border: 1px solid var(--lar-line) !important; border-radius: 16px; background: rgba(255, 255, 255, .94); box-shadow: 0 8px 28px rgba(33, 33, 36, .06); backdrop-filter: blur(12px); }
+body.page-config .lar-config-tab { min-height: 58px !important; display: flex !important; flex-direction: column; align-items: flex-start !important; justify-content: center !important; gap: 3px; padding: 9px 11px !important; border: 1px solid transparent !important; border-radius: 12px !important; background: transparent !important; color: var(--lar-text-soft) !important; text-align: left; box-shadow: none !important; }
+body.page-config .lar-config-tab:hover { background: var(--lar-surface-soft) !important; }
+body.page-config .lar-config-tab.is-active { border-color: #ffd2b1 !important; background: var(--lar-orange-soft) !important; color: var(--lar-orange-hover) !important; }
+body.page-config .lar-config-tab strong { font-size: 12px; font-weight: 850; letter-spacing: -.02em; }
+body.page-config .lar-config-tab small { overflow: hidden; max-width: 100%; color: var(--lar-muted); font-size: 9px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+body.page-config .lar-config-panel[hidden], body.page-config .lar-config-system-extras[hidden], body.page-config .lar-setting-row[hidden], body.page-config .config-section[hidden] { display: none !important; }
+body.page-config .lar-config-panel-grid, body.page-config .lar-config-system-extras { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; align-items: start; }
+body.page-config .lar-config-panel-grid > .config-section, body.page-config .lar-config-system-extras > .config-section, body.page-config .lar-config-system-extras > #account-fields > .config-section { min-width: 0; min-height: 0 !important; height: auto !important; margin: 0 !important; padding: 18px !important; border: 1px solid var(--lar-line) !important; border-radius: 16px !important; background: var(--lar-surface) !important; box-shadow: var(--lar-shadow) !important; }
+body.page-config .lar-config-system-extras { margin-top: 12px; }
+body.page-config .lar-config-system-extras > #account-fields { min-width: 0; }
+body.page-config .config-section .section-head { min-height: 0 !important; display: flex !important; align-items: center; gap: 8px; margin: 0 0 14px !important; padding: 0 0 11px !important; border-bottom: 1px solid var(--lar-line) !important; }
+body.page-config .config-section .section-head h3 { margin: 0 !important; color: var(--lar-text) !important; font-size: 16px !important; font-weight: 850 !important; letter-spacing: -.025em; }
+body.page-config .config-section .section-num { display: none !important; }
+body.page-config .config-section .section-tag { margin-left: auto; color: var(--lar-muted) !important; font-size: 9px !important; font-weight: 750; letter-spacing: .04em; }
+body.page-config .lar-setting-row { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; padding: 11px 0; border-bottom: 1px solid #f1f2f4; }
+body.page-config .lar-setting-row:last-child { padding-bottom: 0; border-bottom: 0; }
+body.page-config .lar-setting-row > label { margin: 0 !important; color: var(--lar-text) !important; font-size: 12px !important; font-weight: 780 !important; line-height: 1.35; }
+body.page-config .lar-setting-row > input:not([type="submit"]), body.page-config .lar-setting-row > select, body.page-config .lar-setting-row > textarea { width: 100% !important; min-height: 42px !important; margin: 0 !important; padding: 9px 11px !important; border: 1px solid var(--lar-line-strong) !important; border-radius: 11px !important; background: #fff !important; color: var(--lar-text) !important; box-shadow: none !important; }
+body.page-config .lar-setting-row > input:focus, body.page-config .lar-setting-row > select:focus, body.page-config .lar-setting-row > textarea:focus { border-color: var(--lar-orange) !important; box-shadow: 0 0 0 3px rgba(255, 111, 15, .12) !important; }
+body.page-config .lar-setting-row > .lar-boolean-select { width: min(180px, 100%) !important; }
+body.page-config .config-section .description { margin: 0 !important; color: var(--lar-muted) !important; font-size: 10.5px !important; line-height: 1.55 !important; }
+body.page-config .lar-help-details { margin-top: 2px; border: 1px solid var(--lar-line); border-radius: 10px; background: var(--lar-surface-soft); }
+body.page-config .lar-help-details > summary { padding: 9px 10px; color: var(--lar-text-soft); font-size: 10.5px; font-weight: 750; cursor: pointer; }
+body.page-config .lar-help-details[open] > summary { border-bottom: 1px solid var(--lar-line); }
+body.page-config .lar-help-details > .description { padding: 10px !important; }
+body.page-config .lar-help-details table.description { width: calc(100% - 20px) !important; margin: 10px !important; font-size: 10px !important; }
+body.page-config .lar-filename-preview { display: grid; gap: 5px; padding: 10px 11px; border: 1px dashed #ffc99f; border-radius: 10px; background: #fffaf6; }
+body.page-config .lar-filename-preview span { color: var(--lar-muted); font-size: 9px; font-weight: 750; }
+body.page-config .lar-filename-preview code { overflow-wrap: anywhere; color: var(--lar-orange-hover); font-size: 11px; font-weight: 750; }
+body.page-config .lar-field-actions, body.page-config .lar-encoder-diagnostic { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+body.page-config .lar-secondary-button, body.page-config .lar-inline-primary, body.page-config .lar-primary-button { min-height: 38px !important; display: inline-flex !important; align-items: center; justify-content: center; padding: 8px 12px !important; border-radius: 10px !important; font-size: 11px !important; font-weight: 800 !important; text-decoration: none !important; }
+body.page-config .lar-secondary-button { border: 1px solid var(--lar-line-strong) !important; background: #fff !important; color: var(--lar-text-soft) !important; }
+body.page-config .lar-inline-primary, body.page-config .lar-primary-button { border: 1px solid var(--lar-orange) !important; background: var(--lar-orange) !important; color: #fff !important; }
+body.page-config .lar-field-result { color: var(--lar-muted); font-size: 10px; }
+body.page-config .lar-field-result.is-ok { color: var(--lar-success); }
+body.page-config .lar-field-result.is-error { color: var(--lar-danger); }
+body.page-config .lar-profile-row { padding-top: 0; }
+body.page-config .lar-encoder-diagnostic { margin: 2px 0 10px; padding: 10px; border: 1px solid var(--lar-line); border-radius: 11px; background: var(--lar-surface-soft); }
+body.page-config .lar-encoder-result { display: flex; flex-wrap: wrap; gap: 5px; }
+body.page-config .lar-encoder-result span { display: inline-flex; padding: 4px 7px; border-radius: 999px; font-size: 9px; font-weight: 750; }
+body.page-config .lar-encoder-result .is-ok { background: var(--lar-success-soft); color: var(--lar-success); }
+body.page-config .lar-encoder-result .is-off { background: #eef0f2; color: var(--lar-muted); }
+body.page-config .lar-encoder-result .is-error { background: var(--lar-danger-soft); color: var(--lar-danger); }
+body.page-config .lar-notification-grid { display: block; }
+body.page-config .lar-notification-tabs { display: inline-flex; gap: 4px; margin-bottom: 10px; padding: 4px; border: 1px solid var(--lar-line); border-radius: 11px; background: var(--lar-surface-soft); }
+body.page-config .lar-notification-tabs button { min-height: 34px !important; padding: 7px 14px !important; border: 0 !important; border-radius: 8px !important; background: transparent !important; color: var(--lar-muted) !important; box-shadow: none !important; font-size: 11px !important; }
+body.page-config .lar-notification-tabs button.is-active { background: #fff !important; color: var(--lar-orange-hover) !important; box-shadow: 0 1px 4px rgba(33, 33, 36, .08) !important; }
+body.page-config .lar-notification-grid > .config-section { max-width: 760px; }
+body.page-config .lar-operations-link-card { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; }
+body.page-config .lar-operations-link-card p { margin: 0; color: var(--lar-muted); font-size: 11px; line-height: 1.6; }
+body.page-config .lar-original-submit { display: none !important; }
+body.page-config .lar-config-savebar { position: fixed; right: 0; bottom: 0; left: var(--lar-sidebar-current, 244px); z-index: 120; min-height: 76px; display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 12px max(28px, calc((100vw - var(--lar-sidebar-current, 244px) - 1180px) / 2)); border-top: 1px solid var(--lar-line); background: rgba(255, 255, 255, .96); box-shadow: 0 -10px 32px rgba(33, 33, 36, .07); backdrop-filter: blur(14px); }
+body.page-config .lar-config-savebar > div:first-child { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+body.page-config .lar-config-savebar strong { color: var(--lar-text); font-size: 12px; font-weight: 850; }
+body.page-config .lar-config-savebar span { overflow: hidden; color: var(--lar-muted); font-size: 9.5px; text-overflow: ellipsis; white-space: nowrap; }
+body.page-config .lar-config-savebar.is-dirty strong { color: var(--lar-orange-hover); }
+body.page-config .lar-config-save-actions { display: flex; gap: 8px; flex: none; }
+body.page-config .lar-config-save-actions button { min-height: 40px !important; margin: 0 !important; padding: 8px 14px !important; border-radius: 10px !important; font-size: 11px !important; }
+body.page-config .lar-config-save-actions button:not(.lar-primary-button) { border: 1px solid var(--lar-line-strong) !important; background: #fff !important; color: var(--lar-text-soft) !important; }
+body.page-config .lar-config-save-actions button:disabled { opacity: .48 !important; cursor: default; }
+@media (max-width: 1099px) { body.page-config .lar-config-tabs { top: 76px; grid-template-columns: repeat(5, minmax(118px, 1fr)); overflow-x: auto; scrollbar-width: none; } body.page-config .lar-config-tabs::-webkit-scrollbar { display: none; } body.page-config .lar-config-panel-grid, body.page-config .lar-config-system-extras { grid-template-columns: 1fr; } body.page-config .lar-config-savebar { left: 0; padding: 12px 24px; } }
+@media (max-width: 700px) { body.page-config { padding-bottom: 126px !important; } body.page-config #content { width: min(100% - 28px, 1180px) !important; padding-top: 22px !important; } body.page-config .lar-config-tabs { top: 70px; margin-right: -14px; margin-left: -14px; padding: 7px 14px; border-right: 0 !important; border-left: 0 !important; border-radius: 0; box-shadow: 0 6px 18px rgba(33, 33, 36, .05); } body.page-config .lar-config-tab { min-height: 52px !important; } body.page-config .lar-config-panel-grid > .config-section, body.page-config .lar-config-system-extras > .config-section, body.page-config .lar-config-system-extras > #account-fields > .config-section { padding: 15px !important; border-radius: 14px !important; } body.page-config .lar-config-savebar { min-height: 108px; align-items: stretch; flex-direction: column; gap: 9px; padding: 10px 14px max(10px, env(safe-area-inset-bottom)); } body.page-config .lar-config-savebar span { white-space: normal; } body.page-config .lar-config-save-actions { display: grid; grid-template-columns: 1fr 1.4fr; } }
