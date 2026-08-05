@@ -1,12 +1,29 @@
 /* Focused UI polish for the dashboard channel modal and desktop top bar. */
 
 @media (min-width: 1100px) {
+  body.lar-sidebar-v3 .navbar-container {
+    left: var(--lar-sidebar-current) !important;
+    right: 0 !important;
+    width: auto !important;
+    margin-left: 0 !important;
+  }
+
   body.lar-sidebar-v3 .navbar {
     width: 100% !important;
     max-width: none !important;
     margin: 0 !important;
     padding-left: 28px !important;
     padding-right: 28px !important;
+  }
+
+  body.lar-sidebar-v3 .lar-topbar-context {
+    position: static !important;
+    margin: 0 !important;
+    transform: none !important;
+  }
+
+  body.lar-sidebar-v3 .lar-topbar-context-icon {
+    display: grid !important;
   }
 }
 
