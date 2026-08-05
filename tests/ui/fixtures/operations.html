@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="ko" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>운영 관리</title>
+  <link rel="stylesheet" href="/templates/static/css/style.css">
+  <link rel="stylesheet" href="/templates/static/css/app-v3.css">
+  <link rel="stylesheet" href="/templates/static/css/operations-v2.css">
+  <style>@media (min-width:1100px){body.lar-sidebar-v3 .menu-icon{display:none!important}}</style>
+</head>
+<body class="page-operations lar-sidebar-v3 lar-desktop-nav lar-ui-v3">
+  <div class="navbar-container"><div class="navbar"><button class="menu-icon">☰</button><div class="lar-topbar-context"><span class="lar-topbar-context-icon">●</span><span><small>Live Auto Recorder</small><strong>운영 관리</strong></span></div></div></div>
+  <aside id="mySidenav" class="sidenav">
+    <div class="lar-sidenav-head"><a class="lar-sidebar-brand"><span class="lar-sidebar-logo">◉</span><span class="lar-sidebar-brand-copy"><strong>Live Auto Recorder</strong><small>Operations</small></span></a></div>
+    <nav class="lar-sidebar-list"><a class="lar-sidebar-link"><span class="lar-sidebar-link-icon">⌂</span><span class="lar-sidebar-link-copy"><strong>대시보드</strong><small>전체 상태</small></span></a><a class="lar-sidebar-link lar-active"><span class="lar-sidebar-link-icon">⚙</span><span class="lar-sidebar-link-copy"><strong>운영 관리</strong><small>안전·백업·통계</small></span></a></nav>
+  </aside>
+  <main id="content" class="ops-page">
+    <header class="ops-hero"><div><span class="ops-eyebrow">OPERATIONS CENTER</span><h1>운영 관리</h1><p>저장소 보호, 녹화 상태, 후처리, 백업과 자동 녹화 규칙을 한곳에서 관리합니다.</p></div><button class="ops-primary">지금 새로고침</button></header>
+    <section class="ops-summary">
+      <article class="ops-kpi"><span>녹화 저장소</span><strong>42% 남음</strong><small>4.6 TB 사용 가능</small></article>
+      <article class="ops-kpi"><span>현재 녹화</span><strong>2</strong><small>확인 중 3개</small></article>
+      <article class="ops-kpi"><span>상태 이상</span><strong>0</strong><small>재연결 0개</small></article>
+      <article class="ops-kpi"><span>후처리</span><strong>1</strong><small>실패 0건</small></article>
+      <article class="ops-kpi"><span>백업</span><strong>7</strong><small>보관 중</small></article>
+    </section>
+    <nav class="ops-tabs"><button class="is-active">저장소</button><button>녹화 상태</button><button>후처리</button><button>백업</button><button>통계</button><button>채널 규칙</button></nav>
+    <section class="ops-panel is-active">
+      <div class="ops-section-head"><div><h2>저장소 보호</h2><p>디스크가 부족하면 신규 녹화를 차단합니다.</p></div></div>
+      <div class="ops-storage-card"><div><span>녹화 저장소</span><strong>/app/chzzk</strong></div><div class="ops-storage-number"><strong>4.6 TB</strong><span>42% 남음</span></div><div class="ops-progress"><i style="width:58%"></i></div><small>6.3 TB / 10.9 TB</small></div>
+      <form class="ops-form-grid"><label>경고 기준<input value="10"></label><label>차단 기준<input value="5"></label><label>정리 방식<select><option>보관 기간</option></select></label><label>보관 기간<input value="30"></label><label>최대 용량<input value="0"></label><label class="ops-check"><input type="checkbox"> 자동 정리</label><div class="ops-form-actions"><button class="ops-primary">정책 저장</button><button>삭제 대상 미리보기</button></div></form>
+    </section>
+    <section class="ops-panel is-active">
+      <div class="ops-section-head"><div><h2>녹화 건강 상태</h2><p>파일 기록 속도와 프로세스 상태를 감시합니다.</p></div></div>
+      <div class="ops-card-list"><article class="ops-health-card" data-state="recording"><div class="ops-card-head"><div><strong>테스트 채널</strong><small>CHZZK</small></div><span class="ops-status">녹화 중</span></div><dl><div><dt>기록 속도</dt><dd>4.2 MB/s</dd></div><div><dt>파일 크기</dt><dd>12.4 GB</dd></div><div><dt>마지막 기록</dt><dd>방금 전</dd></div><div><dt>녹화 도구</dt><dd>Streamlink + FFmpeg</dd></div></dl></article><article class="ops-health-card" data-state="checking"><div class="ops-card-head"><div><strong>대기 채널</strong><small>YOUTUBE</small></div><span class="ops-status">라이브 확인 중</span></div><dl><div><dt>기록 속도</dt><dd>-</dd></div><div><dt>파일 크기</dt><dd>-</dd></div></dl></article></div>
+    </section>
+  </main>
+</body>
+</html>

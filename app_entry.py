@@ -3,15 +3,19 @@ from __future__ import annotations
 
 import os
 import re
+import time
+from collections import defaultdict, deque
+from contextlib import asynccontextmanager
 from html import escape
 from pathlib import Path
 
 import uvicorn
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
-from starlette.responses import Response
+from starlette.responses import JSONResponse, Response
 
 import live_auto_recorder as lar
+from module.operations_v2 import install_operations
 
 
 ROOT_DIR = Path(__file__).resolve().parent
@@ -23,13 +27,30 @@ RELEASE_VERSION = (
 )
 PROGRAM_NAME = str(getattr(lar, "PROGRAM_NAME", "Live Auto Recorder"))
 
-# Keep template cache keys and UI version labels consistent with the release file.
+# VERSION is the single runtime source used by templates, assets, logs and Docker.
 lar.PROGRAM_VERSION = RELEASE_VERSION
 lar.templates.env.globals.update(
     program_name=PROGRAM_NAME,
     program_version=RELEASE_VERSION,
 )
 app = lar.app
+operations = install_operations(app, lar)
+
+# Extend the recorder lifespan without changing the legacy core module.
+_core_lifespan = app.router.lifespan_context
+
+
+@asynccontextmanager
+async def application_lifespan(application):
+    async with _core_lifespan(application):
+        await operations.start()
+        try:
+            yield
+        finally:
+            await operations.stop()
+
+
+app.router.lifespan_context = application_lifespan
 
 HTML_ROUTES = {
     "/",
@@ -38,6 +59,7 @@ HTML_ROUTES = {
     "/channels",
     "/cookies",
     "/files",
+    "/operations",
     "/register",
 }
 
@@ -45,6 +67,53 @@ _VERSION_IN_TITLE = re.compile(
     r"(<title>[^<]*?)\s+v\d+\.\d+\.\d+(?:[.-][0-9A-Za-z.-]+)?\s*(</title>)",
     re.IGNORECASE,
 )
+
+
+class SecurityMiddleware(BaseHTTPMiddleware):
+    """Add conservative security headers, login throttling, and audit events."""
+
+    failures = defaultdict(deque)
+    window_seconds = 600
+    max_failures = 5
+
+    @staticmethod
+    def client_key(request: Request) -> str:
+        forwarded = request.headers.get("x-forwarded-for", "").split(",")[0].strip()
+        return forwarded or (request.client.host if request.client else "unknown")
+
+    async def dispatch(self, request: Request, call_next):
+        key = self.client_key(request)
+        now = time.time()
+        attempts = self.failures[key]
+        while attempts and now - attempts[0] > self.window_seconds:
+            attempts.popleft()
+
+        if request.method == "POST" and request.url.path == "/login" and len(attempts) >= self.max_failures:
+            operations.audit("login_throttled", f"client={key}", "blocked")
+            return JSONResponse(
+                {"status": "error", "message": "로그인 시도가 너무 많습니다. 10분 후 다시 시도하세요."},
+                status_code=429,
+            )
+
+        response = await call_next(request)
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("X-Frame-Options", "DENY")
+        response.headers.setdefault("Referrer-Policy", "same-origin")
+        response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+        response.headers.setdefault("Content-Security-Policy", "frame-ancestors 'none'; base-uri 'self'; form-action 'self'")
+        if request.url.path in {"/login", "/register", "/config", "/cookies", "/operations"}:
+            response.headers.setdefault("Cache-Control", "no-store")
+
+        if request.method == "POST" and request.url.path == "/login":
+            if response.status_code == 401:
+                attempts.append(now)
+                operations.audit("login_failed", f"client={key}", "error")
+            elif response.status_code < 400:
+                attempts.clear()
+                operations.audit("login_succeeded", f"client={key}")
+        elif request.method in {"POST", "PUT", "PATCH", "DELETE"} and not request.url.path.startswith("/api/sys_metrics"):
+            operations.audit("http_mutation", f"{request.method} {request.url.path}; status={response.status_code}", "ok" if response.status_code < 400 else "error")
+        return response
 
 
 class ConsoleAssetsMiddleware(BaseHTTPMiddleware):
@@ -74,8 +143,6 @@ class ConsoleAssetsMiddleware(BaseHTTPMiddleware):
                 media_type=content_type,
             )
 
-        # Browser tabs show the product/page name only; release versions stay in
-        # deployment metadata and Docker tags instead of the document title.
         html = _VERSION_IN_TITLE.sub(r"\1\2", html)
 
         version = escape(RELEASE_VERSION, quote=True)
@@ -84,6 +151,9 @@ class ConsoleAssetsMiddleware(BaseHTTPMiddleware):
             '<link rel="stylesheet" href="/static/css/app-v3.css?v='
             + version
             + '" data-lar-ui-v3>'
+            '<link rel="stylesheet" href="/static/css/operations-v2.css?v='
+            + version
+            + '" data-lar-operations-v2>'
             '<style data-lar-ui-v3-critical>'
             '@media (min-width:1100px){body.lar-sidebar-v3 .menu-icon{display:none!important}}'
             '</style>'
@@ -101,6 +171,9 @@ class ConsoleAssetsMiddleware(BaseHTTPMiddleware):
             '<script src="/static/js/app-ui-v3.js?v='
             + version
             + '" defer data-lar-ui-v3></script>'
+            '<script src="/static/js/operations-v2.js?v='
+            + version
+            + '" defer data-lar-operations-v2></script>'
         )
 
         if "data-lar-ui-v3" not in html:
@@ -125,6 +198,7 @@ class ConsoleAssetsMiddleware(BaseHTTPMiddleware):
 
 
 app.add_middleware(ConsoleAssetsMiddleware)
+app.add_middleware(SecurityMiddleware)
 
 
 def main() -> None:
