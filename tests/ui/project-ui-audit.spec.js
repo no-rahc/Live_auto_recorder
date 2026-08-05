@@ -13,12 +13,14 @@ test('channel management keeps summaries compact and opens editing on demand', a
   const cards = page.locator('.channel-card');
   await expect(cards).toHaveCount(2);
   await expect(cards.first().locator('.channel-edit-form')).toBeHidden();
-  const toggle = cards.first().getByRole('button', { name: '설정 열기' });
+  const toggle = cards.first().locator('.lar-channel-edit-toggle');
+  await expect(toggle).toHaveText('설정 열기');
   await expect(toggle).toHaveAttribute('aria-expanded', 'false');
   await toggle.click();
   await expect(cards.first().locator('.channel-edit-form')).toBeVisible();
+  await expect(toggle).toHaveText('설정 닫기');
   await expect(toggle).toHaveAttribute('aria-expanded', 'true');
-  await cards.first().getByRole('button', { name: '설정 닫기' }).click();
+  await toggle.click();
   await expect(cards.first().locator('.channel-edit-form')).toBeHidden();
 
   if ((viewport?.width || 0) >= 901) {
@@ -35,10 +37,12 @@ test('cookie management groups providers and masks sensitive values', async ({ p
   await expect(panels).toHaveCount(2);
   const secret = page.locator('#NID_AUT');
   await expect(secret).toHaveAttribute('type', 'password');
-  const toggle = secret.locator('xpath=..').getByRole('button', { name: '비밀번호 표시' });
+  const toggle = secret.locator('xpath=..').locator('.lar-password-toggle');
+  await expect(toggle).toHaveAccessibleName('비밀번호 표시');
   await toggle.click();
   await expect(secret).toHaveAttribute('type', 'text');
   await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+  await expect(toggle).toHaveAccessibleName('비밀번호 숨기기');
 
   const first = await panels.first().boundingBox();
   const second = await panels.nth(1).boundingBox();
