@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.1.12 - 2026-08-05
+
+- Reorganized settings into five focused groups for recording, CHZZK, processing, notifications, and system/security.
+- Removed duplicate backup and cleanup cards from settings and linked those tasks to the operations center.
+- Added progressive disclosure so disabled plugins, split recording, post-processing, encoding, notifications, and file-manager options do not consume space.
+- Added encoding profiles, live filename previews, recording-path diagnostics, and server encoder capability checks.
+- Added a fixed unsaved-change bar with reset and save actions and hid desktop-only tray/window options in the container UI.
+- Replaced the legacy settings masonry override with a single responsive settings workspace and automated interaction checks.
+
 ## v1.1.11 - 2026-08-05
 
 - Replaced the dashboard modal's square automatic-recording checkbox with a compact orange switch and supporting description.
