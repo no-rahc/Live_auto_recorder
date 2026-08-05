@@ -78,8 +78,10 @@ class SecurityMiddleware(BaseHTTPMiddleware):
 
     @staticmethod
     def client_key(request: Request) -> str:
-        forwarded = request.headers.get("x-forwarded-for", "").split(",")[0].strip()
-        return forwarded or (request.client.host if request.client else "unknown")
+        # Do not trust client-supplied forwarding headers by default. Reverse
+        # proxies should enforce rate limiting at the edge or pass through a
+        # trusted middleware before enabling forwarded-client resolution.
+        return request.client.host if request.client else "unknown"
 
     async def dispatch(self, request: Request, call_next):
         key = self.client_key(request)
