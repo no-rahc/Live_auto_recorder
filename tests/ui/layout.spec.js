@@ -4,6 +4,7 @@ const fixture = '/tests/ui/fixtures/recording.html';
 
 test('light layout has no horizontal overflow and visible content', async ({ page }, testInfo) => {
   await page.goto(fixture);
+  await expect(page).toHaveTitle('Live Auto Recorder');
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
   await expect(page.getByRole('heading', { name: '녹화 현황' })).toBeVisible();
   await expect(page.locator('.channel-info').first()).toBeVisible();
