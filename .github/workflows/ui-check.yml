@@ -65,6 +65,7 @@ jobs:
               'templates/static/css/config-density-v1.css',
               'templates/static/css/recording-density-v1.css',
               'templates/static/css/operations-v2.css',
+              'templates/static/css/ui-polish-v1.css',
           ):
               css = Path(css_path).read_text(encoding='utf-8')
               if css.count('{') != css.count('}'):
