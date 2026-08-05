@@ -1,0 +1,53 @@
+name: UI layout checks
+
+on:
+  pull_request:
+    paths:
+      - 'templates/**'
+      - 'tests/ui/**'
+      - 'package.json'
+      - 'playwright.config.js'
+      - '.github/workflows/ui-check.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'templates/**'
+      - 'tests/ui/**'
+      - 'package.json'
+      - 'playwright.config.js'
+
+permissions:
+  contents: read
+
+jobs:
+  layout:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install test dependencies
+        run: npm install
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run responsive UI checks
+        run: npm run test:ui
+
+      - name: Upload UI reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-layout-report
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 14
