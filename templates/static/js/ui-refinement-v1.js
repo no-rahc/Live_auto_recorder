@@ -70,11 +70,14 @@
     const bar = document.querySelector(".lar-config-savebar");
     if (bar) {
       const title = bar.querySelector("strong");
-      const observer = new MutationObserver(function () {
-        if (bar.classList.contains("is-dirty") && title) title.textContent = "변경사항 저장";
-      });
-      observer.observe(bar, { attributes: true, attributeFilter: ["class"], subtree: true, childList: true });
-      if (bar.classList.contains("is-dirty") && title) title.textContent = "변경사항 저장";
+      const syncTitle = function () {
+        if (bar.classList.contains("is-dirty") && title && title.textContent !== "변경사항 저장") {
+          title.textContent = "변경사항 저장";
+        }
+      };
+      const observer = new MutationObserver(syncTitle);
+      observer.observe(bar, { attributes: true, attributeFilter: ["class"] });
+      syncTitle();
     }
 
     const viewport = window.visualViewport;
