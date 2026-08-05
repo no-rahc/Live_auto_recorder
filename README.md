@@ -42,6 +42,19 @@ docker compose up -d --build
 
 설정과 쿠키 등 민감한 런타임 데이터는 저장소에 커밋하지 말고 위 볼륨 경로에 보관하세요.
 
+## 대시보드 갱신 구조
+
+실시간 시스템 지표는 기능 코드와 분리된 `system-metrics-v2.js`가 관리합니다.
+
+- 녹화 현황 화면은 시스템 지표 WebSocket 연결을 하나만 유지합니다.
+- 메인 화면에서 같은 시점에 발생하는 `/api/sys_metrics` 요청은 하나로 병합합니다.
+- 브라우저 탭이 숨겨진 동안에는 최근 값을 재사용해 불필요한 네트워크 요청을 줄입니다.
+- CPU·메모리·네트워크 그래프는 완만하게 보간하고 숫자 영역의 폭을 고정합니다.
+- 디스크 카드는 매 갱신마다 삭제하지 않고 마운트 경로를 키로 사용해 기존 DOM을 갱신합니다.
+- 동적으로 추가된 UI의 접근성 처리는 문서 전체가 아닌 새 요소만 묶어서 수행합니다.
+
+따라서 2초 단위 갱신 중에도 카드 크기와 그리드 위치가 유지되며, 같은 데이터를 위한 중복 렌더링과 중복 요청이 줄어듭니다.
+
 ## Docker Hub 자동 게시
 
 `.github/workflows/docker-publish.yml`은 `main` 브랜치 또는 `v*` 태그가 푸시될 때 이미지를 빌드하고 Docker Hub로 게시합니다.
@@ -63,15 +76,19 @@ python app_entry.py
 ## 프로젝트 구조
 
 ```text
-app_entry.py                       # Docker/서버용 실행 진입점과 UI 레이어
-live_auto_recorder.py              # FastAPI 애플리케이션과 API
-module/                            # 녹화·채널·알림·파일 관리 모듈
-templates/                         # 기존 웹 UI 템플릿과 정적 리소스
-templates/static/css/console-v2.css
-templates/static/js/console-v2.js
-compose.yaml                       # 운영용 Compose 구성
-Dockerfile                         # 컨테이너 이미지 빌드 설정
+app_entry.py                            # Docker 진입점과 UI 정적 자산 주입
+live_auto_recorder.py                   # FastAPI 애플리케이션과 API
+module/                                 # 녹화·채널·알림·파일 관리 모듈
+templates/                              # 기존 웹 UI 템플릿
+templates/static/css/console-v2.css     # 공통 Console v2 디자인
+templates/static/css/system-metrics-v2.css
+templates/static/js/console-v2.js       # 내비게이션·테마·접근성
+templates/static/js/system-metrics-v2.js # 실시간 지표 연결·캐시·안정화
+compose.yaml                            # 운영용 Compose 구성
+Dockerfile                              # 컨테이너 이미지 빌드 설정
 ```
+
+`app_entry.py`의 UI 미들웨어는 대시보드 HTML 경로에만 적용됩니다. API, 정적 파일, WebSocket, 다운로드 요청은 응답 본문 가공 과정을 거치지 않습니다.
 
 ## 라이선스
 
