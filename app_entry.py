@@ -1,16 +1,35 @@
-"""Docker-friendly application entrypoint with modular UI enhancement layers."""
+"""Docker-friendly application entrypoint with consolidated UI assets."""
 from __future__ import annotations
 
 import os
+import re
 from html import escape
+from pathlib import Path
 
 import uvicorn
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
 
-from live_auto_recorder import PROGRAM_VERSION, app
+import live_auto_recorder as lar
 
+
+ROOT_DIR = Path(__file__).resolve().parent
+VERSION_FILE = ROOT_DIR / "VERSION"
+RELEASE_VERSION = (
+    VERSION_FILE.read_text(encoding="utf-8").strip()
+    if VERSION_FILE.exists()
+    else str(getattr(lar, "PROGRAM_VERSION", "v0.0.0"))
+)
+PROGRAM_NAME = str(getattr(lar, "PROGRAM_NAME", "Live Auto Recorder"))
+
+# Keep template cache keys and UI version labels consistent with the release file.
+lar.PROGRAM_VERSION = RELEASE_VERSION
+lar.templates.env.globals.update(
+    program_name=PROGRAM_NAME,
+    program_version=RELEASE_VERSION,
+)
+app = lar.app
 
 HTML_ROUTES = {
     "/",
@@ -22,15 +41,14 @@ HTML_ROUTES = {
     "/register",
 }
 
+_VERSION_IN_TITLE = re.compile(
+    r"(<title>[^<]*?)\s+v\d+\.\d+\.\d+(?:[.-][0-9A-Za-z.-]+)?\s*(</title>)",
+    re.IGNORECASE,
+)
+
 
 class ConsoleAssetsMiddleware(BaseHTTPMiddleware):
-    """Inject modular UI assets into the small set of dashboard pages.
-
-    API, static-file, websocket, and download responses bypass the response-body
-    buffering path entirely. The original templates and their functional element
-    IDs remain unchanged while presentation and live-metrics behavior can evolve
-    in isolated static assets.
-    """
+    """Inject the consolidated light UI only into dashboard HTML routes."""
 
     async def dispatch(self, request: Request, call_next):
         if request.method != "GET" or request.url.path not in HTML_ROUTES:
@@ -56,62 +74,36 @@ class ConsoleAssetsMiddleware(BaseHTTPMiddleware):
                 media_type=content_type,
             )
 
-        version = escape(str(PROGRAM_VERSION), quote=True)
+        # Browser tabs show the product/page name only; release versions stay in
+        # deployment metadata and Docker tags instead of the document title.
+        html = _VERSION_IN_TITLE.sub(r"\1\2", html)
+
+        version = escape(RELEASE_VERSION, quote=True)
         head_assets = (
             '<meta name="color-scheme" content="light">'
-            '<link rel="stylesheet" href="/static/css/console-v2.css?v='
+            '<link rel="stylesheet" href="/static/css/app-v3.css?v='
             + version
-            + '" data-lar-console-v2>'
-            '<link rel="stylesheet" href="/static/css/shell-v3.css?v='
-            + version
-            + '" data-lar-shell-v3>'
-            '<link rel="stylesheet" href="/static/css/sidebar-v3.css?v='
-            + version
-            + '" data-lar-sidebar-v3>'
-            '<link rel="stylesheet" href="/static/css/system-metrics-v2.css?v='
-            + version
-            + '" data-lar-metrics-v2>'
-            '<link rel="stylesheet" href="/static/css/dashboard-v4.css?v='
-            + version
-            + '" data-lar-dashboard-v4>'
-            '<link rel="stylesheet" href="/static/css/recording-v3.css?v='
-            + version
-            + '" data-lar-recording-v3>'
-            '<link rel="stylesheet" href="/static/css/metrics-compact-v1.css?v='
-            + version
-            + '" data-lar-metrics-compact-v1>'
-            '<link rel="stylesheet" href="/static/css/carrot-ui-v1.css?v='
-            + version
-            + '" data-lar-carrot-ui-v1>'
-            '<link rel="stylesheet" href="/static/css/light-layout-v2.css?v='
-            + version
-            + '" data-lar-light-layout-v2>'
+            + '" data-lar-ui-v3>'
+            '<style data-lar-ui-v3-critical>'
+            '@media (min-width:1100px){body.lar-sidebar-v3 .menu-icon{display:none!important}}'
+            '</style>'
             '<script src="/static/js/system-metrics-v2.js?v='
             + version
             + '" data-lar-metrics-v2></script>'
         )
         body_assets = (
-            '<script src="/static/js/console-v2.js?v='
-            + version
-            + '" defer data-lar-console-v2></script>'
             '<script src="/static/js/sidebar-v3.js?v='
             + version
             + '" defer data-lar-sidebar-v3></script>'
             '<script src="/static/js/dashboard-v4.js?v='
             + version
             + '" defer data-lar-dashboard-v4></script>'
-            '<script src="/static/js/metrics-compact-v1.js?v='
+            '<script src="/static/js/app-ui-v3.js?v='
             + version
-            + '" defer data-lar-metrics-compact-v1></script>'
-            '<script src="/static/js/carrot-ui-v1.js?v='
-            + version
-            + '" defer data-lar-carrot-ui-v1></script>'
-            '<script src="/static/js/light-layout-v2.js?v='
-            + version
-            + '" defer data-lar-light-layout-v2></script>'
+            + '" defer data-lar-ui-v3></script>'
         )
 
-        if "data-lar-console-v2" not in html:
+        if "data-lar-ui-v3" not in html:
             if "</head>" in html:
                 html = html.replace("</head>", head_assets + "</head>", 1)
             else:

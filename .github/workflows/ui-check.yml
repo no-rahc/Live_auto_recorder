@@ -1,0 +1,79 @@
+name: UI layout checks
+
+on:
+  pull_request:
+    paths:
+      - 'app_entry.py'
+      - 'VERSION'
+      - 'templates/**'
+      - 'tests/ui/**'
+      - 'package.json'
+      - 'playwright.config.js'
+      - '.github/workflows/ui-check.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'app_entry.py'
+      - 'VERSION'
+      - 'templates/**'
+      - 'tests/ui/**'
+      - 'package.json'
+      - 'playwright.config.js'
+
+permissions:
+  contents: read
+
+jobs:
+  layout:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          package-manager-cache: false
+
+      - name: Validate source files
+        shell: bash
+        run: |
+          python3 -m py_compile app_entry.py
+          node --check templates/static/js/system-metrics-v2.js
+          node --check templates/static/js/sidebar-v3.js
+          node --check templates/static/js/dashboard-v4.js
+          node --check templates/static/js/app-ui-v3.js
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+
+          version = Path('VERSION').read_text(encoding='utf-8').strip()
+          if not re.fullmatch(r'v\d+\.\d+\.\d+(?:[.-][0-9A-Za-z.-]+)?', version):
+              raise SystemExit(f'invalid VERSION: {version}')
+
+          css = Path('templates/static/css/app-v3.css').read_text(encoding='utf-8')
+          if css.count('{') != css.count('}'):
+              raise SystemExit('unbalanced CSS braces')
+          PY
+
+      - name: Install test dependencies
+        run: npm install
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run responsive UI checks
+        run: npm run test:ui
+
+      - name: Upload UI reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ui-layout-report
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 14
