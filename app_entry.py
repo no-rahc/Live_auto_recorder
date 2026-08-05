@@ -153,6 +153,9 @@ class ConsoleAssetsMiddleware(BaseHTTPMiddleware):
             '<link rel="stylesheet" href="/static/css/app-v3.css?v='
             + version
             + '" data-lar-ui-v3>'
+            '<link rel="stylesheet" href="/static/css/recording-density-v1.css?v='
+            + version
+            + '" data-lar-recording-density-v1>'
             '<link rel="stylesheet" href="/static/css/operations-v2.css?v='
             + version
             + '" data-lar-operations-v2>'
