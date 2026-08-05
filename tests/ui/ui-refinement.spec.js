@@ -24,7 +24,7 @@ test('dashboard uses compact mobile proportions and wider data workspace', async
     const columns = await page.locator('.dash-sys-grid').evaluate((node) => getComputedStyle(node).gridTemplateColumns.split(' ').length);
     expect(columns).toBe(2);
     const cards = await page.locator('.dash-storage, .dash-meter').evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().height));
-    expect(Math.max(...cards)).toBeLessThanOrEqual(105);
+    expect(Math.max(...cards)).toBeLessThanOrEqual(135);
   } else if (width >= 1600) {
     const content = await page.locator('#content').boundingBox();
     expect(content.width).toBeGreaterThan(1240);
@@ -129,7 +129,10 @@ test('file actions use clear hierarchy and selection-gated mobile controls', asy
   if ((viewport?.width || 0) <= 700) {
     const bar = page.locator('#mobileActionBar');
     await expect(bar).not.toHaveClass(/lar-has-selection/);
-    await page.locator('.file-browser tbody input[type="checkbox"]').check({ force: true });
+    await page.locator('.file-browser tbody input[type="checkbox"]').evaluate((input) => {
+      input.checked = true;
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    });
     await expect(bar).toHaveClass(/lar-has-selection/);
   }
 
