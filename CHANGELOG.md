@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.1.7 - 2026-08-05
+
+- Rebalanced the recording status page so wide screens use a compact three-column channel grid instead of stretching two cards across the full content width.
+- Reduced channel card spacing, typography, metadata padding, and action height while preserving the full 16:9 thumbnail and all recording controls.
+- Added responsive checks for compact desktop, two-column tablet, and single-column mobile channel layouts.
+
 ## v1.1.6 - 2026-08-05
 
 - Added an operations center for storage protection, recording health, post-processing jobs, backups, statistics, channel rules, and audit history.
