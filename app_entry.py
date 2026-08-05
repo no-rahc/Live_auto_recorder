@@ -1,4 +1,4 @@
-"""Docker-friendly application entrypoint with the Console v2 UI layer."""
+"""Docker-friendly application entrypoint with modular UI enhancement layers."""
 from __future__ import annotations
 
 import os
@@ -12,15 +12,30 @@ from starlette.responses import Response
 from live_auto_recorder import PROGRAM_VERSION, app
 
 
-class ConsoleAssetsMiddleware(BaseHTTPMiddleware):
-    """Inject the optional UI layer into every HTML response.
+HTML_ROUTES = {
+    "/",
+    "/recording",
+    "/config",
+    "/channels",
+    "/cookies",
+    "/files",
+    "/register",
+}
 
-    The original templates, element IDs, forms, and page-specific JavaScript stay
-    untouched. This keeps application behavior stable while allowing the visual
-    layer to evolve independently.
+
+class ConsoleAssetsMiddleware(BaseHTTPMiddleware):
+    """Inject modular UI assets into the small set of dashboard pages.
+
+    API, static-file, websocket, and download responses bypass the response-body
+    buffering path entirely. The original templates and their functional element
+    IDs remain unchanged while presentation and live-metrics behavior can evolve
+    in isolated static assets.
     """
 
     async def dispatch(self, request: Request, call_next):
+        if request.method != "GET" or request.url.path not in HTML_ROUTES:
+            return await call_next(request)
+
         response = await call_next(request)
         content_type = response.headers.get("content-type", "")
         if "text/html" not in content_type.lower():
@@ -47,6 +62,12 @@ class ConsoleAssetsMiddleware(BaseHTTPMiddleware):
             '<link rel="stylesheet" href="/static/css/console-v2.css?v='
             + version
             + '" data-lar-console-v2>'
+            '<link rel="stylesheet" href="/static/css/system-metrics-v2.css?v='
+            + version
+            + '" data-lar-metrics-v2>'
+            '<script src="/static/js/system-metrics-v2.js?v='
+            + version
+            + '" data-lar-metrics-v2></script>'
         )
         body_assets = (
             '<script src="/static/js/console-v2.js?v='
