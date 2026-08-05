@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.1.13 - 2026-08-05
+
+- Standardized dashboard status chips to one fixed height, baseline, padding, and icon alignment.
+- Rebuilt the collapsed desktop sidebar header so the logo and collapse control no longer overlap inside the 72 px rail.
+- Normalized collapsed menu, account, and logout controls to compact square icon sizes and removed horizontal overflow.
+- Added automatic enhancement for navigation links injected after sidebar initialization, including the operations center link.
+- Added responsive browser checks for status-chip dimensions, delayed navigation links, collapsed sidebar width, hidden labels, account controls, and top-bar offsets.
+
 ## v1.1.12 - 2026-08-05
 
 - Reorganized settings into five focused groups for recording, CHZZK, processing, notifications, and system/security.
