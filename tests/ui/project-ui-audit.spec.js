@@ -124,7 +124,7 @@ test('login uses one centered card and supports password reveal', async ({ page,
 
   if ((viewport?.width || 0) >= 1100) {
     const content = await page.locator('#content').boundingBox();
-    const expectedCenter = (244 + viewport.width) / 2;
+    const expectedCenter = viewport.width / 2;
     expect(Math.abs(content.x + content.width / 2 - expectedCenter)).toBeLessThanOrEqual(2);
   }
 
@@ -147,7 +147,7 @@ test('registration is centered and reports password match without changing form 
 
   if ((viewport?.width || 0) >= 1100) {
     const content = await page.locator('#content').boundingBox();
-    const expectedCenter = (244 + viewport.width) / 2;
+    const expectedCenter = viewport.width / 2;
     expect(Math.abs(content.x + content.width / 2 - expectedCenter)).toBeLessThanOrEqual(2);
   }
 
