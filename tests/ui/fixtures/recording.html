@@ -3,12 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Live Auto Recorder v1.1.7</title>
+  <title>Live Auto Recorder v1.1.13</title>
   <link rel="stylesheet" href="/templates/static/css/style.css">
   <link rel="stylesheet" href="/templates/static/css/app-v3.css">
   <link rel="stylesheet" href="/templates/static/css/recording-density-v1.css">
   <style>@media (min-width:1100px){body.lar-sidebar-v3 .menu-icon{display:none!important}}</style>
   <script src="/templates/static/js/app-ui-v3.js" defer></script>
+  <script src="/templates/static/js/recording-live-meta-v1.js" defer></script>
 </head>
 <body class="page-recording lar-sidebar-v3 lar-desktop-nav lar-ui-v3">
   <div class="navbar-container">
@@ -25,7 +26,7 @@
     <div class="lar-sidenav-head">
       <a class="lar-sidebar-brand" href="#">
         <span class="lar-sidebar-logo">◉</span>
-        <span class="lar-sidebar-brand-copy"><strong>Live Auto Recorder</strong><small>v1.1.7</small></span>
+        <span class="lar-sidebar-brand-copy"><strong>Live Auto Recorder</strong><small>v1.1.13</small></span>
       </a>
       <button class="lar-sidebar-collapse">◀</button>
     </div>
@@ -56,13 +57,13 @@
     <div class="filter-container"><div><label>채널 필터</label><select><option>모든 채널</option></select></div><div><label>채널 검색</label><input type="search" placeholder="채널 이름 입력"></div></div>
 
     <section id="channel-list">
-      <article class="channel">
+      <article class="channel" data-channel-id="a" data-platform="chzzk">
         <div class="channel-thumbnail-container"><div class="channel-thumbnail" style="background:linear-gradient(135deg,#121212,#252525);display:grid;place-items:center;color:white;font-size:24px;font-weight:800">CHZZK LIVE</div></div>
-        <div class="channel-info"><h2 class="channel-name">테스트 채널 A (대기)</h2><p id="title-a">라이브 방송 제목이 여기에 표시됩니다.</p><p><strong>카테고리</strong>: 게임</p><p id="timing-a">녹화 OFF: 00:00:00</p><p id="filename-a">/app/chzzk/very-long-recording-file-name-example.ts</p><button class="start-recording">녹화 시작</button></div>
+        <div class="channel-info"><h2 class="channel-name">테스트 채널 A (대기)</h2><p id="title-a">라이브 방송 제목이 여기에 표시됩니다.</p><p id="category-a"><strong>카테고리</strong>: 게임</p><p id="timing-a">녹화 OFF: 00:00:00</p><p id="filename-a">/app/chzzk/very-long-recording-file-name-example.ts</p><button class="start-recording">녹화 시작</button></div>
       </article>
-      <article class="channel">
+      <article class="channel" data-channel-id="b" data-platform="chzzk">
         <div class="channel-thumbnail-container"><div class="channel-thumbnail" style="background:linear-gradient(135deg,#121212,#252525);display:grid;place-items:center;color:white;font-size:24px;font-weight:800">CHZZK LIVE</div></div>
-        <div class="channel-info"><h2 class="channel-name">테스트 채널 B (녹화 중)</h2><p id="title-b">다른 라이브 방송 제목입니다.</p><p><strong>카테고리</strong>: 토크</p><p id="timing-b">녹화시간: 01:24:18</p><p id="filename-b">/app/chzzk/another-long-file-name-example.ts</p><button class="stop-recording">녹화 중지</button></div>
+        <div class="channel-info"><h2 class="channel-name">테스트 채널 B (녹화 중)</h2><p id="title-b">방송 준비 중</p><p id="category-b"><strong>카테고리</strong>: 토크</p><p id="timing-b">녹화시간: 01:24:18</p><p id="filename-b">/app/chzzk/another-long-file-name-example.ts</p><button class="stop-recording">녹화 중지</button></div>
       </article>
     </section>
   </main>
