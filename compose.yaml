@@ -1,0 +1,33 @@
+services:
+  recorder:
+    image: ${LIVE_AUTO_RECORDER_IMAGE:-no-rahc/live-auto-recorder:latest}
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: live-auto-recorder
+    init: true
+    restart: unless-stopped
+    ports:
+      - "${APP_PORT:-5000}:5000"
+    environment:
+      TZ: ${TZ:-Asia/Seoul}
+      HOST: 0.0.0.0
+      PORT: 5000
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    volumes:
+      - ${CONFIG_PATH:-./data}:/app/json
+      - ${RECORDINGS_PATH:-./recordings}:/app/chzzk
+      - ${LOG_PATH:-./logs}:/app/logs
+      - ${TMP_PATH:-./tmp}:/app/tmp
+    stop_grace_period: 45s
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:5000/"]
+      interval: 30s
+      timeout: 5s
+      start_period: 45s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
