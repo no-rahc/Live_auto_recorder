@@ -16,6 +16,7 @@
   const lastRequestedAt = new Map();
   const inFlight = new Map();
   const retryTimers = new Map();
+  const placeholderRetryCount = new Map();
 
   function isRecordingCard(card) {
     const text = card.querySelector(".channel-name")?.textContent || "";
@@ -52,6 +53,7 @@
     if (titleNode && title && !placeholderTitles.has(title)) {
       titleNode.textContent = adult ? `${title} (연령제한)` : title;
       titleNode.dataset.larLiveTitle = "current";
+      placeholderRetryCount.delete(channelId);
     }
 
     const categoryNode = document.getElementById(`category-${channelId}`) || card.querySelector(".channel-category, .category");
@@ -70,8 +72,10 @@
 
   function schedulePlaceholderRetry(card) {
     const channelId = card.dataset.channelId || "";
-    if (!channelId || retryTimers.has(channelId) || !isRecordingCard(card)) return;
+    const retries = placeholderRetryCount.get(channelId) || 0;
+    if (!channelId || retries >= 1 || retryTimers.has(channelId) || !isRecordingCard(card)) return;
 
+    placeholderRetryCount.set(channelId, retries + 1);
     const timer = window.setTimeout(function () {
       retryTimers.delete(channelId);
       refreshCard(card, true);
@@ -129,13 +133,19 @@
     const observer = new MutationObserver(function (mutations) {
       const cards = new Set();
       mutations.forEach(function (mutation) {
-        const card = mutation.target instanceof Element
-          ? mutation.target.closest(".channel[data-channel-id]")
-          : mutation.target.parentElement?.closest(".channel[data-channel-id]");
+        const target = mutation.target instanceof Element
+          ? mutation.target
+          : mutation.target.parentElement;
+        const statusNode = target?.closest?.(".channel-name");
+        if (!statusNode) return;
+        const card = statusNode.closest(".channel[data-channel-id]");
         if (card) cards.add(card);
       });
       cards.forEach(function (card) {
-        if (isRecordingCard(card)) refreshCard(card, true);
+        if (isRecordingCard(card)) {
+          placeholderRetryCount.delete(card.dataset.channelId || "");
+          refreshCard(card, true);
+        }
       });
     });
 
