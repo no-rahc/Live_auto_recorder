@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.1.11 - 2026-08-05
+
+- Replaced the dashboard modal's square automatic-recording checkbox with a compact orange switch and supporting description.
+- Kept the switch visually clear in both view and edit modes while preserving keyboard focus and disabled-state behavior.
+- Removed the inherited centered max-width from the desktop top bar so page context begins a consistent distance from the sidebar.
+- Added responsive checks for the sidebar-to-topbar gap and the automatic-recording switch dimensions and colors.
+
 ## v1.1.10 - 2026-08-05
 
 - Added a dashboard channel-details modal that opens from each channel status row.

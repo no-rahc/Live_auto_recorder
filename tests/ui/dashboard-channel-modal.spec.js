@@ -45,6 +45,22 @@ test('dashboard channel row opens editable detail modal', async ({ page }, testI
   });
 
   await page.goto('/tests/ui/fixtures/dashboard.html');
+
+  const viewport = page.viewportSize();
+  if (viewport && viewport.width >= 1100) {
+    const sidebar = await page.locator('.sidenav').boundingBox();
+    const topbar = await page.locator('.lar-topbar-context').boundingBox();
+    const topbarIcon = await page.locator('.lar-topbar-context-icon').boundingBox();
+    const sidebarRight = sidebar.x + sidebar.width;
+    const gap = topbar.x - sidebarRight;
+    const iconGap = topbarIcon.x - sidebarRight;
+    expect(gap).toBeGreaterThanOrEqual(24);
+    expect(gap).toBeLessThanOrEqual(36);
+    expect(iconGap).toBeGreaterThanOrEqual(24);
+    expect(iconGap).toBeLessThanOrEqual(36);
+    expect(topbarIcon.width).toBeGreaterThanOrEqual(36);
+  }
+
   const firstRow = page.locator('#ch-list .ch-row').first();
   await expect(firstRow).toHaveClass(/lar-channel-clickable/);
   await expect(firstRow).toHaveAttribute('role', 'button');
@@ -58,12 +74,39 @@ test('dashboard channel row opens editable detail modal', async ({ page }, testI
 
   const nameInput = page.locator('#lar-channel-detail-form [name="name"]');
   const platformSelect = page.locator('#lar-channel-detail-form [name="platform"]');
+  const recordToggle = page.locator('#lar-channel-detail-form [name="record_enabled"]');
   await expect(nameInput).toBeDisabled();
   await expect(platformSelect).toBeDisabled();
+  await expect(recordToggle).toBeDisabled();
 
   await page.getByRole('button', { name: '수정', exact: true }).click();
   await expect(nameInput).toBeEnabled();
   await expect(platformSelect).toBeDisabled();
+  await expect(recordToggle).toBeEnabled();
+  await expect(recordToggle).toBeChecked();
+
+  const toggleStyle = await recordToggle.evaluate((element) => {
+    const style = getComputedStyle(element);
+    const knob = getComputedStyle(element, '::after');
+    return {
+      width: style.width,
+      height: style.height,
+      radius: style.borderRadius,
+      background: style.backgroundColor,
+      knobWidth: knob.width,
+    };
+  });
+  expect(toggleStyle.width).toBe('48px');
+  expect(toggleStyle.height).toBe('28px');
+  expect(toggleStyle.radius).toBe('999px');
+  expect(toggleStyle.background).toBe('rgb(255, 111, 15)');
+  expect(toggleStyle.knobWidth).toBe('22px');
+
+  const toggleDescription = await page.locator('.lar-channel-switch-field > span').evaluate((element) => {
+    return getComputedStyle(element, '::after').content;
+  });
+  expect(toggleDescription).toContain('자동 녹화를 허용');
+
   await nameInput.fill('채널 A 수정');
   await page.locator('#lar-channel-detail-form [name="quality"]').selectOption('1080p');
   await page.getByRole('button', { name: '변경사항 저장' }).click();
@@ -76,7 +119,6 @@ test('dashboard channel row opens editable detail modal', async ({ page }, testI
   await expect(nameInput).toBeDisabled();
 
   const box = await dialog.boundingBox();
-  const viewport = page.viewportSize();
   expect(box.width).toBeLessThanOrEqual(viewport.width);
   expect(box.height).toBeLessThanOrEqual(viewport.height);
 
