@@ -159,7 +159,7 @@ python app_entry.py
 python -m compileall -q app_entry.py lar_app module
 python -m unittest discover -s tests -p 'test_*_v1.py' -v
 python -m unittest discover -s tests -p 'test_operations_v2.py' -v
-npm install
+npm ci
 npm run test:ui
 python scripts/release.py check
 ```
