@@ -19,6 +19,11 @@ test('local mode removes account and logout controls from the sidebar', async ({
 });
 
 test('authenticated mode keeps only a compact topbar logout action', async ({ page }, testInfo) => {
+  await page.route('**/user_info', (route) => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({ config: { loginMode: true } }),
+  }));
   await page.goto('/tests/ui/fixtures/sidebar-account-auth.html');
   await expect(page.locator('body')).toHaveClass(/lar-sidebar-account-clean/);
   await expect(page.locator('#user-info')).toHaveCount(0);
