@@ -7,7 +7,7 @@ CHZZK·YouTube 라이브 자동 녹화 도구
 [![UI checks](https://github.com/no-rahc/Live_auto_recorder/actions/workflows/ui-check.yml/badge.svg?branch=main)](https://github.com/no-rahc/Live_auto_recorder/actions/workflows/ui-check.yml)
 [![Core checks](https://github.com/no-rahc/Live_auto_recorder/actions/workflows/core-check.yml/badge.svg?branch=main)](https://github.com/no-rahc/Live_auto_recorder/actions/workflows/core-check.yml)
 [![Docker publish](https://github.com/no-rahc/Live_auto_recorder/actions/workflows/docker-publish.yml/badge.svg?branch=main)](https://github.com/no-rahc/Live_auto_recorder/actions/workflows/docker-publish.yml)
-[![Docker pulls](https://img.shields.io/docker/pulls/no-rahc/live-auto-recorder?logo=docker&label=pulls)](https://hub.docker.com/r/no-rahc/live-auto-recorder)
+[![Docker pulls](https://img.shields.io/docker/pulls/yeowoonlee/live-auto-recorder?logo=docker&label=pulls)](https://hub.docker.com/r/yeowoonlee/live-auto-recorder)
 [![License](https://img.shields.io/badge/license-MIT-2f81f7.svg)](LICENSE)
 
 </div>
@@ -40,7 +40,7 @@ http://서버주소:5000
 
 | 변수 | 기본값 | 설명 |
 |---|---|---|
-| `LIVE_AUTO_RECORDER_IMAGE` | `no-rahc/live-auto-recorder:latest` | Docker 이미지 |
+| `LIVE_AUTO_RECORDER_IMAGE` | `yeowoonlee/live-auto-recorder:latest` | Docker 이미지 |
 | `APP_PORT` | `5000` | 웹 포트 |
 | `TZ` | `Asia/Seoul` | 시간대 |
 | `LOG_LEVEL` | `info` | 로그 수준 |
@@ -50,7 +50,7 @@ http://서버주소:5000
 | `TMP_PATH` | `./tmp` | 임시 파일 |
 
 ```env
-LIVE_AUTO_RECORDER_IMAGE=no-rahc/live-auto-recorder:vX.Y.Z
+LIVE_AUTO_RECORDER_IMAGE=yeowoonlee/live-auto-recorder:vX.Y.Z
 APP_PORT=5000
 TZ=Asia/Seoul
 LOG_LEVEL=info
