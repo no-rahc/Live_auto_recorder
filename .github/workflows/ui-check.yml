@@ -11,6 +11,7 @@ on:
       - 'templates/**'
       - 'tests/ui/**'
       - 'package.json'
+      - 'package-lock.json'
       - 'playwright.config.js'
       - '.github/workflows/ui-check.yml'
   push:
@@ -24,6 +25,7 @@ on:
       - 'templates/**'
       - 'tests/ui/**'
       - 'package.json'
+      - 'package-lock.json'
       - 'playwright.config.js'
 
 permissions:
@@ -75,7 +77,13 @@ jobs:
           PY
 
       - name: Install test dependencies
-        run: npm install
+        shell: bash
+        run: |
+          if [[ -f package-lock.json ]]; then
+            npm ci
+          else
+            npm install
+          fi
 
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
@@ -89,6 +97,7 @@ jobs:
         with:
           name: ui-layout-report
           path: |
+            package-lock.json
             playwright-report/
             test-results/
           if-no-files-found: ignore
