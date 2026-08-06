@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-Security fixes are applied to the latest release. Older Docker tags may not receive backports.
+Security fixes are applied to `main` and the current `latest` Docker image. Older version tags may not receive backports.
 
 ## Reporting a vulnerability
 
