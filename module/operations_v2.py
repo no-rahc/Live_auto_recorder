@@ -6,6 +6,7 @@ from typing import Any
 from fastapi import APIRouter, Body, Depends, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 
+from lar_app.security import secret_backups_allowed
 from module.operations_backup import BackupStatsMixin
 from module.operations_common import OperationsBase, _iso
 from module.operations_health import HealthJobsMixin
@@ -20,13 +21,20 @@ def install_operations(app: Any, lar: Any) -> OperationsRuntime:
     runtime = OperationsRuntime(app, lar)
     runtime.install_hooks()
     router = APIRouter()
-    auth = Depends(lar.requireLogin)
+
+    async def require_operator(request: Request) -> bool:
+        account = lar.loadAccount() or {}
+        if not account.get("password") or not request.session.get("logged_in"):
+            raise HTTPException(status_code=401, detail="Operator login required")
+        return True
+
+    auth = Depends(require_operator)
 
     @router.get("/operations", response_class=HTMLResponse)
     async def operations_page(request: Request, login: Any = auth):
         return lar.templates.TemplateResponse("operations.html", {
             "request": request,
-            "loginMode": bool((getattr(app.state, "config", {}) or {}).get("loginMode", False)),
+            "loginMode": True,
             "program_version": getattr(lar, "PROGRAM_VERSION", ""),
             "channels": list(getattr(app.state, "channels", []) or []),
         })
@@ -75,7 +83,13 @@ def install_operations(app: Any, lar: Any) -> OperationsRuntime:
 
     @router.post("/api/operations/backups")
     async def create_backup(payload: dict[str, Any] = Body(default={}), login: Any = auth):
-        return runtime.create_backup(payload.get("include_secrets"), reason="manual")
+        include_secrets = bool(payload.get("include_secrets", False))
+        if include_secrets and not secret_backups_allowed():
+            raise HTTPException(
+                status_code=403,
+                detail="Secret backups are disabled. Set ALLOW_SECRET_BACKUPS=true to enable them.",
+            )
+        return runtime.create_backup(include_secrets, reason="manual")
 
     @router.get("/api/operations/backups/{name}/download")
     async def download_backup(name: str, login: Any = auth):
