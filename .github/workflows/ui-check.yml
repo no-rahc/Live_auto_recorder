@@ -77,13 +77,7 @@ jobs:
           PY
 
       - name: Install test dependencies
-        shell: bash
-        run: |
-          if [[ -f package-lock.json ]]; then
-            npm ci
-          else
-            npm install
-          fi
+        run: npm ci
 
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
@@ -97,7 +91,6 @@ jobs:
         with:
           name: ui-layout-report
           path: |
-            package-lock.json
             playwright-report/
             test-results/
           if-no-files-found: ignore
