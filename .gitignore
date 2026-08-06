@@ -1,6 +1,10 @@
 # Runtime state and secrets
+data/
 json/
 logs/
+recordings/
+tmp/
+backups/
 .env
 .env.*
 !.env.example
@@ -17,6 +21,15 @@ __pycache__/
 *.so
 .venv/
 venv/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Node and browser tests
+node_modules/
+playwright-report/
+test-results/
+blob-report/
 
 # Local/editor files
 .DS_Store
@@ -28,3 +41,4 @@ venv/
 *.log
 *.lock
 *.part
+*.tmp
