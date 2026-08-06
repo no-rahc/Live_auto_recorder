@@ -9,6 +9,7 @@ from typing import Any
 import live_auto_recorder as recorder_core
 
 from lar_app.release import ReleaseInfo, apply_release_info, load_release_info
+from lar_app.security import configure_session_middleware, enforce_login_default
 from lar_app.web.middleware import ConsoleAssetsMiddleware, SecurityMiddleware
 from module.config_tools_v1 import install_config_tools
 from module.operations_v2 import install_operations
@@ -24,12 +25,13 @@ class ApplicationRuntime:
     release: ReleaseInfo
 
 
-def _install_operations_lifespan(app: Any, operations: Any) -> None:
+def _install_operations_lifespan(app: Any, operations: Any, core: Any) -> None:
     core_lifespan = app.router.lifespan_context
 
     @asynccontextmanager
     async def application_lifespan(application):
         async with core_lifespan(application):
+            enforce_login_default(application, core)
             await operations.start()
             try:
                 yield
@@ -37,6 +39,16 @@ def _install_operations_lifespan(app: Any, operations: Any) -> None:
                 await operations.stop()
 
     app.router.lifespan_context = application_lifespan
+
+
+def _install_health_route(app: Any, release: ReleaseInfo) -> None:
+    if any(getattr(route, "path", None) == "/healthz" for route in app.routes):
+        return
+
+    async def healthz() -> dict[str, str]:
+        return {"status": "ok", "version": release.version}
+
+    app.add_api_route("/healthz", healthz, methods=["GET"], include_in_schema=False)
 
 
 def build_application(
@@ -53,10 +65,12 @@ def build_application(
 
     release = load_release_info(core, root_dir=root_dir)
     apply_release_info(core, release)
+    configure_session_middleware(app)
+    _install_health_route(app, release)
 
     operations = install_operations(app, core)
     install_config_tools(app, core)
-    _install_operations_lifespan(app, operations)
+    _install_operations_lifespan(app, operations, core)
 
     # Preserve the original middleware order: security wraps HTML injection.
     app.add_middleware(ConsoleAssetsMiddleware, release_version=release.version)
