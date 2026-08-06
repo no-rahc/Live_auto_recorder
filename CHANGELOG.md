@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.1.18 - 2026-08-06
+
+- Removed the persistent username, online indicator, and logout card from the bottom of the navigation sidebar.
+- Local mode now shows navigation only, with no account or logout controls rendered in the console shell.
+- Login-protected deployments keep access to logout through one compact accessible icon in the top bar instead of a full sidebar card.
+- Added five-viewport browser checks for local and authenticated sidebar states, compact action sizing, and horizontal overflow.
+
 ## v1.1.17 - 2026-08-06
 
 - Rebalanced dashboard, recording, files, and operations workspaces with page-specific maximum widths instead of one global 1240 px limit.
