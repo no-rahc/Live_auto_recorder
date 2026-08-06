@@ -1,6 +1,6 @@
 services:
   recorder:
-    image: ${LIVE_AUTO_RECORDER_IMAGE:-no-rahc/live-auto-recorder:latest}
+    image: ${LIVE_AUTO_RECORDER_IMAGE:-yeowoonlee/live-auto-recorder:latest}
     build:
       context: .
       dockerfile: Dockerfile
