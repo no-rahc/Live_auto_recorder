@@ -11,6 +11,10 @@ permissions:
   contents: write
   pull-requests: read
 
+concurrency:
+  group: branch-cleanup
+  cancel-in-progress: false
+
 jobs:
   cleanup:
     runs-on: ubuntu-latest
