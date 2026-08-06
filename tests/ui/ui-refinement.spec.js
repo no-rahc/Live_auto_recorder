@@ -2,10 +2,23 @@ const { test, expect } = require('@playwright/test');
 
 async function loadRefinement(page, withScript = true) {
   await page.addStyleTag({ url: '/templates/static/css/ui-refinement-v1.css' });
+  await page.addStyleTag({ url: '/templates/static/css/ui-refinement-final-v1.css' });
   if (withScript) {
     await page.addScriptTag({ url: '/templates/static/js/ui-refinement-v1.js' });
     await expect(page.locator('body')).toHaveClass(/lar-ui-refinement-v1/);
   }
+}
+
+async function normalizeFixtureInputs(page) {
+  await page.evaluate(() => {
+    document.querySelectorAll('input:not([type])').forEach((input) => input.setAttribute('type', 'text'));
+  });
+}
+
+async function settle(page) {
+  await page.mouse.move(0, 0);
+  await page.evaluate(() => window.scrollTo({ top: 0, left: 0, behavior: 'instant' }));
+  await page.waitForTimeout(300);
 }
 
 async function expectNoOverflow(page) {
@@ -31,6 +44,7 @@ test('dashboard uses compact mobile proportions and wider data workspace', async
   }
 
   await expectNoOverflow(page);
+  await settle(page);
   await page.screenshot({ path: testInfo.outputPath(`refine-dashboard-${testInfo.project.name}.png`), fullPage: true });
 });
 
@@ -52,11 +66,14 @@ test('recording prioritizes channel cards and compacts system metrics on mobile'
     await expect(toggle).toBeVisible();
     await toggle.click();
     await expect(page.locator('.filter-container')).not.toHaveClass(/lar-mobile-collapsed/);
+    await toggle.click();
+    await expect(page.locator('.filter-container')).toHaveClass(/lar-mobile-collapsed/);
   } else {
     expect(card.width).toBeLessThanOrEqual(421);
   }
 
   await expectNoOverflow(page);
+  await settle(page);
   await page.screenshot({ path: testInfo.outputPath(`refine-recording-${testInfo.project.name}.png`), fullPage: true });
 });
 
@@ -78,6 +95,7 @@ test('settings save bar appears only for unsaved changes and stays compact', asy
   }
 
   await expectNoOverflow(page);
+  await settle(page);
   await page.screenshot({ path: testInfo.outputPath(`refine-config-${testInfo.project.name}.png`), fullPage: true });
 });
 
@@ -88,15 +106,17 @@ test('authentication removes the empty console shell', async ({ page, viewport }
 
   await expect(page.locator('.navbar-container')).toBeHidden();
   await expect(page.locator('.sidenav')).toBeHidden();
-  const content = await page.locator('#content').boundingBox();
-  expect(Math.abs(content.x + content.width / 2 - (viewport.width / 2))).toBeLessThanOrEqual(3);
+  const card = await page.locator('.lar-auth-card').boundingBox();
+  expect(Math.abs(card.x + card.width / 2 - (viewport.width / 2))).toBeLessThanOrEqual(3);
 
   await expectNoOverflow(page);
+  await settle(page);
   await page.screenshot({ path: testInfo.outputPath(`refine-auth-${testInfo.project.name}.png`), fullPage: true });
 });
 
 test('channel registration hides advanced fields on small screens', async ({ page, viewport }, testInfo) => {
   await page.goto('/tests/ui/fixtures/channels-audit.html');
+  await normalizeFixtureInputs(page);
   await expect(page.locator('#addChannelForm .lar-field')).toHaveCount(8);
   await loadRefinement(page);
 
@@ -108,12 +128,15 @@ test('channel registration hides advanced fields on small screens', async ({ pag
     await toggle.click();
     await expect(advanced).toBeVisible();
     await expect(advanced.locator('.lar-field')).toHaveCount(5);
+    await toggle.click();
+    await expect(advanced).toBeHidden();
   } else {
     await expect(toggle).toBeHidden();
     await expect(advanced).toBeVisible();
   }
 
   await expectNoOverflow(page);
+  await settle(page);
   await page.screenshot({ path: testInfo.outputPath(`refine-channels-${testInfo.project.name}.png`), fullPage: true });
 });
 
@@ -122,9 +145,16 @@ test('file actions use clear hierarchy and selection-gated mobile controls', asy
   await expect(page.locator('.lar-toolbar-actions')).toBeAttached();
   await loadRefinement(page);
 
-  await expect(page.locator('#btnMkdir')).toHaveClass(/lar-file-action-primary/);
-  await expect(page.locator('#btnUp')).toHaveClass(/lar-file-action-secondary/);
-  await expect(page.locator('#mobDelete')).toHaveClass(/lar-file-action-danger/);
+  const primary = page.locator('#btnMkdir');
+  const secondary = page.locator('#btnUp');
+  const danger = page.locator('#mobDelete');
+  await expect(primary).toHaveClass(/lar-file-action-primary/);
+  await expect(secondary).toHaveClass(/lar-file-action-secondary/);
+  await expect(danger).toHaveClass(/lar-file-action-danger/);
+  await expect(primary).toHaveCSS('background-color', 'rgb(255, 111, 15)');
+  await expect(primary).toHaveCSS('color', 'rgb(255, 255, 255)');
+  await expect(secondary).toHaveCSS('background-color', 'rgb(255, 255, 255)');
+  await expect(danger).toHaveCSS('color', 'rgb(229, 72, 77)');
 
   if ((viewport?.width || 0) <= 700) {
     const bar = page.locator('#mobileActionBar');
@@ -137,6 +167,7 @@ test('file actions use clear hierarchy and selection-gated mobile controls', asy
   }
 
   await expectNoOverflow(page);
+  await settle(page);
   await page.screenshot({ path: testInfo.outputPath(`refine-files-${testInfo.project.name}.png`), fullPage: true });
 });
 
@@ -164,5 +195,6 @@ test('cookie and operations cards use intentional desktop and mobile ratios', as
   }
 
   await expectNoOverflow(page);
+  await settle(page);
   await page.screenshot({ path: testInfo.outputPath(`refine-operations-${testInfo.project.name}.png`), fullPage: true });
 });
