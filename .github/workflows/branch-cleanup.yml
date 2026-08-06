@@ -18,11 +18,11 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout full history
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
-      - name: Delete merged agent branches
+      - name: Delete merged work branches
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -68,6 +68,10 @@ jobs:
               echo "Kept unmerged branch: ${branch}"
               kept=$((kept + 1))
             fi
-          done < <(git for-each-ref --format='%(refname:short)' refs/remotes/origin/agent/)
+          done < <(
+            git for-each-ref --format='%(refname:short)' \
+              refs/remotes/origin/agent/ \
+              refs/remotes/origin/dependabot/
+          )
 
           echo "Deleted ${deleted} merged branches; kept ${kept} unmerged branches."
