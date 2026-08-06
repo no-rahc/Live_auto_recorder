@@ -1,0 +1,236 @@
+/* At-a-glance settings hierarchy, switches, advanced disclosure, and richer save review. */
+body.page-config .lar-config-tabs {
+  grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
+}
+body.page-config .lar-config-tab {
+  position: relative;
+  min-height: 72px !important;
+  gap: 4px !important;
+}
+body.page-config .lar-config-tab strong {
+  font-size: 13px !important;
+}
+body.page-config .lar-config-tab small {
+  font-size: 11px !important;
+}
+body.page-config .lar-tab-status {
+  display: inline-flex;
+  width: fit-content;
+  max-width: 100%;
+  align-items: center;
+  overflow: hidden;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: #eef0f2;
+  color: var(--lar-text-soft);
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+body.page-config .lar-tab-status[data-tone="success"] { background: var(--lar-success-soft); color: var(--lar-success); }
+body.page-config .lar-tab-status[data-tone="warning"] { background: #fff2d8; color: #8b5b12; }
+body.page-config .lar-tab-status[data-tone="danger"] { background: var(--lar-danger-soft); color: var(--lar-danger); }
+body.page-config .lar-config-overview-line {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--lar-line);
+  border-radius: 14px;
+  background: var(--lar-surface-soft);
+}
+body.page-config .lar-config-overview-line > span {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: #fff;
+  color: var(--lar-text-soft);
+  font-size: 12px;
+  font-weight: 750;
+}
+body.page-config .lar-config-overview-line b { color: var(--lar-muted); font-size: 10px; }
+body.page-config .lar-config-overview-line .is-danger { color: var(--lar-danger); }
+body.page-config .lar-config-overview-line .is-warning { color: #8b5b12; }
+body.page-config .config-section .section-tag { display: none !important; }
+body.page-config .lar-setting-row > label {
+  font-size: 14px !important;
+  line-height: 1.4 !important;
+}
+body.page-config .config-section .description,
+body.page-config .lar-help-details > summary,
+body.page-config .lar-field-validation,
+body.page-config .lar-danger-note,
+body.page-config .lar-secret-state,
+body.page-config .lar-field-result {
+  font-size: 12px !important;
+}
+body.page-config .lar-secondary-button,
+body.page-config .lar-inline-primary,
+body.page-config .lar-primary-button,
+body.page-config .lar-danger-ghost,
+body.page-config .lar-config-save-actions button {
+  font-size: 12px !important;
+}
+body.page-config .lar-switch-source {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  overflow: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+body.page-config .lar-setting-switch {
+  width: fit-content !important;
+  min-width: 104px !important;
+  min-height: 42px !important;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: flex-start !important;
+  gap: 9px;
+  margin: 0 !important;
+  padding: 6px 11px 6px 7px !important;
+  border: 1px solid var(--lar-line-strong) !important;
+  border-radius: 999px !important;
+  background: #f4f5f6 !important;
+  color: var(--lar-muted) !important;
+  box-shadow: none !important;
+}
+body.page-config .lar-setting-switch.is-on {
+  border-color: #ffc69d !important;
+  background: var(--lar-orange-soft) !important;
+  color: var(--lar-orange-hover) !important;
+}
+body.page-config .lar-setting-switch:focus-visible {
+  outline: 3px solid rgba(255, 111, 15, .2);
+  outline-offset: 2px;
+}
+body.page-config .lar-switch-track {
+  width: 36px;
+  height: 22px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  padding: 2px;
+  border-radius: 999px;
+  background: #c7cbd0;
+  transition: background .16s ease;
+}
+body.page-config .lar-switch-track span {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(20, 20, 24, .2);
+  transform: translateX(0);
+  transition: transform .16s ease;
+}
+body.page-config .lar-setting-switch.is-on .lar-switch-track { background: var(--lar-orange); }
+body.page-config .lar-setting-switch.is-on .lar-switch-track span { transform: translateX(14px); }
+body.page-config .lar-setting-switch:disabled { opacity: .5; cursor: not-allowed; }
+body.page-config .lar-encoding-current {
+  display: grid;
+  gap: 4px;
+  margin: 2px 0 10px;
+  padding: 13px 14px;
+  border: 1px solid #ffd0ad;
+  border-radius: 12px;
+  background: #fffaf6;
+}
+body.page-config .lar-encoding-current > span { color: var(--lar-muted); font-size: 10px; font-weight: 800; }
+body.page-config .lar-encoding-current > strong { color: var(--lar-orange-hover); font-size: 15px; font-weight: 850; }
+body.page-config .lar-encoding-current > p { margin: 0; color: var(--lar-text-soft); font-size: 12px; line-height: 1.5; }
+body.page-config .lar-encoding-advanced {
+  border: 1px solid var(--lar-line);
+  border-radius: 12px;
+  background: var(--lar-surface-soft);
+}
+body.page-config .lar-encoding-advanced > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 13px;
+  color: var(--lar-text-soft);
+  cursor: pointer;
+  list-style: none;
+}
+body.page-config .lar-encoding-advanced > summary::-webkit-details-marker { display: none; }
+body.page-config .lar-encoding-advanced > summary span { display: grid; gap: 2px; }
+body.page-config .lar-encoding-advanced > summary strong { font-size: 13px; }
+body.page-config .lar-encoding-advanced > summary small { color: var(--lar-muted); font-size: 11px; }
+body.page-config .lar-encoding-advanced > summary em { color: var(--lar-orange-hover); font-size: 11px; font-style: normal; font-weight: 800; }
+body.page-config .lar-encoding-advanced[open] > summary { border-bottom: 1px solid var(--lar-line); }
+body.page-config .lar-encoding-advanced-body { padding: 0 13px 13px; }
+body.page-config .lar-notification-tabs button {
+  min-width: 150px;
+  display: grid !important;
+  grid-template-columns: auto auto;
+  align-items: center;
+  justify-content: space-between !important;
+  gap: 10px;
+  font-size: 12px !important;
+}
+body.page-config .lar-notification-status {
+  padding: 3px 6px;
+  border-radius: 999px;
+  background: #e7e9ec;
+  color: var(--lar-muted);
+  font-size: 9px;
+  font-weight: 800;
+}
+body.page-config .lar-notification-tabs button.is-configured .lar-notification-status { background: var(--lar-success-soft); color: var(--lar-success); }
+body.page-config .lar-notification-tabs button.is-incomplete .lar-notification-status { background: var(--lar-danger-soft); color: var(--lar-danger); }
+body.page-config .lar-config-change-summary { display: none !important; }
+body.page-config .lar-config-change-details {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px 8px;
+  margin-top: 3px;
+}
+body.page-config .lar-config-change-details[hidden] { display: none !important; }
+body.page-config .lar-config-change-details > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  color: var(--lar-text-soft);
+  font-size: 11px;
+}
+body.page-config .lar-config-change-details b { color: var(--lar-text); }
+body.page-config .lar-config-change-details del { color: var(--lar-muted); text-decoration-thickness: 1px; }
+body.page-config .lar-config-change-details ins { color: var(--lar-orange-hover); font-weight: 800; text-decoration: none; }
+body.page-config .lar-config-change-details i { color: var(--lar-muted); font-style: normal; }
+body.page-config .lar-config-change-details em {
+  padding: 2px 5px;
+  border-radius: 999px;
+  background: #fff2d8;
+  color: #8b5b12;
+  font-size: 9px;
+  font-style: normal;
+  font-weight: 800;
+}
+body.page-config .lar-config-change-details small { color: var(--lar-muted); font-size: 10px; }
+body.page-config .lar-config-savebar { min-height: 84px; }
+body.page-config .lar-config-savebar span { font-size: 11px !important; }
+body.page-config .lar-config-files-grid { grid-template-columns: minmax(0, 760px) !important; }
+@media (max-width: 1180px) {
+  body.page-config .lar-config-tabs { grid-template-columns: repeat(6, minmax(132px, 1fr)) !important; min-width: 0; max-width: 100%; overflow-x: auto; }
+  body.page-config .lar-config-overview-line { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 700px) {
+  body.page-config .lar-config-tab { min-height: 68px !important; }
+  body.page-config .lar-config-overview-line { grid-template-columns: 1fr 1fr; }
+  body.page-config .lar-config-overview-line > span:last-child { grid-column: 1 / -1; }
+  body.page-config .lar-notification-tabs { width: 100%; }
+  body.page-config .lar-notification-tabs button { min-width: 0; flex: 1; }
+  body.page-config .lar-config-savebar { min-height: 132px; }
+  body.page-config .lar-config-change-details { max-height: 54px; overflow: auto; }
+  body.page-config .lar-setting-row > label { font-size: 13px !important; }
+}
