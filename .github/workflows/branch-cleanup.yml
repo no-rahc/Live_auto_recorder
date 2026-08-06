@@ -13,7 +13,6 @@ permissions:
 
 jobs:
   cleanup:
-    if: github.event_name != 'pull_request' || github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -22,7 +21,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Delete merged work branches
+      - name: Delete completed work branches
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -39,7 +38,18 @@ jobs:
             branch="${remote_ref#origin/}"
             safe_to_delete=false
 
-            if git merge-base --is-ancestor "$remote_ref" origin/main; then
+            if [[ "$branch" == dependabot/* ]]; then
+              open_pr="$(
+                gh api --paginate --method GET "repos/${GITHUB_REPOSITORY}/pulls" \
+                  -f state=open \
+                  -f head="${owner}:${branch}" \
+                  --jq '.[].number' \
+                  | head -n 1
+              )"
+              if [[ -z "$open_pr" ]]; then
+                safe_to_delete=true
+              fi
+            elif git merge-base --is-ancestor "$remote_ref" origin/main; then
               safe_to_delete=true
             else
               merged_pr="$(
@@ -65,7 +75,7 @@ jobs:
               echo "Deleted ${branch}"
               deleted=$((deleted + 1))
             else
-              echo "Kept unmerged branch: ${branch}"
+              echo "Kept active branch: ${branch}"
               kept=$((kept + 1))
             fi
           done < <(
@@ -74,4 +84,4 @@ jobs:
               refs/remotes/origin/dependabot/
           )
 
-          echo "Deleted ${deleted} merged branches; kept ${kept} unmerged branches."
+          echo "Deleted ${deleted} completed branches; kept ${kept} active branches."
