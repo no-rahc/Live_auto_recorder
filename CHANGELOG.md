@@ -1,5 +1,18 @@
 # Changelog
 
+## v1.1.17 - 2026-08-06
+
+- Rebalanced dashboard, recording, files, and operations workspaces with page-specific maximum widths instead of one global 1240 px limit.
+- Reduced mobile dashboard hero and system-card height while keeping the four core metrics in a compact two-column grid.
+- Reordered mobile recording content so global controls and channel cards appear before compact system metrics, with search and filters collapsed on demand.
+- Limited recording-card width on large monitors and shortened mobile thumbnails to prevent sparse or overly tall layouts.
+- Hid the settings action bar until a change exists, reduced its mobile height, and suppress it while the virtual keyboard is open.
+- Removed the management sidebar and top bar from login and account creation, creating a centered standalone authentication shell.
+- Collapsed advanced channel-registration fields on mobile while keeping all existing defaults and submit behavior intact.
+- Added explicit primary, secondary, and danger hierarchy to file-manager controls and show the mobile action bar only after a file is selected.
+- Changed cookie cards to a natural 65/35 desktop ratio and made the fifth operations KPI span the mobile row, with a horizontal-tab overflow cue.
+- Added five-viewport coordinate and interaction checks for every proportional refinement in this release.
+
 ## v1.1.16 - 2026-08-05
 
 - Split the production entrypoint into a side-effect-free `lar_app` package for bootstrap, release metadata, server settings, middleware, and web asset registration.

@@ -49,6 +49,8 @@ STYLESHEETS = (
     Asset("/static/css/project-ui-audit-v1.css", "data-lar-project-ui-audit-v1"),
     Asset("/static/css/project-ui-audit-fixes-v1.css", "data-lar-project-ui-audit-fixes-v1"),
     Asset("/static/css/operations-controls-v1.css", "data-lar-operations-controls-v1"),
+    Asset("/static/css/ui-refinement-v1.css", "data-lar-ui-refinement-v1"),
+    Asset("/static/css/ui-refinement-final-v1.css", "data-lar-ui-refinement-final-v1"),
 )
 
 HEAD_SCRIPTS = (
@@ -65,6 +67,7 @@ BODY_SCRIPTS = (
     Asset("/static/js/project-ui-audit-v1.js", "data-lar-project-ui-audit-v1", defer=True),
     Asset("/static/js/operations-v2.js", "data-lar-operations-v2", defer=True),
     Asset("/static/js/operations-controls-v1.js", "data-lar-operations-controls-v1", defer=True),
+    Asset("/static/js/ui-refinement-v1.js", "data-lar-ui-refinement-v1", defer=True),
 )
 
 _CRITICAL_STYLE = (

@@ -18,13 +18,13 @@ body.page-channels .lar-channel-edit-close:hover:not(:disabled) {
 @media (min-width: 1100px) {
   body.lar-auth-mode.lar-sidebar-v3:not(.page-register) #content {
     width: 500px !important;
-    margin-left: calc(var(--lar-sidebar-current) + (100vw - var(--lar-sidebar-current) - 500px) / 2) !important;
-    margin-right: 0 !important;
+    margin-right: auto !important;
+    margin-left: auto !important;
   }
 
   body.page-register.lar-sidebar-v3 #content {
     width: 520px !important;
-    margin-left: calc(var(--lar-sidebar-current) + (100vw - var(--lar-sidebar-current) - 520px) / 2) !important;
-    margin-right: 0 !important;
+    margin-right: auto !important;
+    margin-left: auto !important;
   }
 }
