@@ -51,6 +51,7 @@ STYLESHEETS = (
     Asset("/static/css/operations-controls-v1.css", "data-lar-operations-controls-v1"),
     Asset("/static/css/ui-refinement-v1.css", "data-lar-ui-refinement-v1"),
     Asset("/static/css/ui-refinement-final-v1.css", "data-lar-ui-refinement-final-v1"),
+    Asset("/static/css/sidebar-account-v1.css", "data-lar-sidebar-account-v1"),
 )
 
 HEAD_SCRIPTS = (
@@ -59,6 +60,7 @@ HEAD_SCRIPTS = (
 
 BODY_SCRIPTS = (
     Asset("/static/js/sidebar-v3.js", "data-lar-sidebar-v3", defer=True),
+    Asset("/static/js/sidebar-account-v1.js", "data-lar-sidebar-account-v1", defer=True),
     Asset("/static/js/dashboard-v4.js", "data-lar-dashboard-v4", defer=True),
     Asset("/static/js/dashboard-channel-modal-v1.js", "data-lar-dashboard-channel-modal-v1", defer=True),
     Asset("/static/js/app-ui-v3.js", "data-lar-ui-v3", defer=True),
