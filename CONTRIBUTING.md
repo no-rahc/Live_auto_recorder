@@ -11,7 +11,7 @@
 
 ```bash
 python -m pip install -r requirements.txt
-npm install
+npm ci
 python app_entry.py
 ```
 
