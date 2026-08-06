@@ -1,0 +1,61 @@
+name: Bug report
+description: Report a reproducible problem
+title: "fix: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Do not include cookies, tokens, passwords, private paths, or full channel identifiers.
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Application version or Docker tag
+      placeholder: v1.1.19
+    validations:
+      required: true
+  - type: dropdown
+    id: deployment
+    attributes:
+      label: Deployment
+      options:
+        - Docker Compose
+        - Docker
+        - Python
+        - Windows
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What happened and what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open ...
+        2. Change ...
+        3. See ...
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Sanitized logs
+      render: shell
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: I searched existing issues.
+          required: true
+        - label: I removed secrets and private data from this report.
+          required: true
+        - label: This is not a security vulnerability.
+          required: true

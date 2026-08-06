@@ -42,7 +42,8 @@ RUN apt-get update \
 
 COPY requirements.txt ./
 RUN python -m pip install --no-cache-dir --upgrade pip \
-    && python -m pip install --no-cache-dir -r requirements.txt
+    && python -m pip install --no-cache-dir -r requirements.txt \
+    && python -m pip check
 
 COPY --from=ytarchive-builder /out/ytarchive /usr/local/bin/ytarchive
 RUN chmod 0755 /usr/local/bin/ytarchive \
@@ -57,7 +58,7 @@ EXPOSE 5000
 VOLUME ["/app/json", "/app/chzzk", "/app/logs"]
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=45s --retries=3 \
-  CMD curl -fsS "http://127.0.0.1:${PORT}/" >/dev/null || exit 1
+  CMD curl -fsS "http://127.0.0.1:${PORT}/healthz" >/dev/null || exit 1
 
 ENTRYPOINT ["/usr/bin/tini", "--"]
 CMD ["python", "app_entry.py"]

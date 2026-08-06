@@ -11,6 +11,7 @@ on:
       - 'templates/**'
       - 'tests/ui/**'
       - 'package.json'
+      - 'package-lock.json'
       - 'playwright.config.js'
       - '.github/workflows/ui-check.yml'
   push:
@@ -24,6 +25,7 @@ on:
       - 'templates/**'
       - 'tests/ui/**'
       - 'package.json'
+      - 'package-lock.json'
       - 'playwright.config.js'
 
 permissions:
@@ -75,7 +77,7 @@ jobs:
           PY
 
       - name: Install test dependencies
-        run: npm install
+        run: npm ci
 
       - name: Install Chromium
         run: npx playwright install --with-deps chromium

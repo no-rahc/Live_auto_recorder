@@ -6,6 +6,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from lar_app.release import apply_release_info, load_release_info
+from lar_app.security import env_flag, enforce_login_default, secret_backups_allowed
 from lar_app.server import ServerSettings
 from lar_app.web.assets import all_asset_paths, inject_console_assets
 
@@ -74,6 +75,32 @@ class AppRuntimeStructureTests(unittest.TestCase):
             ServerSettings.from_env({"PORT": "70000"})
         with self.assertRaisesRegex(ValueError, "LOG_LEVEL"):
             ServerSettings.from_env({"LOG_LEVEL": "verbose"})
+
+    def test_security_flags_are_strict(self):
+        self.assertTrue(env_flag("FLAG", environ={"FLAG": "yes"}))
+        self.assertFalse(env_flag("FLAG", True, environ={"FLAG": "off"}))
+        self.assertTrue(env_flag("FLAG", True, environ={}))
+        with self.assertRaisesRegex(ValueError, "FLAG must be one of"):
+            env_flag("FLAG", environ={"FLAG": "sometimes"})
+
+    def test_login_is_required_unless_anonymous_mode_is_explicit(self):
+        saved: list[dict[str, bool]] = []
+        app = SimpleNamespace(state=SimpleNamespace(config={"loginMode": False}))
+        core = SimpleNamespace(saveConfig=lambda config: saved.append(dict(config)))
+
+        changed = enforce_login_default(app, core, environ={"ALLOW_ANONYMOUS": "false"})
+        self.assertTrue(changed)
+        self.assertTrue(app.state.config["loginMode"])
+        self.assertEqual(saved, [{"loginMode": True}])
+
+        app.state.config["loginMode"] = False
+        changed = enforce_login_default(app, core, environ={"ALLOW_ANONYMOUS": "true"})
+        self.assertFalse(changed)
+        self.assertFalse(app.state.config["loginMode"])
+
+    def test_secret_backups_are_opt_in(self):
+        self.assertFalse(secret_backups_allowed({}))
+        self.assertTrue(secret_backups_allowed({"ALLOW_SECRET_BACKUPS": "true"}))
 
 
 if __name__ == "__main__":
