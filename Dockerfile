@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.7
-FROM --platform=$BUILDPLATFORM golang:1.23-bookworm AS ytarchive-builder
+FROM --platform=$BUILDPLATFORM golang:1.24-bookworm AS ytarchive-builder
 
 ARG TARGETOS=linux
 ARG TARGETARCH=amd64
