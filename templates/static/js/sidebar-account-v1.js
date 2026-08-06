@@ -2,9 +2,38 @@
   "use strict";
 
   const LOGIN_TRUE = new Set(["1", "true", "yes", "on"]);
+  let loginModePromise = null;
 
-  function loginModeEnabled() {
-    return LOGIN_TRUE.has(String(document.body.dataset.loginMode || "").trim().toLowerCase());
+  function parseLoginMode(value) {
+    return LOGIN_TRUE.has(String(value ?? "").trim().toLowerCase());
+  }
+
+  function resolveLoginMode() {
+    if (loginModePromise) return loginModePromise;
+
+    const declared = document.body.dataset.loginMode;
+    if (declared !== undefined && declared !== "") {
+      loginModePromise = Promise.resolve(parseLoginMode(declared));
+      return loginModePromise;
+    }
+
+    loginModePromise = fetch("/user_info", {
+      credentials: "same-origin",
+      cache: "no-store",
+      headers: { Accept: "application/json" },
+    })
+      .then(function (response) {
+        if (!response.ok) throw new Error(`user_info HTTP ${response.status}`);
+        return response.json();
+      })
+      .then(function (payload) {
+        return Boolean(payload?.config?.loginMode);
+      })
+      .catch(function () {
+        return false;
+      });
+
+    return loginModePromise;
   }
 
   function logoutIcon() {
@@ -25,7 +54,7 @@
   }
 
   function addCompactLogout(logout) {
-    if (!loginModeEnabled() || !logout) return;
+    if (!logout) return;
 
     const actions = ensureTopbarActions();
     if (!actions || actions.querySelector(".lar-topbar-logout")) return;
@@ -39,13 +68,14 @@
     actions.appendChild(link);
   }
 
-  function cleanSidebarAccount() {
+  async function cleanSidebarAccount() {
     const userInfo = document.getElementById("user-info");
     const logout = userInfo?.querySelector("#logout-btn") || document.getElementById("logout-btn");
 
-    addCompactLogout(logout);
     userInfo?.remove();
     document.body.classList.add("lar-sidebar-account-clean");
+
+    if (await resolveLoginMode()) addCompactLogout(logout);
   }
 
   function boot() {
