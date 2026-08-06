@@ -13,6 +13,9 @@
   const $ = (selector, root) => (root || document).querySelector(selector);
   const $$ = (selector, root) => Array.from((root || document).querySelectorAll(selector));
   const truthy = (value) => ["true", "1", "on", "yes"].includes(String(value || "").toLowerCase());
+  const escapeHtml = (value) => String(value).replace(/[&<>'"]/g, (char) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", "\"": "&quot;"
+  }[char]));
   const helperNames = new Set(["danger_confirmation", "danger_current_password", "danger_ack"]);
   const restartFields = new Set(["autoRecordingMode", "loginMode"]);
   const fieldNames = {
@@ -479,7 +482,7 @@
       details.hidden = false;
       details.innerHTML = shown.map((change) => {
         const restart = restartFields.has(change.name) ? '<em>재시작</em>' : "";
-        return `<span><b>${controlLabel(change.name)}</b><del>${friendlyValue(change.name, change.before)}</del><i aria-hidden="true">→</i><ins>${friendlyValue(change.name, change.after)}</ins>${restart}</span>`;
+        return `<span><b>${escapeHtml(controlLabel(change.name))}</b><del>${escapeHtml(friendlyValue(change.name, change.before))}</del><i aria-hidden="true">→</i><ins>${escapeHtml(friendlyValue(change.name, change.after))}</ins>${restart}</span>`;
       }).join("") + (changes.length > shown.length ? `<small>외 ${changes.length - shown.length}개 변경</small>` : "");
     };
     form.addEventListener("input", () => window.setTimeout(update, 0), true);
