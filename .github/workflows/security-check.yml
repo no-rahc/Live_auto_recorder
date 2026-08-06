@@ -7,6 +7,7 @@ on:
       - '**/*.js'
       - 'requirements.txt'
       - 'package.json'
+      - 'package-lock.json'
       - '.github/workflows/security-check.yml'
   push:
     branches: [main]
@@ -15,7 +16,9 @@ on:
       - '**/*.js'
       - 'requirements.txt'
       - 'package.json'
+      - 'package-lock.json'
       - '.github/workflows/security-check.yml'
+  public:
   schedule:
     - cron: '20 18 * * 1'
   workflow_dispatch:
@@ -28,8 +31,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
           cache: pip
@@ -37,13 +40,29 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           python -m pip install pip-audit==2.10.1
-          # These advisories currently require aiohttp 3.14.3 and
-          # cryptography 50.0.0, which have not been released on PyPI.
-          # Keep the packages at their latest stable releases and remove
-          # each exception as soon as the fixed release is available.
-          python -m pip_audit -r requirements.txt --strict \
-            --ignore-vuln PYSEC-2026-3545 \
-            --ignore-vuln PYSEC-2026-3552
+          python -m pip_audit -r requirements.txt --strict
+
+  history-secret-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Install verified Gitleaks binary
+        shell: bash
+        run: |
+          set -euo pipefail
+          version='8.30.0'
+          archive="gitleaks_${version}_linux_x64.tar.gz"
+          base="https://github.com/gitleaks/gitleaks/releases/download/v${version}"
+          curl -fsSLO "${base}/${archive}"
+          curl -fsSLO "${base}/gitleaks_${version}_checksums.txt"
+          grep "  ${archive}$" "gitleaks_${version}_checksums.txt" | sha256sum --check --strict
+          tar -xzf "${archive}" gitleaks
+          ./gitleaks version
+      - name: Scan complete Git history
+        run: ./gitleaks git --redact --verbose --exit-code 1
 
   codeql:
     if: github.event.repository.private == false
@@ -58,7 +77,7 @@ jobs:
       matrix:
         language: [python, javascript-typescript]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: github/codeql-action/init@v4
         with:
           languages: ${{ matrix.language }}
