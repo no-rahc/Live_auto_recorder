@@ -20,8 +20,12 @@
   }
 }
 
-body.lar-auth-mode .lar-auth-card,
-body.page-register .register-form {
+body.lar-auth-mode #content > .login-form.lar-auth-card,
+body.page-register #content > .register-form {
+  width: 100% !important;
+  max-width: none !important;
+  margin-right: auto !important;
+  margin-left: auto !important;
   transform: none !important;
   animation: none !important;
 }
