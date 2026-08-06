@@ -17,6 +17,7 @@
     "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", "\"": "&quot;"
   }[char]));
   const helperNames = new Set(["danger_confirmation", "danger_current_password", "danger_ack"]);
+  const secretValueNames = new Set(["telegram_bot_token", "telegram_chat_id", "discord_webhook_url"]);
   const restartFields = new Set(["autoRecordingMode", "loginMode"]);
   const fieldNames = {
     autoRecordingMode: "자동 녹화",
@@ -430,7 +431,7 @@
     const result = new Map();
     const grouped = new Map();
     Array.from(form.elements).forEach((control) => {
-      if (!control.name || helperNames.has(control.name) || control.type === "submit" || control.type === "button") return;
+      if (!control.name || helperNames.has(control.name) || secretValueNames.has(control.name) || control.type === "submit" || control.type === "button") return;
       let value = "";
       if ((control.type === "checkbox" || control.type === "radio") && !control.checked) return;
       if (control instanceof HTMLSelectElement) value = control.value;
