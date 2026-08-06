@@ -4,8 +4,24 @@ on:
   pull_request:
     paths:
       - 'Dockerfile'
+      - '.dockerignore'
+      - 'compose.yaml'
+      - '.env.example'
       - 'requirements.txt'
       - 'app_entry.py'
+      - 'lar_app/**'
+      - 'module/**'
+      - '.github/workflows/docker-build-check.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'Dockerfile'
+      - '.dockerignore'
+      - 'compose.yaml'
+      - '.env.example'
+      - 'requirements.txt'
+      - 'app_entry.py'
+      - 'lar_app/**'
       - 'module/**'
       - '.github/workflows/docker-build-check.yml'
 
