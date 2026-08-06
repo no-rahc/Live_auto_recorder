@@ -1,0 +1,55 @@
+/* Manual visual-review corrections loaded after the main refinement layer. */
+
+@media (min-width: 1100px) {
+  body.lar-auth-mode.lar-sidebar-v3:not(.page-register) #content {
+    width: min(500px, calc(100% - 32px)) !important;
+    max-width: 500px !important;
+    margin-right: auto !important;
+    margin-left: auto !important;
+    transform: none !important;
+    animation: none !important;
+  }
+
+  body.page-register.lar-auth-mode.lar-sidebar-v3 #content {
+    width: min(520px, calc(100% - 32px)) !important;
+    max-width: 520px !important;
+    margin-right: auto !important;
+    margin-left: auto !important;
+    transform: none !important;
+    animation: none !important;
+  }
+}
+
+body.lar-auth-mode .lar-auth-card,
+body.page-register .register-form {
+  transform: none !important;
+  animation: none !important;
+}
+
+body.page-files .lar-toolbar-actions > button.lar-file-action-primary,
+body.page-files .mobile-actionbar > button.lar-file-action-primary {
+  border-color: var(--lar-orange) !important;
+  background: var(--lar-orange) !important;
+  color: #fff !important;
+}
+
+body.page-files .lar-toolbar-actions > button.lar-file-action-primary:hover:not(:disabled),
+body.page-files .mobile-actionbar > button.lar-file-action-primary:hover:not(:disabled) {
+  border-color: var(--lar-orange-hover) !important;
+  background: var(--lar-orange-hover) !important;
+  color: #fff !important;
+}
+
+body.page-files .lar-toolbar-actions > button.lar-file-action-danger,
+body.page-files .mobile-actionbar > button.lar-file-action-danger {
+  border-color: #f0b9bb !important;
+  background: #fff !important;
+  color: var(--lar-danger) !important;
+}
+
+body.page-files .lar-toolbar-actions > button.lar-file-action-danger:hover:not(:disabled),
+body.page-files .mobile-actionbar > button.lar-file-action-danger:hover:not(:disabled) {
+  border-color: var(--lar-danger) !important;
+  background: var(--lar-danger) !important;
+  color: #fff !important;
+}
