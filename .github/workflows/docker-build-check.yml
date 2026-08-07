@@ -94,6 +94,13 @@ jobs:
           test "$operations_status" = "200"
           grep -qiE '<!doctype html|<html' /tmp/operations.html
 
+          management_status="$(curl -sS -o /tmp/recordings.json -w '%{http_code}' "http://127.0.0.1:${port}/api/v3/recordings?limit=1")"
+          test "$management_status" = "200"
+
+          token_status="$(curl -sS -o /tmp/token-error.json -w '%{http_code}' "http://127.0.0.1:${port}/api/v3/automation/status")"
+          test "$token_status" = "401"
+          grep -q 'Valid read API token required' /tmp/token-error.json
+
           login_status="$(curl -sS -o /dev/null -w '%{http_code}' "http://127.0.0.1:${port}/login")"
           test "$login_status" = "302"
 
