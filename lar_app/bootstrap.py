@@ -6,6 +6,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from lar_app.template_compat import install_template_response_compat
+
+# Starlette 1.x removed TemplateResponse(name, context). The legacy core still
+# contains that calling convention, so install the adapter before importing it.
+install_template_response_compat()
+
 import live_auto_recorder as recorder_core
 
 from lar_app.release import ReleaseInfo, apply_release_info, load_release_info
