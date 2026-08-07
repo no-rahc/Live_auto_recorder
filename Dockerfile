@@ -35,6 +35,7 @@ RUN apt-get update \
         ca-certificates \
         curl \
         ffmpeg \
+        rclone \
         tini \
         tzdata \
         yt-dlp \
@@ -47,7 +48,9 @@ RUN python -m pip install --no-cache-dir --upgrade pip \
 
 COPY --from=ytarchive-builder /out/ytarchive /usr/local/bin/ytarchive
 RUN chmod 0755 /usr/local/bin/ytarchive \
-    && /usr/local/bin/ytarchive -V
+    && /usr/local/bin/ytarchive -V \
+    && rclone version \
+    && ffprobe -version >/dev/null
 
 COPY . .
 
