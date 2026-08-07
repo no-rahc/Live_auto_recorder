@@ -1,0 +1,230 @@
+/* Color-only theme layer. Keep layout, spacing, typography, and component structure unchanged. */
+:root {
+  --lar-orange: #3182f6;
+  --lar-orange-hover: #2272eb;
+  --lar-orange-soft: #e8f3ff;
+  --lar-bg: #f2f4f6;
+  --lar-surface: #ffffff;
+  --lar-surface-soft: #f9fafb;
+  --lar-text: #191f28;
+  --lar-text-soft: #4e5968;
+  --lar-muted: #8b95a1;
+  --lar-line: #e5e8eb;
+  --lar-line-strong: #d1d6db;
+  --lar-success: #03b26c;
+  --lar-success-soft: #f0faf6;
+  --lar-danger: #f04452;
+  --lar-danger-soft: #ffeeee;
+  --lar-warning: #ee8f11;
+  --lar-warning-soft: #fff9e7;
+  --lar-shadow: 0 1px 2px rgba(0, 23, 51, .02), 0 5px 16px rgba(2, 32, 71, .05);
+  --lar-shadow-hover: 0 10px 28px rgba(0, 27, 55, .10);
+
+  --bg3: #f2f4f6;
+  --bg4: #e5e8eb;
+  --tx3: #b0b8c1;
+}
+
+::selection {
+  background: #c9e2ff;
+  color: #191f28;
+}
+
+:focus-visible {
+  outline-color: rgba(49, 130, 246, .28) !important;
+}
+
+.lar-topbar-context-icon {
+  border-color: #c9e2ff !important;
+  background: #e8f3ff !important;
+  color: #3182f6 !important;
+}
+
+.lar-sidebar-link-arrow,
+.dash-v4-dock-arrow {
+  color: #b0b8c1 !important;
+}
+
+.lar-sidebar-link.lar-active {
+  border-color: #c9e2ff !important;
+  background: #e8f3ff !important;
+  color: #1b64da !important;
+}
+
+.lar-sidebar-link.lar-active .lar-sidebar-link-icon {
+  border-color: #c9e2ff !important;
+  background: #f9fcff !important;
+  color: #3182f6 !important;
+}
+
+.lar-sidebar-logout:hover,
+body.page-files .lar-toolbar-actions > button.lar-file-action-danger,
+body.page-files .mobile-actionbar > button.lar-file-action-danger,
+body.page-operations .ops-action-danger,
+body.page-operations .ops-danger {
+  border-color: #feafb4 !important;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  box-shadow: 0 0 0 3px rgba(49, 130, 246, .12) !important;
+}
+
+input:disabled,
+select:disabled,
+textarea:disabled {
+  background: #f2f4f6 !important;
+  color: #b0b8c1 !important;
+}
+
+.delete-channel,
+.danger,
+[data-action="delete"] {
+  border-color: #ffd4d6 !important;
+}
+
+.warning-banner,
+.notice {
+  border-color: #ffe69b !important;
+  color: #dd7d02 !important;
+}
+
+tbody tr:hover {
+  background: #f9fafb !important;
+}
+
+.dash-hero {
+  box-shadow: 0 16px 34px rgba(49, 130, 246, .18) !important;
+}
+
+.lar-dirty-bar {
+  border-color: #c9e2ff !important;
+  background: #f8fbff !important;
+}
+
+.lar-dirty {
+  border-color: #90c2ff !important;
+}
+
+.lar-skeleton {
+  background: #f2f4f6 !important;
+}
+
+body.page-index .dash-v5-top .dash-hero {
+  border-color: #c9e2ff !important;
+  background: linear-gradient(135deg, #e8f3ff 0%, #f7fbff 58%, #ffffff 100%) !important;
+}
+
+body.page-index .dash-autopill,
+body.page-index .dash-v4-health,
+body.page-index .dash-v4-updated {
+  border-color: #c9e2ff !important;
+}
+
+body.page-index .dash-autopill.is-on,
+body.page-index .dash-v4-health[data-state="good"] {
+  border-color: #aeefd5 !important;
+  background: #f0faf6 !important;
+  color: #028450 !important;
+}
+
+body.page-index .dash-v4-health[data-state="warn"] {
+  border-color: #ffe69b !important;
+  background: #fff9e7 !important;
+  color: #dd7d02 !important;
+}
+
+body.page-index .dash-v4-health[data-state="bad"] {
+  border-color: #ffd4d6 !important;
+  background: #ffeeee !important;
+  color: #f04452 !important;
+}
+
+body.page-index .dash-v4-stat[data-tone="live"] {
+  background: #e8f3ff !important;
+}
+
+body.page-index .dash-v4-stat[data-tone="channels"] {
+  background: #f9fafb !important;
+}
+
+body.page-index .dash-v4-stat[data-tone="today"] {
+  background: #f0faf6 !important;
+}
+
+body.page-index .dash-v4-stat[data-tone="fail"] {
+  background: #ffeeee !important;
+}
+
+body.page-config .lar-tab-status {
+  background: #f2f4f6 !important;
+}
+
+body.page-config .lar-tab-status[data-tone="warning"],
+body.page-config .lar-config-change-details em {
+  background: #fff9e7 !important;
+  color: #dd7d02 !important;
+}
+
+body.page-config .lar-config-overview-line .is-warning {
+  color: #dd7d02 !important;
+}
+
+body.page-config .lar-setting-switch {
+  background: #f2f4f6 !important;
+}
+
+body.page-config .lar-setting-switch.is-on {
+  border-color: #c9e2ff !important;
+  background: #e8f3ff !important;
+  color: #1b64da !important;
+}
+
+body.page-config .lar-setting-switch:focus-visible {
+  outline-color: rgba(49, 130, 246, .24) !important;
+}
+
+body.page-config .lar-switch-track {
+  background: #b0b8c1 !important;
+}
+
+body.page-config .lar-encoding-current {
+  border-color: #c9e2ff !important;
+  background: #f8fbff !important;
+}
+
+body.page-operations .ops-refresh-button:hover:not(:disabled),
+body.page-operations .ops-action-secondary:hover:not(:disabled),
+body.page-operations .ops-button:hover,
+body.page-operations .ops-button-small:hover,
+body.page-operations .ops-tabs button.is-active,
+body.page-operations .ops-tabs button[aria-selected="true"] {
+  border-color: #c9e2ff !important;
+}
+
+body.page-operations .ops-action-danger,
+body.page-operations .ops-danger {
+  border-color: #feafb4 !important;
+}
+
+body.page-operations .ops-action-danger:disabled,
+body.page-operations .ops-danger:disabled {
+  border-color: #e5e8eb !important;
+  background: #f9fafb !important;
+  color: #b0b8c1 !important;
+}
+
+body.page-operations .ops-platform-status {
+  background: #f2f4f6 !important;
+}
+
+body.page-operations .ops-platform-status.is-warn {
+  background: #fff9e7 !important;
+  color: #dd7d02 !important;
+}
+
+body.page-operations .ops-token-once {
+  border-color: #c9e2ff !important;
+  background: #f8fbff !important;
+}
