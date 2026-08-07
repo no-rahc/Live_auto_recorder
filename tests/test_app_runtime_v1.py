@@ -6,7 +6,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from lar_app.release import apply_release_info, load_release_info
-from lar_app.security import env_flag, enforce_login_default, secret_backups_allowed
+from lar_app.security import enforce_local_mode, env_flag, secret_backups_allowed
 from lar_app.server import ServerSettings
 from lar_app.web.assets import all_asset_paths, inject_console_assets
 
@@ -26,6 +26,9 @@ class AppRuntimeStructureTests(unittest.TestCase):
         paths = all_asset_paths()
         self.assertEqual(len(paths), len(set(paths)))
         self.assertTrue(all(path.startswith("/static/") for path in paths))
+        self.assertIn("/static/js/local-mode-v1.js", paths)
+        self.assertIn("/static/css/local-mode-v1.css", paths)
+        self.assertNotIn("/static/js/sidebar-account-v1.js", paths)
 
     def test_asset_injection_is_idempotent_and_removes_title_version(self):
         html = "<html><head><title>Live Auto Recorder v1.1.15</title></head><body><main>ok</main></body></html>"
@@ -33,6 +36,7 @@ class AppRuntimeStructureTests(unittest.TestCase):
         self.assertIn("<title>Live Auto Recorder</title>", injected)
         self.assertIn("/static/css/app-v3.css?v=v1.1.16", injected)
         self.assertIn("/static/js/app-ui-v3.js?v=v1.1.16", injected)
+        self.assertIn("/static/js/local-mode-v1.js?v=v1.1.16", injected)
         self.assertEqual(inject_console_assets(injected, "v1.1.16"), injected)
 
     def test_asset_version_is_html_escaped(self):
@@ -60,6 +64,10 @@ class AppRuntimeStructureTests(unittest.TestCase):
         self.assertEqual(globals_map["program_version"], "v9.8.7")
 
     def test_server_settings_validate_environment(self):
+        defaults = ServerSettings.from_env({})
+        self.assertEqual(defaults.host, "127.0.0.1")
+        self.assertEqual(defaults.port, 5000)
+
         settings = ServerSettings.from_env({
             "HOST": "127.0.0.1",
             "PORT": "8080",
@@ -83,20 +91,19 @@ class AppRuntimeStructureTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "FLAG must be one of"):
             env_flag("FLAG", environ={"FLAG": "sometimes"})
 
-    def test_login_is_required_unless_anonymous_mode_is_explicit(self):
+    def test_local_mode_forces_legacy_login_flag_off(self):
         saved: list[dict[str, bool]] = []
-        app = SimpleNamespace(state=SimpleNamespace(config={"loginMode": False}))
+        app = SimpleNamespace(state=SimpleNamespace(config={"loginMode": True}))
         core = SimpleNamespace(saveConfig=lambda config: saved.append(dict(config)))
 
-        changed = enforce_login_default(app, core, environ={"ALLOW_ANONYMOUS": "false"})
+        changed = enforce_local_mode(app, core)
         self.assertTrue(changed)
-        self.assertTrue(app.state.config["loginMode"])
-        self.assertEqual(saved, [{"loginMode": True}])
-
-        app.state.config["loginMode"] = False
-        changed = enforce_login_default(app, core, environ={"ALLOW_ANONYMOUS": "true"})
-        self.assertFalse(changed)
         self.assertFalse(app.state.config["loginMode"])
+        self.assertEqual(saved, [{"loginMode": False}])
+
+        changed = enforce_local_mode(app, core)
+        self.assertFalse(changed)
+        self.assertEqual(len(saved), 1)
 
     def test_secret_backups_are_opt_in(self):
         self.assertFalse(secret_backups_allowed({}))
