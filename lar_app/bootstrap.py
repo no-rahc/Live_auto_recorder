@@ -15,7 +15,7 @@ install_template_response_compat()
 import live_auto_recorder as recorder_core
 
 from lar_app.release import ReleaseInfo, apply_release_info, load_release_info
-from lar_app.security import configure_session_middleware, enforce_login_default
+from lar_app.security import configure_session_middleware, enforce_local_mode
 from lar_app.web.middleware import ConsoleAssetsMiddleware, SecurityMiddleware
 from module.config_tools_v1 import install_config_tools
 from module.operations_platform_v3 import install_platform_features
@@ -39,7 +39,7 @@ def _install_operations_lifespan(app: Any, operations: Any, platform: Any, core:
     @asynccontextmanager
     async def application_lifespan(application):
         async with core_lifespan(application):
-            enforce_login_default(application, core)
+            enforce_local_mode(application, core)
             await operations.start()
             await platform.start()
             try:
@@ -66,7 +66,7 @@ def build_application(
     *,
     root_dir: Path | None = None,
 ) -> ApplicationRuntime:
-    """Build the application once while preserving the legacy public API."""
+    """Build the local-only application while preserving the legacy public API."""
 
     app = core.app
     existing = getattr(app.state, "lar_runtime", None)
