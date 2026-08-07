@@ -1,4 +1,4 @@
-"""Runtime security defaults for public and self-hosted deployments."""
+"""Runtime security helpers for the local-only deployment model."""
 from __future__ import annotations
 
 import os
@@ -26,28 +26,30 @@ def env_flag(name: str, default: bool = False, environ: Mapping[str, str] | None
 
 
 def configure_session_middleware(app: Any, environ: Mapping[str, str] | None = None) -> None:
-    """Apply cookie security flags before Starlette builds its middleware stack."""
+    """Keep the legacy session object available without exposing login controls."""
 
-    https_only = env_flag("SESSION_HTTPS_ONLY", False, environ)
+    del environ  # Kept in the signature for compatibility with older callers/tests.
     for middleware in getattr(app, "user_middleware", []):
         if getattr(middleware, "cls", None) is SessionMiddleware:
-            middleware.kwargs["https_only"] = https_only
+            middleware.kwargs["https_only"] = False
             middleware.kwargs.setdefault("same_site", "lax")
             app.middleware_stack = None
             return
 
 
-def enforce_login_default(app: Any, core: Any, environ: Mapping[str, str] | None = None) -> bool:
-    """Require login unless the operator explicitly enables anonymous mode."""
+def enforce_local_mode(app: Any, core: Any) -> bool:
+    """Persist the application in passwordless local mode.
 
-    if env_flag("ALLOW_ANONYMOUS", False, environ):
-        return False
+    The legacy core still reads ``loginMode`` in several places. Keeping that
+    compatibility key forced to ``False`` makes those paths behave as local
+    access while the surrounding application removes the login/account UI.
+    """
 
     config = getattr(getattr(app, "state", None), "config", None)
-    if not isinstance(config, dict) or config.get("loginMode") is True:
+    if not isinstance(config, dict) or config.get("loginMode") is False:
         return False
 
-    config["loginMode"] = True
+    config["loginMode"] = False
     save_config = getattr(core, "saveConfig", None)
     if callable(save_config):
         save_config(config)
@@ -55,6 +57,6 @@ def enforce_login_default(app: Any, core: Any, environ: Mapping[str, str] | None
 
 
 def secret_backups_allowed(environ: Mapping[str, str] | None = None) -> bool:
-    """Return whether backups containing account and platform secrets are enabled."""
+    """Return whether backups containing cookies and platform secrets are enabled."""
 
     return env_flag("ALLOW_SECRET_BACKUPS", False, environ)
