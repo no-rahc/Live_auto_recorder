@@ -47,7 +47,7 @@ jobs:
           tags: live-auto-recorder:smoke
           cache-from: type=gha
 
-      - name: Smoke test health and dashboard
+      - name: Smoke test local dashboard and operations
         shell: bash
         run: |
           set -euo pipefail
@@ -62,7 +62,6 @@ jobs:
 
           docker run -d --name "$container" \
             -p "127.0.0.1:${port}:5000" \
-            -e ALLOW_ANONYMOUS=true \
             live-auto-recorder:smoke >/dev/null
 
           ready=false
@@ -85,6 +84,18 @@ jobs:
             exit 1
           fi
           grep -qiE '<!doctype html|<html' /tmp/dashboard.html
+          grep -q '녹화 관제 보드' /tmp/dashboard.html
+          if grep -q '<h2>로그인</h2>' /tmp/dashboard.html; then
+            echo "Dashboard unexpectedly rendered the legacy login form"
+            exit 1
+          fi
+
+          operations_status="$(curl -sS -o /tmp/operations.html -w '%{http_code}' "http://127.0.0.1:${port}/operations")"
+          test "$operations_status" = "200"
+          grep -qiE '<!doctype html|<html' /tmp/operations.html
+
+          login_status="$(curl -sS -o /dev/null -w '%{http_code}' "http://127.0.0.1:${port}/login")"
+          test "$login_status" = "302"
 
       - name: Build amd64 and arm64 images
         uses: docker/build-push-action@v7
