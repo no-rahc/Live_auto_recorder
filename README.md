@@ -27,9 +27,9 @@ docker compose ps
 docker compose logs --tail 100 recorder
 ```
 
-기본 접속 주소는 `http://127.0.0.1:5000`입니다. 로그인이나 계정 생성 없이 바로 대시보드를 사용합니다.
+기본 접속 주소는 `http://127.0.0.1:5000`입니다.
 
-이 프로젝트의 기본 실행 모델은 **로컬 전용**입니다. Compose 웹 포트는 호스트의 `127.0.0.1`에만 게시되며 외부 인터페이스로 변경하는 설정은 제공하지 않습니다.
+Compose 웹 포트는 기본적으로 호스트의 `127.0.0.1`에 게시됩니다.
 
 ## 설정
 
@@ -38,7 +38,7 @@ docker compose logs --tail 100 recorder
 | 변수 | 기본값 | 설명 |
 |---|---|---|
 | `LIVE_AUTO_RECORDER_IMAGE` | `yeowoonlee/live-auto-recorder:latest` | Docker 이미지 |
-| `APP_PORT` | `5000` | 로컬 웹 포트 |
+| `APP_PORT` | `5000` | 웹 포트 |
 | `TZ` | `Asia/Seoul` | 시간대 |
 | `LOG_LEVEL` | `info` | 로그 수준 |
 | `ALLOW_SECRET_BACKUPS` | `false` | 쿠키·토큰 포함 백업 허용 |
@@ -53,7 +53,7 @@ docker compose logs --tail 100 recorder
 docker compose up -d --force-recreate
 ```
 
-다른 기기에서 직접 접속하는 구성은 기본 지원 범위가 아닙니다. 원격 사용이 필요하면 애플리케이션 포트를 외부에 직접 노출하지 말고 별도의 인증된 터널이나 프록시를 구성하세요.
+외부 접속 구성이 필요하면 애플리케이션 포트를 직접 노출하기보다 별도의 인증된 터널이나 프록시를 사용하세요.
 
 ## 저장 경로
 
