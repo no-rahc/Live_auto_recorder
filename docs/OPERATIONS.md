@@ -33,9 +33,69 @@
 
 기본 120초 동안 파일이 증가하지 않으면 멈춤으로 판정합니다. 자동 재연결은 기본 최대 3회이며 채널별 잠금과 재시도 대기 시간을 사용해 반복 재시작을 제한합니다.
 
+## 녹화 기록과 완료 파일 검증
+
+녹화 이벤트는 기존 `recording_history.jsonl`과 함께 `/app/json/recordings.sqlite3`에 누적됩니다. JSONL은 최근 상태 호환용으로 유지되지만 운영 화면의 장기 기록과 통계는 SQLite를 사용합니다.
+
+정상 종료된 녹화는 백그라운드에서 `ffprobe`로 영상 스트림과 재생 시간을 확인합니다. 검증이 실패하면 FFmpeg stream copy remux를 한 번 시도하고 복구한 파일을 다시 검사합니다. 원본 교체는 복구 파일이 검증된 경우에만 수행합니다.
+
+운영 화면의 **녹화 기록** 탭에서 다음 상태를 확인할 수 있습니다.
+
+- 녹화 완료·실패
+- 파일 검증 정상·복구 완료·손상·파일 없음
+- 외부 보관 대기·완료·실패
+- 수동 검증·복구 재실행
+
 ## 후처리 작업
 
 기존 후처리 진입점을 감싸 작업 상태를 기록합니다. 실행 중 작업은 취소 요청이 가능하고 완료·실패·취소 작업은 재시도할 수 있습니다. 재시도 시 원본 경로가 이동되었으면 녹화 저장소에서 같은 파일명을 한 번 더 찾습니다.
+
+## 알림 센터
+
+녹화 시작·완료·실패, 파일 검증, 저장소 경고와 외부 보관 결과를 전송 대기열에 넣습니다. 실패한 전송은 지수 백오프로 재시도하며 최대 시도 횟수와 조용한 시간대를 설정할 수 있습니다.
+
+Telegram과 Discord는 기존 설정을 사용합니다. 추가 이벤트 웹훅은 운영 화면에서 등록할 수 있으며 secret을 지정하면 요청 본문에 대한 HMAC-SHA256 값을 `X-LAR-Signature-256` 헤더로 전송합니다.
+
+## 외부 보관
+
+외부 보관은 `rclone`을 사용합니다. Docker 이미지의 기본 설정 경로는 `/app/json/rclone.conf`이며 `data` 볼륨에 함께 보존됩니다.
+
+예시 remote:
+
+```text
+gdrive:LiveAutoRecorder
+s3:recording-bucket/live
+webdav:archive
+```
+
+`rclone config`로 작성한 설정 파일을 호스트의 `data/rclone.conf`에 두고 운영 화면에서 remote 경로를 지정합니다. 자동 보관을 켜면 녹화 파일 검증이 `정상` 또는 `복구 완료`일 때 업로드 대기열에 추가합니다. 원격 크기 검증이 성공한 경우에만 `업로드 후 로컬 삭제` 옵션이 실행됩니다.
+
+## API 토큰과 자동화
+
+외부 자동화에는 로그인 세션 대신 `lar_` 접두사의 API 토큰을 사용합니다. 토큰 원문은 생성 직후 한 번만 표시되며 SHA-256 해시만 SQLite에 저장합니다.
+
+권한 범위:
+
+- `read`: 상태와 녹화 기록 조회
+- `control`: `read` + 채널 수동 시작·중지
+- `admin`: 향후 관리용 전체 범위
+
+지원 엔드포인트:
+
+```text
+GET  /api/v3/automation/status
+GET  /api/v3/automation/recordings
+POST /api/v3/automation/channels/{channel_id}/start
+POST /api/v3/automation/channels/{channel_id}/stop
+```
+
+요청 헤더:
+
+```text
+Authorization: Bearer lar_...
+```
+
+토큰에는 만료일과 마지막 사용 시각이 기록되며 운영 화면에서 즉시 폐기할 수 있습니다.
 
 ## 백업과 복원
 
@@ -46,6 +106,8 @@
 - `operations_v2.json`
 
 민감정보 포함을 선택하면 쿠키, 로그인 계정과 Telegram 설정도 포함합니다. 복원 직전에는 현재 상태를 담은 `pre_restore` 백업을 자동 생성합니다.
+
+`recordings.sqlite3`, `platform_v3.json`, `rclone.conf`는 운영 데이터이므로 호스트의 `data` 디렉터리 백업에 포함하는 것을 권장합니다.
 
 ## 채널 규칙
 
