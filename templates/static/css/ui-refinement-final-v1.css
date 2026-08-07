@@ -57,36 +57,3 @@ body.page-files .mobile-actionbar > button.lar-file-action-danger:hover:not(:dis
   background: var(--lar-danger) !important;
   color: #fff !important;
 }
-
-/* Keep boolean settings controls compact beside their labels without changing behavior. */
-body.page-config .lar-setting-switch {
-  width: 88px !important;
-  min-width: 88px !important;
-  min-height: 36px !important;
-  box-sizing: border-box;
-  gap: 7px !important;
-  padding: 5px 9px 5px 6px !important;
-}
-
-body.page-config .lar-setting-switch > strong {
-  min-width: 24px;
-  font-size: 13px;
-  line-height: 1;
-  text-align: left;
-}
-
-body.page-config .lar-switch-track {
-  box-sizing: border-box !important;
-  width: 34px !important;
-  min-width: 34px !important;
-  max-width: 34px !important;
-  height: 20px !important;
-  flex: 0 0 34px !important;
-  padding: 2px !important;
-}
-
-body.page-config .lar-switch-track span {
-  box-sizing: border-box !important;
-  width: 16px !important;
-  height: 16px !important;
-}
