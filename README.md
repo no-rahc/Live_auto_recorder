@@ -27,7 +27,9 @@ docker compose ps
 docker compose logs --tail 100 recorder
 ```
 
-기본 접속 주소는 `http://127.0.0.1:5000`입니다. 처음 접속하면 계정을 만든 뒤 로그인합니다.
+기본 접속 주소는 `http://127.0.0.1:5000`입니다. 로그인이나 계정 생성 없이 바로 대시보드를 사용합니다.
+
+이 프로젝트의 기본 실행 모델은 **로컬 전용**입니다. Compose 웹 포트는 호스트의 `127.0.0.1`에만 게시되며 외부 인터페이스로 변경하는 설정은 제공하지 않습니다.
 
 ## 설정
 
@@ -36,29 +38,14 @@ docker compose logs --tail 100 recorder
 | 변수 | 기본값 | 설명 |
 |---|---|---|
 | `LIVE_AUTO_RECORDER_IMAGE` | `yeowoonlee/live-auto-recorder:latest` | Docker 이미지 |
-| `APP_BIND_ADDRESS` | `127.0.0.1` | 호스트 바인딩 주소 |
-| `APP_PORT` | `5000` | 웹 포트 |
+| `APP_PORT` | `5000` | 로컬 웹 포트 |
 | `TZ` | `Asia/Seoul` | 시간대 |
 | `LOG_LEVEL` | `info` | 로그 수준 |
-| `ALLOW_ANONYMOUS` | `false` | 로그인 없이 사용하는 모드 |
-| `SESSION_HTTPS_ONLY` | `false` | 세션 쿠키의 Secure 속성 |
-| `ALLOW_SECRET_BACKUPS` | `false` | 쿠키·계정·토큰 포함 백업 허용 |
-| `CONFIG_PATH` | `./data` | 설정·계정·쿠키·백업 |
+| `ALLOW_SECRET_BACKUPS` | `false` | 쿠키·토큰 포함 백업 허용 |
+| `CONFIG_PATH` | `./data` | 설정·쿠키·운영 데이터 |
 | `RECORDINGS_PATH` | `./recordings` | 녹화 파일 |
 | `LOG_PATH` | `./logs` | 로그 |
 | `TMP_PATH` | `./tmp` | 임시 파일 |
-
-다른 기기에서 접속하려면 로그인 설정을 마친 뒤 다음 값을 사용합니다.
-
-```env
-APP_BIND_ADDRESS=0.0.0.0
-```
-
-HTTPS 리버스 프록시 뒤에서 운영할 때는 다음 값도 켭니다.
-
-```env
-SESSION_HTTPS_ONLY=true
-```
 
 변경 후 컨테이너를 다시 생성합니다.
 
@@ -66,7 +53,7 @@ SESSION_HTTPS_ONLY=true
 docker compose up -d --force-recreate
 ```
 
-`ALLOW_ANONYMOUS=true`는 외부에 노출되지 않은 신뢰할 수 있는 네트워크에서만 사용하세요. 운영 관리와 백업 기능은 익명 모드에서도 계정 로그인이 필요합니다.
+다른 기기에서 직접 접속하는 구성은 기본 지원 범위가 아닙니다. 원격 사용이 필요하면 애플리케이션 포트를 외부에 직접 노출하지 말고 별도의 인증된 터널이나 프록시를 구성하세요.
 
 ## 저장 경로
 
@@ -154,6 +141,8 @@ docker compose config
 python -m pip install -r requirements.txt
 python app_entry.py
 ```
+
+직접 실행할 때도 기본 바인딩은 `127.0.0.1:5000`입니다.
 
 ```bash
 python -m compileall -q app_entry.py lar_app module
