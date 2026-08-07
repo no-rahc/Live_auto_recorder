@@ -38,17 +38,6 @@
     form.appendChild(input);
   }
 
-  function addLocalBadge() {
-    if (document.querySelector(".lar-local-mode-badge")) return;
-    const content = document.getElementById("content") || document.querySelector("main");
-    const heading = content?.querySelector("h1") || document.querySelector("h1");
-    if (!heading) return;
-    const badge = document.createElement("div");
-    badge.className = "lar-local-mode-badge";
-    badge.textContent = "로컬 전용 · 로그인 없음";
-    heading.insertAdjacentElement("afterend", badge);
-  }
-
   function simplifyConfigWorkspace() {
     if (!document.body.classList.contains("page-config")) return;
     document.body.classList.add("lar-local-mode");
@@ -85,13 +74,12 @@
 
     const overview = document.querySelector(".lar-config-overview-line");
     const access = overview ? Array.from(overview.children).find((node) => node.querySelector("b")?.textContent.trim() === "접속") : null;
-    if (access) access.innerHTML = "<b>접속</b>로컬 전용";
+    access?.remove();
   }
 
   function boot() {
     removeLegacyAuthUi(document);
     simplifyConfigWorkspace();
-    addLocalBadge();
 
     const sidebar = document.getElementById("mySidenav");
     if (sidebar) {
