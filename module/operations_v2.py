@@ -8,11 +8,12 @@ from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 
 from lar_app.security import secret_backups_allowed
 from module.operations_backup import BackupStatsMixin
+from module.operations_catalog_stats import CatalogStatsMixin
 from module.operations_common import OperationsBase, _iso
 from module.operations_health import HealthJobsMixin
 
 
-class OperationsRuntime(HealthJobsMixin, BackupStatsMixin, OperationsBase):
+class OperationsRuntime(CatalogStatsMixin, HealthJobsMixin, BackupStatsMixin, OperationsBase):
     pass
 
 
