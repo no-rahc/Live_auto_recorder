@@ -20,7 +20,7 @@ If a credential may have been exposed, revoke or rotate it before sending the re
 
 ## Deployment notes
 
-The default deployment model is passwordless and local-only. Compose publishes the web interface only on `127.0.0.1`, and standalone execution also defaults to `127.0.0.1`.
+Compose publishes the web interface on `127.0.0.1` by default, and standalone execution also defaults to `127.0.0.1`.
 
 Do not expose the application port directly on a LAN or the public internet. If remote access is required, place an authenticated tunnel or reverse proxy in front of the application and keep the recorder port private.
 
