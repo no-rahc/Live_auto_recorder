@@ -25,7 +25,8 @@ ENV DEBIAN_FRONTEND=noninteractive \
     TZ=Asia/Seoul \
     HOST=0.0.0.0 \
     PORT=5000 \
-    RECORDINGS_ROOT=/app/chzzk
+    RECORDINGS_ROOT=/app/chzzk \
+    RCLONE_CONFIG=/app/json/rclone.conf
 
 WORKDIR /app
 
