@@ -57,7 +57,7 @@ test('history renders durable record and exposes verify and archive actions', as
   await expect(page.locator('#ops-history-body')).toContainText('정상');
   await page.getByRole('button', { name: '검증·복구' }).click();
   await expect(page.locator('#ops-notice')).toContainText('검증');
-  await page.getByRole('button', { name: '외부 보관' }).click();
+  await page.locator('#ops-history-body [data-archive="7"]').click();
   await expect(page.locator('#ops-notice')).toContainText('대기열');
 });
 
