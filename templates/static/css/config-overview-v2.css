@@ -86,20 +86,27 @@ body.page-config .lar-switch-source {
   pointer-events: none !important;
 }
 body.page-config .lar-setting-switch {
-  width: fit-content !important;
-  min-width: 104px !important;
-  min-height: 42px !important;
+  width: 88px !important;
+  min-width: 88px !important;
+  min-height: 36px !important;
+  box-sizing: border-box;
   display: inline-flex !important;
   align-items: center;
   justify-content: flex-start !important;
-  gap: 9px;
+  gap: 7px;
   margin: 0 !important;
-  padding: 6px 11px 6px 7px !important;
+  padding: 5px 9px 5px 6px !important;
   border: 1px solid var(--lar-line-strong) !important;
   border-radius: 999px !important;
   background: #f4f5f6 !important;
   color: var(--lar-muted) !important;
   box-shadow: none !important;
+}
+body.page-config .lar-setting-switch > strong {
+  min-width: 24px;
+  font-size: 13px;
+  line-height: 1;
+  text-align: left;
 }
 body.page-config .lar-setting-switch.is-on {
   border-color: #ffc69d !important;
@@ -111,9 +118,10 @@ body.page-config .lar-setting-switch:focus-visible {
   outline-offset: 2px;
 }
 body.page-config .lar-switch-track {
-  width: 36px;
-  height: 22px;
-  flex: none;
+  box-sizing: border-box;
+  width: 34px;
+  height: 20px;
+  flex: 0 0 34px;
   display: flex;
   align-items: center;
   padding: 2px;
@@ -122,8 +130,9 @@ body.page-config .lar-switch-track {
   transition: background .16s ease;
 }
 body.page-config .lar-switch-track span {
-  width: 18px;
-  height: 18px;
+  box-sizing: border-box;
+  width: 16px;
+  height: 16px;
   border-radius: 50%;
   background: #fff;
   box-shadow: 0 1px 4px rgba(20, 20, 24, .2);

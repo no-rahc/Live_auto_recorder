@@ -18,6 +18,29 @@ test('settings are summarized across six focused tabs', async ({ page }) => {
   await expect(page.locator('.lar-setting-switch').first()).toBeVisible();
 });
 
+test('boolean switch uses compact stable proportions', async ({ page }) => {
+  await page.goto(fixture);
+  const control = page.locator('.lar-setting-switch').first();
+  const track = control.locator('.lar-switch-track');
+
+  const before = await control.boundingBox();
+  const trackBox = await track.boundingBox();
+  expect(before).not.toBeNull();
+  expect(trackBox).not.toBeNull();
+  expect(before.width).toBeGreaterThanOrEqual(86);
+  expect(before.width).toBeLessThanOrEqual(92);
+  expect(before.height).toBeGreaterThanOrEqual(34);
+  expect(before.height).toBeLessThanOrEqual(38);
+  expect(Math.abs(trackBox.width - 34)).toBeLessThan(0.1);
+  expect(Math.abs(trackBox.height - 20)).toBeLessThan(0.1);
+
+  await control.click();
+  const after = await control.boundingBox();
+  expect(after).not.toBeNull();
+  expect(Math.abs(after.width - before.width)).toBeLessThan(0.1);
+  expect(Math.abs(after.height - before.height)).toBeLessThan(0.1);
+});
+
 test('encoding keeps the common choice visible and advanced fields collapsed', async ({ page }) => {
   await page.goto(fixture);
   await page.getByRole('tab', { name: /후처리·인코딩/ }).click();
