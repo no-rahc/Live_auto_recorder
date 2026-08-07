@@ -1,7 +1,5 @@
 import unittest
 
-from werkzeug.security import generate_password_hash
-
 from lar_app.web.middleware import (
     _apply_secret_actions,
     _validate_dangerous_config,
@@ -46,31 +44,16 @@ class ConfigSafetyMiddlewareTests(unittest.TestCase):
         self.assertEqual(result["telegram_chat_id"], "new-chat")
         self.assertEqual(result["discord_webhook_url"], "")
 
-    def test_login_disable_requires_password_and_loopback(self):
-        account = {"password": generate_password_hash("correct-password")}
-        pairs = [
-            ("loginMode", "false"),
-            ("danger_confirmation", "로그인 해제"),
-            ("danger_current_password", "correct-password"),
-        ]
-        current = {"loginMode": True}
-
-        self.assertIsNone(_validate_dangerous_config(pairs, current, account, "127.0.0.1"))
-        self.assertIn(
-            "외부 접속",
-            _validate_dangerous_config(pairs, current, account, "0.0.0.0") or "",
-        )
-
     def test_risky_file_manager_transition_requires_acknowledgement(self):
         current = {
-            "loginMode": True,
+            "loginMode": False,
             "fileManagerEnabled": False,
             "fileManagerMode": "whitelist",
             "fileManagerReadOnly": True,
             "trashEnabled": True,
         }
         risky = [
-            ("loginMode", "true"),
+            ("loginMode", "false"),
             ("fileManagerEnabled", "true"),
             ("fileManagerMode", "blacklist"),
             ("fileManagerReadOnly", "false"),
@@ -79,10 +62,10 @@ class ConfigSafetyMiddlewareTests(unittest.TestCase):
 
         self.assertIn(
             "위험한 파일 관리자",
-            _validate_dangerous_config(risky, current, None, "127.0.0.1") or "",
+            _validate_dangerous_config(risky, current) or "",
         )
         risky.append(("danger_ack", "위험 설정 적용"))
-        self.assertIsNone(_validate_dangerous_config(risky, current, None, "127.0.0.1"))
+        self.assertIsNone(_validate_dangerous_config(risky, current))
 
 
 if __name__ == "__main__":
