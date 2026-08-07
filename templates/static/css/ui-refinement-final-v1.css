@@ -60,8 +60,10 @@ body.page-files .mobile-actionbar > button.lar-file-action-danger:hover:not(:dis
 
 /* Keep boolean settings controls compact beside their labels without changing behavior. */
 body.page-config .lar-setting-switch {
+  width: 88px !important;
   min-width: 88px !important;
   min-height: 36px !important;
+  box-sizing: border-box;
   gap: 7px !important;
   padding: 5px 9px 5px 6px !important;
 }
