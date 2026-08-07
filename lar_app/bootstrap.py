@@ -6,6 +6,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from fastapi import HTTPException, Request
+from fastapi.responses import JSONResponse
+
 from lar_app.template_compat import install_template_response_compat
 
 # Starlette 1.x removed TemplateResponse(name, context). The legacy core still
@@ -61,6 +64,20 @@ def _install_health_route(app: Any, release: ReleaseInfo) -> None:
     app.add_api_route("/healthz", healthz, methods=["GET"], include_in_schema=False)
 
 
+def _install_local_http_exception_handler(app: Any) -> None:
+    """Replace the legacy 401-to-/login redirect with normal HTTP errors."""
+
+    async def local_http_exception_handler(request: Request, exc: HTTPException):
+        del request
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"detail": exc.detail},
+            headers=exc.headers,
+        )
+
+    app.add_exception_handler(HTTPException, local_http_exception_handler)
+
+
 def build_application(
     core: Any = recorder_core,
     *,
@@ -76,6 +93,7 @@ def build_application(
     release = load_release_info(core, root_dir=root_dir)
     apply_release_info(core, release)
     configure_session_middleware(app)
+    _install_local_http_exception_handler(app)
     _install_health_route(app, release)
 
     operations = install_operations(app, core)
