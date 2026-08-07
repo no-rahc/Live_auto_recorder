@@ -12,6 +12,7 @@ from lar_app.release import ReleaseInfo, apply_release_info, load_release_info
 from lar_app.security import configure_session_middleware, enforce_login_default
 from lar_app.web.middleware import ConsoleAssetsMiddleware, SecurityMiddleware
 from module.config_tools_v1 import install_config_tools
+from module.operations_platform_v3 import install_platform_features
 from module.operations_v2 import install_operations
 
 
@@ -22,10 +23,11 @@ class ApplicationRuntime:
     app: Any
     core: Any
     operations: Any
+    platform: Any
     release: ReleaseInfo
 
 
-def _install_operations_lifespan(app: Any, operations: Any, core: Any) -> None:
+def _install_operations_lifespan(app: Any, operations: Any, platform: Any, core: Any) -> None:
     core_lifespan = app.router.lifespan_context
 
     @asynccontextmanager
@@ -33,9 +35,11 @@ def _install_operations_lifespan(app: Any, operations: Any, core: Any) -> None:
         async with core_lifespan(application):
             enforce_login_default(application, core)
             await operations.start()
+            await platform.start()
             try:
                 yield
             finally:
+                await platform.stop()
                 await operations.stop()
 
     app.router.lifespan_context = application_lifespan
@@ -69,8 +73,9 @@ def build_application(
     _install_health_route(app, release)
 
     operations = install_operations(app, core)
+    platform = install_platform_features(app, core, operations)
     install_config_tools(app, core)
-    _install_operations_lifespan(app, operations, core)
+    _install_operations_lifespan(app, operations, platform, core)
 
     # Preserve the original middleware order: security wraps HTML injection.
     app.add_middleware(ConsoleAssetsMiddleware, release_version=release.version)
@@ -80,6 +85,7 @@ def build_application(
         app=app,
         core=core,
         operations=operations,
+        platform=platform,
         release=release,
     )
     app.state.lar_runtime = runtime

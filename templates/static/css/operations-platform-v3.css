@@ -1,0 +1,46 @@
+/* Recording catalog, notifications, archive, and automation panels. */
+body.page-operations .ops-page,
+body.page-operations .ops-panel,
+body.page-operations .ops-table-wrap,
+body.page-operations .ops-platform-card { min-width:0; max-width:100%; }
+body.page-operations .ops-tabs { min-width:0; max-width:100%; overflow-x:auto; scrollbar-width:thin; }
+body.page-operations .ops-platform-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
+body.page-operations .ops-platform-card { padding:16px; border:1px solid var(--lar-line); border-radius:14px; background:#fff; }
+body.page-operations .ops-platform-card h3 { margin:0 0 8px; font-size:15px; }
+body.page-operations .ops-platform-card p { margin:0; color:var(--lar-muted); font-size:12px; line-height:1.55; }
+body.page-operations .ops-platform-toolbar { display:flex; flex-wrap:wrap; align-items:end; gap:8px; margin:0 0 14px; }
+body.page-operations .ops-platform-toolbar label { display:grid; gap:5px; min-width:150px; color:var(--lar-text-soft); font-size:12px; font-weight:700; }
+body.page-operations .ops-platform-toolbar input,
+body.page-operations .ops-platform-toolbar select,
+body.page-operations .ops-platform-form input,
+body.page-operations .ops-platform-form select,
+body.page-operations .ops-platform-form textarea { min-height:40px; padding:8px 10px; border:1px solid var(--lar-line-strong); border-radius:10px; background:#fff; color:var(--lar-text); }
+body.page-operations .ops-platform-form { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+body.page-operations .ops-platform-form > label { display:grid; gap:6px; color:var(--lar-text-soft); font-size:12px; font-weight:750; }
+body.page-operations .ops-platform-form .is-wide { grid-column:1/-1; }
+body.page-operations .ops-platform-form textarea { min-height:96px; resize:vertical; }
+body.page-operations .ops-platform-actions { grid-column:1/-1; display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+body.page-operations .ops-platform-status { display:inline-flex; align-items:center; padding:4px 8px; border-radius:999px; background:#eef1f4; color:var(--lar-muted); font-size:10px; font-weight:800; }
+body.page-operations .ops-platform-status.is-ok { background:var(--lar-success-soft); color:var(--lar-success); }
+body.page-operations .ops-platform-status.is-warn { background:#fff4e8; color:#9a5a14; }
+body.page-operations .ops-platform-status.is-error { background:var(--lar-danger-soft); color:var(--lar-danger); }
+body.page-operations .ops-recording-title { max-width:280px; white-space:normal; }
+body.page-operations .ops-recording-path { display:block; max-width:360px; overflow:hidden; color:var(--lar-muted); font-size:10px; text-overflow:ellipsis; white-space:nowrap; }
+body.page-operations .ops-inline-buttons { display:flex; flex-wrap:wrap; gap:6px; }
+body.page-operations .ops-inline-buttons button { min-height:32px!important; padding:5px 9px!important; font-size:10px!important; }
+body.page-operations .ops-token-once { margin-top:10px; padding:10px 12px; border:1px solid #ffd2b1; border-radius:10px; background:#fff8f2; }
+body.page-operations .ops-token-once code { display:block; margin-top:6px; overflow-wrap:anywhere; user-select:all; }
+body.page-operations .ops-event-grid { grid-column:1/-1; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:7px; }
+body.page-operations .ops-event-grid label { display:flex; align-items:center; gap:7px; padding:8px 10px; border:1px solid var(--lar-line); border-radius:10px; font-size:11px; }
+body.page-operations .ops-webhook-row { display:grid; grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) auto; gap:8px; margin-top:8px; }
+body.page-operations .ops-empty { padding:22px; text-align:center; color:var(--lar-muted); font-size:12px; }
+@media (max-width:900px){
+  body.page-operations .ops-platform-grid, body.page-operations .ops-platform-form { grid-template-columns:1fr; }
+  body.page-operations .ops-event-grid { grid-template-columns:1fr; }
+}
+@media (max-width:700px){
+  body.page-operations .ops-platform-toolbar { display:grid; grid-template-columns:1fr 1fr; }
+  body.page-operations .ops-platform-toolbar label:first-child { grid-column:1/-1; }
+  body.page-operations .ops-webhook-row { grid-template-columns:1fr; }
+  body.page-operations .ops-table-wrap { overflow-x:auto; }
+}

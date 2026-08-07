@@ -44,6 +44,7 @@ STYLESHEETS = (
     Asset("/static/css/dashboard-channel-modal-v1.css", "data-lar-dashboard-channel-modal-v1"),
     Asset("/static/css/recording-density-v1.css", "data-lar-recording-density-v1"),
     Asset("/static/css/operations-v2.css", "data-lar-operations-v2"),
+    Asset("/static/css/operations-platform-v3.css", "data-lar-operations-platform-v3"),
     Asset("/static/css/ui-polish-v1.css", "data-lar-ui-polish-v1"),
     Asset("/static/css/config-workspace-v1.css", "data-lar-config-workspace-v1"),
     Asset("/static/css/config-safety-v1.css", "data-lar-config-safety-v1"),
@@ -73,6 +74,7 @@ BODY_SCRIPTS = (
     Asset("/static/js/project-ui-audit-v1.js", "data-lar-project-ui-audit-v1", defer=True),
     Asset("/static/js/operations-v2.js", "data-lar-operations-v2", defer=True),
     Asset("/static/js/operations-controls-v1.js", "data-lar-operations-controls-v1", defer=True),
+    Asset("/static/js/operations-platform-v3.js", "data-lar-operations-platform-v3", defer=True),
     Asset("/static/js/ui-refinement-v1.js", "data-lar-ui-refinement-v1", defer=True),
 )
 
