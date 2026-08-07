@@ -1,4 +1,4 @@
-"""Small authenticated helpers used by the compact settings workspace."""
+"""Small local helpers used by the compact settings workspace."""
 from __future__ import annotations
 
 import asyncio
@@ -8,7 +8,7 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
-from fastapi import Body, Depends, HTTPException, Request
+from fastapi import Body, HTTPException
 
 
 _ENCODERS = (
@@ -102,11 +102,9 @@ def _probe_encoders(ffmpeg_path: str) -> dict[str, Any]:
 
 
 def install_config_tools(app, lar) -> None:
-    """Register read-only diagnostics for settings-page helpers."""
+    """Register local read-only diagnostics for settings-page helpers."""
 
-    login_dependency = Depends(lar.requireLogin)
-
-    @app.post("/api/config-tools/path-check", dependencies=[login_dependency])
+    @app.post("/api/config-tools/path-check")
     async def config_path_check(payload: dict[str, Any] = Body(default_factory=dict)):
         try:
             return await asyncio.to_thread(_check_path, str(payload.get("path", "")))
@@ -115,9 +113,8 @@ def install_config_tools(app, lar) -> None:
         except OSError as exc:
             raise HTTPException(status_code=500, detail=f"경로 확인 실패: {exc}") from exc
 
-    @app.get("/api/config-tools/encoders", dependencies=[login_dependency])
-    async def config_encoder_check(request: Request):
-        del request
+    @app.get("/api/config-tools/encoders")
+    async def config_encoder_check():
         ffmpeg = None
         try:
             ffmpeg = lar.getFFmpeg()
