@@ -6,6 +6,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from fastapi import HTTPException, Request
+from fastapi.responses import JSONResponse
+
 from lar_app.template_compat import install_template_response_compat
 
 # Starlette 1.x removed TemplateResponse(name, context). The legacy core still
@@ -15,7 +18,7 @@ install_template_response_compat()
 import live_auto_recorder as recorder_core
 
 from lar_app.release import ReleaseInfo, apply_release_info, load_release_info
-from lar_app.security import configure_session_middleware, enforce_login_default
+from lar_app.security import configure_session_middleware, enforce_local_mode
 from lar_app.web.middleware import ConsoleAssetsMiddleware, SecurityMiddleware
 from module.config_tools_v1 import install_config_tools
 from module.operations_platform_v3 import install_platform_features
@@ -39,7 +42,7 @@ def _install_operations_lifespan(app: Any, operations: Any, platform: Any, core:
     @asynccontextmanager
     async def application_lifespan(application):
         async with core_lifespan(application):
-            enforce_login_default(application, core)
+            enforce_local_mode(application, core)
             await operations.start()
             await platform.start()
             try:
@@ -61,12 +64,26 @@ def _install_health_route(app: Any, release: ReleaseInfo) -> None:
     app.add_api_route("/healthz", healthz, methods=["GET"], include_in_schema=False)
 
 
+def _install_local_http_exception_handler(app: Any) -> None:
+    """Replace the legacy 401-to-/login redirect with normal HTTP errors."""
+
+    async def local_http_exception_handler(request: Request, exc: HTTPException):
+        del request
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"detail": exc.detail},
+            headers=exc.headers,
+        )
+
+    app.add_exception_handler(HTTPException, local_http_exception_handler)
+
+
 def build_application(
     core: Any = recorder_core,
     *,
     root_dir: Path | None = None,
 ) -> ApplicationRuntime:
-    """Build the application once while preserving the legacy public API."""
+    """Build the local-only application while preserving the legacy public API."""
 
     app = core.app
     existing = getattr(app.state, "lar_runtime", None)
@@ -76,6 +93,7 @@ def build_application(
     release = load_release_info(core, root_dir=root_dir)
     apply_release_info(core, release)
     configure_session_middleware(app)
+    _install_local_http_exception_handler(app)
     _install_health_route(app, release)
 
     operations = install_operations(app, core)

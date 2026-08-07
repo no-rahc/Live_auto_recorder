@@ -8,7 +8,7 @@ from typing import Any, Mapping
 import uvicorn
 
 
-DEFAULT_HOST = "0.0.0.0"
+DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 5000
 DEFAULT_LOG_LEVEL = "info"
 _ALLOWED_LOG_LEVELS = frozenset({"critical", "error", "warning", "info", "debug", "trace"})

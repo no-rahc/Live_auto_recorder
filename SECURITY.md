@@ -6,7 +6,7 @@ Security fixes are applied to `main` and the current `latest` Docker image. Olde
 
 ## Reporting a vulnerability
 
-Do not open a public issue for vulnerabilities, leaked cookies, tokens, account data, or private recording paths.
+Do not open a public issue for vulnerabilities, leaked cookies, tokens, or private recording paths.
 
 Use GitHub's **Security → Report a vulnerability** form and include:
 
@@ -20,6 +20,8 @@ If a credential may have been exposed, revoke or rotate it before sending the re
 
 ## Deployment notes
 
-The default Compose configuration binds the web interface to `127.0.0.1` and requires login. Only set `APP_BIND_ADDRESS=0.0.0.0` after configuring access control. When serving through HTTPS, set `SESSION_HTTPS_ONLY=true`.
+The default deployment model is passwordless and local-only. Compose publishes the web interface only on `127.0.0.1`, and standalone execution also defaults to `127.0.0.1`.
 
-Backups containing cookies, account data, or notification tokens are disabled unless `ALLOW_SECRET_BACKUPS=true` is set explicitly.
+Do not expose the application port directly on a LAN or the public internet. If remote access is required, place an authenticated tunnel or reverse proxy in front of the application and keep the recorder port private.
+
+Backups containing cookies or notification/API tokens are disabled unless `ALLOW_SECRET_BACKUPS=true` is set explicitly.

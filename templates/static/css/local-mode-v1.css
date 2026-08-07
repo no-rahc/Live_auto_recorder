@@ -1,0 +1,44 @@
+/* Passwordless local-only presentation. Legacy auth markup stays hidden for compatibility. */
+a[href="/login"],
+a[href="/logout"],
+a[href="/register"],
+#user-info,
+#account-fields,
+body.page-config .config-section:has(#loginMode),
+body.page-config [data-config-tab="security"],
+body.page-config [data-config-panel="security"] {
+  display: none !important;
+}
+
+.lar-local-mode-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 14px;
+  padding: 6px 10px;
+  border: 1px solid var(--lar-line, #e2e5e9);
+  border-radius: 999px;
+  background: var(--lar-surface-soft, #f7f8f9);
+  color: var(--lar-text-soft, #5b626b);
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.lar-local-mode-badge::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #22a06b;
+}
+
+body.page-config.lar-local-mode .lar-config-tabs {
+  grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+}
+
+@media (max-width: 1180px) {
+  body.page-config.lar-local-mode .lar-config-tabs {
+    grid-template-columns: repeat(5, minmax(132px, 1fr)) !important;
+  }
+}

@@ -1,26 +1,23 @@
-"""HTTP middleware for security policy and shared console assets."""
+"""HTTP middleware for local-mode policy and shared console assets."""
 from __future__ import annotations
 
 import html as html_module
-import os
 import re
 import time
-from collections import defaultdict, deque
 from typing import Any, Protocol
 from urllib.parse import urlencode
 
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
-from starlette.responses import JSONResponse, Response
-from werkzeug.security import check_password_hash
+from starlette.responses import JSONResponse, RedirectResponse, Response
 
 from lar_app.web.assets import HTML_ROUTES, inject_console_assets
-from module.data_manager import loadAccount, loadConfig, loadTelegram
+from module.data_manager import loadConfig, loadTelegram, saveConfig
 
 
-NO_STORE_ROUTES = frozenset({"/login", "/register", "/config", "/cookies", "/operations"})
+NO_STORE_ROUTES = frozenset({"/config", "/cookies", "/operations"})
+AUTH_ROUTES = frozenset({"/login", "/register", "/logout", "/updateAccount"})
 MUTATING_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
-_LOOPBACK_BINDS = frozenset({"127.0.0.1", "localhost", "::1"})
 _SECRET_FIELDS = (
     ("telegram_bot_token", "telegram"),
     ("telegram_chat_id", "telegram"),
@@ -88,27 +85,12 @@ def _file_manager_risk(values: dict[str, Any]) -> bool:
 def _validate_dangerous_config(
     pairs: list[tuple[str, str]],
     current_config: dict[str, Any],
-    account: dict[str, Any] | None,
-    bind_address: str,
+    account: dict[str, Any] | None = None,
+    bind_address: str = "127.0.0.1",
 ) -> str | None:
-    """Return a user-facing error when a dangerous transition lacks confirmation."""
+    """Require explicit confirmation for risky file-manager transitions."""
 
-    current_login = _truthy(current_config.get("loginMode", True))
-    next_login = _truthy(_first(pairs, "loginMode", str(current_login).lower()))
-    login_downgrade = current_login and not next_login
-
-    if login_downgrade:
-        if bind_address.strip().lower() not in _LOOPBACK_BINDS:
-            return "외부 접속이 가능한 바인딩에서는 로그인 모드를 끌 수 없습니다. APP_BIND_ADDRESS를 127.0.0.1로 변경하세요."
-
-        phrase = _first(pairs, "danger_confirmation").strip()
-        password = _first(pairs, "danger_current_password")
-        password_hash = str((account or {}).get("password") or "")
-        if phrase != "로그인 해제":
-            return "로그인 모드를 끄려면 확인 문구 ‘로그인 해제’를 정확히 입력하세요."
-        if not password_hash or not check_password_hash(password_hash, password):
-            return "현재 비밀번호가 올바르지 않습니다."
-
+    del account, bind_address  # Legacy parameters retained for compatibility.
     current_risk = _file_manager_risk(current_config)
     next_values = {
         "fileManagerEnabled": _first(
@@ -145,7 +127,7 @@ def _validate_dangerous_config(
 
     if next_risk and (not current_risk or risk_fields_changed):
         acknowledgement = _first(pairs, "danger_ack").strip()
-        if acknowledgement not in {"위험 설정 적용", "로그인 해제"}:
+        if acknowledgement != "위험 설정 적용":
             return "위험한 파일 관리자 설정을 적용하려면 확인 문구 ‘위험 설정 적용’을 입력하세요."
 
     return None
@@ -197,31 +179,11 @@ def mask_config_secrets(html: str) -> str:
 
 
 class SecurityMiddleware(BaseHTTPMiddleware):
-    """Add security headers, login throttling, config guards, and mutation audit events."""
+    """Apply local-mode routing, config guards, security headers, and audit events."""
 
-    def __init__(
-        self,
-        app: Any,
-        operations: AuditSink,
-        *,
-        window_seconds: int = 600,
-        max_failures: int = 5,
-    ) -> None:
+    def __init__(self, app: Any, operations: AuditSink) -> None:
         super().__init__(app)
         self.operations = operations
-        self.window_seconds = window_seconds
-        self.max_failures = max_failures
-        self.failures: dict[str, deque[float]] = defaultdict(deque)
-
-    @staticmethod
-    def _client_key(request: Request) -> str:
-        return request.client.host if request.client else "unknown"
-
-    def _recent_attempts(self, key: str, now: float) -> deque[float]:
-        attempts = self.failures[key]
-        while attempts and now - attempts[0] > self.window_seconds:
-            attempts.popleft()
-        return attempts
 
     @staticmethod
     def _apply_headers(request: Request, response: Response) -> None:
@@ -236,17 +198,7 @@ class SecurityMiddleware(BaseHTTPMiddleware):
         if request.url.path in NO_STORE_ROUTES:
             response.headers.setdefault("Cache-Control", "no-store")
 
-    def _audit_response(self, request: Request, response: Response, key: str, now: float) -> None:
-        if request.method == "POST" and request.url.path == "/login":
-            attempts = self._recent_attempts(key, now)
-            if response.status_code == 401:
-                attempts.append(now)
-                self.operations.audit("login_failed", f"client={key}", "error")
-            elif response.status_code < 400:
-                attempts.clear()
-                self.operations.audit("login_succeeded", f"client={key}")
-            return
-
+    def _audit_response(self, request: Request, response: Response) -> None:
         if request.method in MUTATING_METHODS and not request.url.path.startswith("/api/sys_metrics"):
             status = "ok" if response.status_code < 400 else "error"
             self.operations.audit(
@@ -270,12 +222,20 @@ class SecurityMiddleware(BaseHTTPMiddleware):
         current_telegram = loadTelegram() or {}
         _apply_secret_actions(pairs, current_config, current_telegram)
 
-        error = _validate_dangerous_config(
+        # The legacy core still couples fileManagerEnabled to loginMode. Feed it
+        # local mode explicitly, then restore the requested file-manager state
+        # after the legacy handler completes.
+        requested_file_manager = _first(
             pairs,
-            current_config,
-            loadAccount(),
-            os.environ.get("APP_BIND_ADDRESS", "127.0.0.1"),
+            "fileManagerEnabled",
+            str(current_config.get("fileManagerEnabled", False)).lower(),
         )
+        request.state.local_file_manager_enabled = requested_file_manager
+        _replace_pair(pairs, "loginMode", "false")
+
+        local_current = dict(current_config)
+        local_current["loginMode"] = False
+        error = _validate_dangerous_config(pairs, local_current)
         if error:
             return JSONResponse({"status": "error", "message": error}, status_code=400)
 
@@ -300,28 +260,39 @@ class SecurityMiddleware(BaseHTTPMiddleware):
         request.scope["headers"] = headers
         return None
 
-    async def dispatch(self, request: Request, call_next):
-        key = self._client_key(request)
-        now = time.monotonic()
-        attempts = self._recent_attempts(key, now)
+    @staticmethod
+    def _normalize_local_config(request: Request) -> None:
+        config = loadConfig() or {}
+        config["loginMode"] = False
+        requested = getattr(request.state, "local_file_manager_enabled", None)
+        if requested is not None:
+            config["fileManagerEnabled"] = _truthy(requested)
+        saveConfig(config)
+        request.app.state.config = config
 
-        if request.method == "POST" and request.url.path == "/login" and len(attempts) >= self.max_failures:
-            self.operations.audit("login_throttled", f"client={key}", "blocked")
-            return JSONResponse(
-                {"status": "error", "message": "로그인 시도가 너무 많습니다. 10분 후 다시 시도하세요."},
-                status_code=429,
-            )
+    async def dispatch(self, request: Request, call_next):
+        if request.url.path in AUTH_ROUTES:
+            response = RedirectResponse(url="/", status_code=302 if request.method == "GET" else 303)
+            self._apply_headers(request, response)
+            return response
 
         if request.method == "POST" and request.url.path == "/config":
             blocked = await self._prepare_config_request(request)
             if blocked is not None:
                 self._apply_headers(request, blocked)
-                self._audit_response(request, blocked, key, now)
+                self._audit_response(request, blocked)
                 return blocked
 
         response = await call_next(request)
+
+        if request.method == "POST" and request.url.path == "/config" and response.status_code < 400:
+            self._normalize_local_config(request)
+            location = response.headers.get("location", "")
+            if location.startswith("/register") or location.startswith("/login"):
+                response.headers["location"] = "/"
+
         self._apply_headers(request, response)
-        self._audit_response(request, response, key, now)
+        self._audit_response(request, response)
         return response
 
 

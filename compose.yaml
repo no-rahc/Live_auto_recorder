@@ -8,14 +8,14 @@ services:
     init: true
     restart: unless-stopped
     ports:
-      - "${APP_BIND_ADDRESS:-127.0.0.1}:${APP_PORT:-5000}:5000"
+      # Local-only console: do not publish the web port on external interfaces.
+      - "127.0.0.1:${APP_PORT:-5000}:5000"
     environment:
       TZ: ${TZ:-Asia/Seoul}
+      # The process listens on the container interface; the host publication above remains loopback-only.
       HOST: 0.0.0.0
       PORT: 5000
       LOG_LEVEL: ${LOG_LEVEL:-info}
-      ALLOW_ANONYMOUS: ${ALLOW_ANONYMOUS:-false}
-      SESSION_HTTPS_ONLY: ${SESSION_HTTPS_ONLY:-false}
       ALLOW_SECRET_BACKUPS: ${ALLOW_SECRET_BACKUPS:-false}
     volumes:
       - ${CONFIG_PATH:-./data}:/app/json

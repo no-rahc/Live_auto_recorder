@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any
 
 import requests
-from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query, Request
+from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query
 
 from module.recording_catalog import (
     _LOCK as DB_LOCK,
@@ -333,12 +333,6 @@ def install_platform_features(app: Any, lar: Any, operations: Any) -> PlatformRu
     runtime = PlatformRuntime(app, lar, operations)
     router = APIRouter()
 
-    async def operator(request: Request) -> bool:
-        account = lar.loadAccount() or {}
-        if not account.get("password") or not request.session.get("logged_in"):
-            raise HTTPException(status_code=401, detail="Operator login required")
-        return True
-
     def bearer(authorization: str | None) -> str:
         text = str(authorization or "")
         return text[7:].strip() if text.lower().startswith("bearer ") else ""
@@ -355,30 +349,28 @@ def install_platform_features(app: Any, lar: Any, operations: Any) -> PlatformRu
             raise HTTPException(status_code=401, detail="Valid control API token required")
         return token
 
-    auth = Depends(operator)
-
     @router.get("/api/v3/recordings")
-    async def recordings(limit: int = Query(100, ge=1, le=500), offset: int = Query(0, ge=0), channel_id: str = "", status: str = "", q: str = "", login: Any = auth):
+    async def recordings(limit: int = Query(100, ge=1, le=500), offset: int = Query(0, ge=0), channel_id: str = "", status: str = "", q: str = ""):
         return list_recordings(limit=limit, offset=offset, channel_id=channel_id, status=status, query=q)
 
     @router.get("/api/v3/recordings/{recording_id}")
-    async def recording(recording_id: int, login: Any = auth):
+    async def recording(recording_id: int):
         item = get_recording(recording_id)
         if not item:
             raise HTTPException(status_code=404, detail="녹화 기록을 찾을 수 없습니다.")
         return item
 
     @router.post("/api/v3/recordings/{recording_id}/verify")
-    async def verify(recording_id: int, payload: dict[str, Any] = Body(default={}), login: Any = auth):
+    async def verify(recording_id: int, payload: dict[str, Any] = Body(default={})):
         return await asyncio.to_thread(verify_recording, recording_id, attempt_repair=bool(payload.get("repair", True)))
 
     @router.post("/api/v3/recordings/{recording_id}/archive")
-    async def archive(recording_id: int, login: Any = auth):
+    async def archive(recording_id: int):
         runtime.enqueue_archive(recording_id)
         return {"status": "queued"}
 
     @router.get("/api/v3/platform/settings")
-    async def settings(login: Any = auth):
+    async def settings():
         safe = json.loads(json.dumps(runtime.settings))
         for item in safe.get("webhooks", []):
             if item.get("secret"):
@@ -386,7 +378,7 @@ def install_platform_features(app: Any, lar: Any, operations: Any) -> PlatformRu
         return safe
 
     @router.put("/api/v3/platform/settings")
-    async def put_settings(payload: dict[str, Any] = Body(...), login: Any = auth):
+    async def put_settings(payload: dict[str, Any] = Body(...)):
         current_webhooks = runtime.settings.get("webhooks", [])
         candidate = _deep_merge(DEFAULT_SETTINGS, {**runtime.settings, **payload})
         for index, item in enumerate(candidate.get("webhooks", [])):
@@ -394,32 +386,32 @@ def install_platform_features(app: Any, lar: Any, operations: Any) -> PlatformRu
                 item["secret"] = current_webhooks[index].get("secret", "")
         runtime.settings = candidate
         runtime.save_settings()
-        return await settings(login)
+        return await settings()
 
     @router.get("/api/v3/notifications")
-    async def notifications(limit: int = Query(100, ge=1, le=500), login: Any = auth):
+    async def notifications(limit: int = Query(100, ge=1, le=500)):
         with DB_LOCK, _connect() as conn:
             rows = conn.execute("SELECT * FROM notification_queue ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
         return {"items": [dict(row) for row in rows]}
 
     @router.post("/api/v3/notifications/{notification_id}/retry")
-    async def retry_notification(notification_id: int, login: Any = auth):
+    async def retry_notification(notification_id: int):
         with DB_LOCK, _connect() as conn:
             conn.execute("UPDATE notification_queue SET status='retry',next_attempt=?,last_error='' WHERE id=?", (time.time(), notification_id))
         return {"status": "queued"}
 
     @router.get("/api/v3/tokens")
-    async def tokens(login: Any = auth):
+    async def tokens():
         with DB_LOCK, _connect() as conn:
             rows = conn.execute("SELECT id,name,token_prefix,scopes,created_epoch,expires_epoch,last_used_epoch,revoked FROM api_tokens ORDER BY id DESC").fetchall()
         return {"items": [dict(row) for row in rows]}
 
     @router.post("/api/v3/tokens")
-    async def create_token(payload: dict[str, Any] = Body(...), login: Any = auth):
+    async def create_token(payload: dict[str, Any] = Body(...)):
         return runtime.create_token(str(payload.get("name") or "API token"), list(payload.get("scopes") or ["read"]), int(payload.get("expires_days") or 0))
 
     @router.delete("/api/v3/tokens/{token_id}")
-    async def revoke_token(token_id: int, login: Any = auth):
+    async def revoke_token(token_id: int):
         with DB_LOCK, _connect() as conn:
             conn.execute("UPDATE api_tokens SET revoked=1 WHERE id=?", (token_id,))
         return {"status": "revoked"}
