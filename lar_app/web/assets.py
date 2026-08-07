@@ -54,6 +54,7 @@ STYLESHEETS = (
     Asset("/static/css/ui-refinement-v1.css", "data-lar-ui-refinement-v1"),
     Asset("/static/css/ui-refinement-final-v1.css", "data-lar-ui-refinement-final-v1"),
     Asset("/static/css/local-mode-v1.css", "data-lar-local-mode-v1"),
+    Asset("/static/css/tds-colors-v1.css", "data-lar-tds-colors-v1"),
 )
 
 HEAD_SCRIPTS = (
