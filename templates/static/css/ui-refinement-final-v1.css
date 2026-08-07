@@ -76,11 +76,17 @@ body.page-config .lar-setting-switch > strong {
 }
 
 body.page-config .lar-switch-track {
-  width: 34px;
-  height: 20px;
+  box-sizing: border-box !important;
+  width: 34px !important;
+  min-width: 34px !important;
+  max-width: 34px !important;
+  height: 20px !important;
+  flex: 0 0 34px !important;
+  padding: 2px !important;
 }
 
 body.page-config .lar-switch-track span {
-  width: 16px;
-  height: 16px;
+  box-sizing: border-box !important;
+  width: 16px !important;
+  height: 16px !important;
 }
