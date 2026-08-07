@@ -52,6 +52,55 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      - name: Build amd64 smoke image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64
+          load: true
+          tags: live-auto-recorder:smoke
+          cache-from: type=gha
+
+      - name: Smoke test health and dashboard
+        shell: bash
+        run: |
+          set -euo pipefail
+          container="live-auto-recorder-smoke"
+          port=15000
+
+          cleanup() {
+            docker logs "$container" 2>&1 || true
+            docker rm -f "$container" >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+
+          docker run -d --name "$container" \
+            -p "127.0.0.1:${port}:5000" \
+            -e ALLOW_ANONYMOUS=true \
+            live-auto-recorder:smoke >/dev/null
+
+          ready=false
+          for attempt in $(seq 1 60); do
+            if curl -fsS "http://127.0.0.1:${port}/healthz" >/dev/null; then
+              ready=true
+              break
+            fi
+            sleep 2
+          done
+          if [[ "$ready" != true ]]; then
+            echo "Container did not become healthy"
+            exit 1
+          fi
+
+          status="$(curl -sS -o /tmp/dashboard.html -w '%{http_code}' "http://127.0.0.1:${port}/")"
+          if [[ "$status" != "200" ]]; then
+            echo "Dashboard returned HTTP ${status}"
+            cat /tmp/dashboard.html || true
+            exit 1
+          fi
+          grep -qiE '<!doctype html|<html' /tmp/dashboard.html
+
       - name: Generate image metadata
         id: meta
         uses: docker/metadata-action@v5
