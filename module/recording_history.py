@@ -1,8 +1,7 @@
 """
 recording_history.py — 녹화 세션 이력 관리
 
-JSONL 파일에 녹화 시작/종료/실패 이벤트를 기록하고,
-최근 N건 조회 API를 제공한다.
+기존 JSONL 호환 로그를 유지하면서 SQLite 카탈로그에도 같은 이벤트를 기록한다.
 """
 from __future__ import annotations
 from module.log_setup import get_logger
@@ -19,7 +18,7 @@ base_directory = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 HISTORY_PATH = os.path.join(base_directory, "json", "recording_history.jsonl")
 
 _lock = threading.Lock()
-_MAX_ENTRIES = 500  # 파일 최대 유지 라인 수
+_MAX_ENTRIES = 500  # 레거시 JSONL은 최근 상태 호환용으로만 유지
 
 
 def _now_iso() -> str:
@@ -27,18 +26,45 @@ def _now_iso() -> str:
 
 
 def _trim_file():
-    """파일이 너무 커지면 오래된 항목 제거."""
     try:
         if not os.path.exists(HISTORY_PATH):
             return
         with open(HISTORY_PATH, "r", encoding="utf-8") as f:
             lines = f.readlines()
         if len(lines) > _MAX_ENTRIES:
-            keep = lines[-_MAX_ENTRIES:]
             with open(HISTORY_PATH, "w", encoding="utf-8") as f:
-                f.writelines(keep)
+                f.writelines(lines[-_MAX_ENTRIES:])
     except Exception:
         pass
+
+
+def _mirror_event(entry: dict) -> None:
+    try:
+        from module.recording_catalog import record_event
+        record_event(entry)
+    except Exception as exc:
+        logger.warning(f"recording catalog write failed: {exc}")
+
+    try:
+        from module.operations_platform_v3 import emit_runtime_event
+        event_map = {
+            "recording_started": "recording.started",
+            "recording_stopped": "recording.completed",
+            "recording_failed": "recording.failed",
+            "postprocess_failed": "postprocess.failed",
+        }
+        mapped = event_map.get(str(entry.get("event") or ""))
+        if mapped:
+            emit_runtime_event(mapped, entry)
+    except Exception:
+        pass
+
+    if entry.get("event") == "recording_stopped":
+        try:
+            from module.recording_verify import queue_validation
+            queue_validation(str(entry.get("channel_id") or ""), str(entry.get("filename") or ""))
+        except Exception as exc:
+            logger.warning(f"recording validation queue failed: {exc}")
 
 
 def log_event(
@@ -52,16 +78,7 @@ def log_event(
     error: str = "",
     extra: Optional[dict] = None,
 ):
-    """
-    녹화 이벤트 기록.
-
-    event 종류:
-      - "recording_started"  : 녹화 시작
-      - "recording_stopped"  : 녹화 정상 종료 (방종/사용자 중지)
-      - "recording_failed"   : 녹화 실패/에러
-      - "postprocess_done"   : 후처리 완료
-      - "postprocess_failed" : 후처리 실패
-    """
+    """Record one lifecycle event to the legacy JSONL and durable catalog."""
     entry = {
         "ts": _now_iso(),
         "epoch": time.time(),
@@ -75,6 +92,8 @@ def log_event(
     }
     if extra:
         entry.update(extra)
+    if filename and not entry.get("file_path"):
+        entry["file_path"] = str(filename)
 
     with _lock:
         try:
@@ -84,13 +103,12 @@ def log_event(
         except Exception as e:
             logger.warning(f"recording_history write failed: {e}")
 
-    # 주기적으로 트리밍 (10회 기록마다)
+    _mirror_event(entry)
+
     try:
         with _lock:
-            if os.path.exists(HISTORY_PATH):
-                size = os.path.getsize(HISTORY_PATH)
-                if size > 200_000:  # ~200KB
-                    _trim_file()
+            if os.path.exists(HISTORY_PATH) and os.path.getsize(HISTORY_PATH) > 200_000:
+                _trim_file()
     except Exception:
         pass
 
@@ -100,14 +118,6 @@ def get_history(
     channel_id: Optional[str] = None,
     event: Optional[str] = None,
 ) -> List[Dict]:
-    """
-    최근 녹화 이력 조회 (최신순).
-
-    Args:
-        limit: 반환 최대 건수
-        channel_id: 채널 필터 (None = 전체)
-        event: 이벤트 타입 필터 (None = 전체)
-    """
     entries: List[Dict] = []
     with _lock:
         try:
@@ -130,28 +140,13 @@ def get_history(
         except Exception as e:
             logger.warning(f"recording_history read failed: {e}")
             return []
-
-    # 최신순 정렬 후 limit
     entries.sort(key=lambda x: x.get("epoch", 0), reverse=True)
     return entries[:limit]
 
 
 def get_stats() -> Dict:
-    """간단한 통계: 오늘 녹화 횟수, 총 이력 수."""
     entries = get_history(limit=9999)
     today = datetime.now().strftime("%Y-%m-%d")
-    today_starts = sum(
-        1 for e in entries
-        if e.get("event") == "recording_started"
-        and e.get("ts", "").startswith(today)
-    )
-    today_fails = sum(
-        1 for e in entries
-        if e.get("event") == "recording_failed"
-        and e.get("ts", "").startswith(today)
-    )
-    return {
-        "total_entries": len(entries),
-        "today_recordings": today_starts,
-        "today_failures": today_fails,
-    }
+    today_starts = sum(1 for e in entries if e.get("event") == "recording_started" and e.get("ts", "").startswith(today))
+    today_fails = sum(1 for e in entries if e.get("event") == "recording_failed" and e.get("ts", "").startswith(today))
+    return {"total_entries": len(entries), "today_recordings": today_starts, "today_failures": today_fails}
