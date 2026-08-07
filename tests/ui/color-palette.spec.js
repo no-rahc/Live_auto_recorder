@@ -9,9 +9,21 @@ function pickBox(box) {
   };
 }
 
+async function waitForStableGeometry(page) {
+  await page.evaluate(async () => {
+    if (document.fonts?.ready) await document.fonts.ready;
+  });
+  await page.locator('#configForm').evaluate(async (element) => {
+    await Promise.all(
+      element.getAnimations().map((animation) => animation.finished.catch(() => undefined)),
+    );
+  });
+}
+
 test.describe('blue neutral color theme', () => {
   test('changes palette without changing component geometry', async ({ page }) => {
     await page.goto('/tests/ui/fixtures/config.html');
+    await waitForStableGeometry(page);
 
     const selectors = ['#configForm', '.config-section', '#autoRecordingMode'];
     const before = {};
