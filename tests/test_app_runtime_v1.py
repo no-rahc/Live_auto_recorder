@@ -27,7 +27,9 @@ class AppRuntimeStructureTests(unittest.TestCase):
         self.assertEqual(len(paths), len(set(paths)))
         self.assertTrue(all(path.startswith("/static/") for path in paths))
         self.assertIn("/static/js/local-mode-v1.js", paths)
-        self.assertIn("/static/css/local-mode-v1.css", paths)
+        self.assertIn("/static/css/ui-consolidated-v1.css", paths)
+        self.assertNotIn("/static/css/local-mode-v1.css", paths)
+        self.assertNotIn("/static/css/ui-refinement-final-v1.css", paths)
         self.assertNotIn("/static/js/sidebar-account-v1.js", paths)
 
     def test_asset_injection_is_idempotent_and_removes_title_version(self):
@@ -35,6 +37,7 @@ class AppRuntimeStructureTests(unittest.TestCase):
         injected = inject_console_assets(html, "v1.1.16")
         self.assertIn("<title>Live Auto Recorder</title>", injected)
         self.assertIn("/static/css/app-v3.css?v=v1.1.16", injected)
+        self.assertIn("/static/css/ui-consolidated-v1.css?v=v1.1.16", injected)
         self.assertIn("/static/js/app-ui-v3.js?v=v1.1.16", injected)
         self.assertIn("/static/js/local-mode-v1.js?v=v1.1.16", injected)
         self.assertEqual(inject_console_assets(injected, "v1.1.16"), injected)
