@@ -2,7 +2,7 @@ const { test, expect } = require('@playwright/test');
 
 async function loadRefinement(page, withScript = true) {
   await page.addStyleTag({ url: '/templates/static/css/ui-refinement-v1.css' });
-  await page.addStyleTag({ url: '/templates/static/css/ui-refinement-final-v1.css' });
+  await page.addStyleTag({ url: '/templates/static/css/ui-consolidated-v1.css' });
   if (withScript) {
     await page.addScriptTag({ url: '/templates/static/js/ui-refinement-v1.js' });
     await expect(page.locator('body')).toHaveClass(/lar-ui-refinement-v1/);
