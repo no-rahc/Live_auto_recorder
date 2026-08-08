@@ -1,24 +1,30 @@
+const fs = require('node:fs');
+const path = require('node:path');
 const { test, expect } = require('@playwright/test');
 
 const cssAssets = [
-  '/templates/static/css/style.css',
-  '/templates/static/css/app-v3.css',
-  '/templates/static/css/dashboard-glance-v1.css',
-  '/templates/static/css/dashboard-channel-modal-v1.css',
-  '/templates/static/css/recording-density-v1.css',
-  '/templates/static/css/operations-v2.css',
-  '/templates/static/css/operations-platform-v3.css',
-  '/templates/static/css/ui-polish-v1.css',
-  '/templates/static/css/config-workspace-v1.css',
-  '/templates/static/css/config-safety-v1.css',
-  '/templates/static/css/config-overview-v2.css',
-  '/templates/static/css/project-ui-audit-v1.css',
-  '/templates/static/css/project-ui-audit-fixes-v1.css',
-  '/templates/static/css/operations-controls-v1.css',
-  '/templates/static/css/ui-refinement-v1.css',
-  '/templates/static/css/ui-consolidated-v1.css',
-  '/templates/static/css/tds-colors-v1.css',
+  'templates/static/css/style.css',
+  'templates/static/css/app-v3.css',
+  'templates/static/css/dashboard-glance-v1.css',
+  'templates/static/css/dashboard-channel-modal-v1.css',
+  'templates/static/css/recording-density-v1.css',
+  'templates/static/css/operations-v2.css',
+  'templates/static/css/operations-platform-v3.css',
+  'templates/static/css/ui-polish-v1.css',
+  'templates/static/css/config-workspace-v1.css',
+  'templates/static/css/config-safety-v1.css',
+  'templates/static/css/config-overview-v2.css',
+  'templates/static/css/project-ui-audit-v1.css',
+  'templates/static/css/project-ui-audit-fixes-v1.css',
+  'templates/static/css/operations-controls-v1.css',
+  'templates/static/css/ui-refinement-v1.css',
+  'templates/static/css/ui-consolidated-v1.css',
+  'templates/static/css/tds-colors-v1.css',
 ];
+
+const dashboardCss = cssAssets
+  .map((asset) => fs.readFileSync(path.join(process.cwd(), asset), 'utf8'))
+  .join('\n');
 
 test('system status cards use one UI typeface for labels and primary values', async ({ page }) => {
   await page.setContent(`
@@ -60,8 +66,7 @@ test('system status cards use one UI typeface for labels and primary values', as
     </body>
   `);
 
-  for (const url of cssAssets) await page.addStyleTag({ url });
-  await page.evaluate(() => document.fonts.ready);
+  await page.addStyleTag({ content: dashboardCss });
 
   const styles = await page.evaluate(() => {
     const read = (id) => {
