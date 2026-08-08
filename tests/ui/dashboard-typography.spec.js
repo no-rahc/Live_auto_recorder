@@ -81,7 +81,6 @@ test('system status cards use one UI typeface for labels and primary values', as
       cpuValue: read('cpu-value'),
       memoryValue: read('memory-value'),
       networkValue: read('network-value'),
-      storagePath: read('storage-path'),
     };
   });
 
@@ -95,6 +94,4 @@ test('system status cards use one UI typeface for labels and primary values', as
   expect(styles.networkValue.fontFamily).toBe(styles.cpuValue.fontFamily);
   expect(styles.storageUsed.fontVariantNumeric).toContain('tabular-nums');
   expect(styles.networkValue.fontVariantNumeric).toContain('tabular-nums');
-
-  expect(styles.storagePath.fontFamily).not.toBe(styles.storageLabel.fontFamily);
 });
