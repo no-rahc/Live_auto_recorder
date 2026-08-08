@@ -32,12 +32,21 @@ class HealthJobsMixin:
         if level != self.last_storage_level:
             self.audit("storage_level", f"level={level}; free={storage.get('free_percent')}%")
             if level in {"warning", "critical"}:
-                await self._notify(f"녹화 저장소 여유 공간이 {storage.get('free_percent')}%입니다. ({level})")
+                await self._notify(
+                    "storage.warning",
+                    f"녹화 저장소 여유 공간이 {storage.get('free_percent')}%입니다. ({level})",
+                    {"status": level, "free_percent": storage.get("free_percent")},
+                )
             self.last_storage_level = level
         if level == "critical" and self.settings["storage"].get("auto_cleanup"):
             with suppress(Exception):
                 result = self.run_cleanup({"confirm": True, "mode": "free_space"})
-                await self._notify(f"저장소 자동 정리로 {len(result.get('deleted', []))}개 파일을 삭제했습니다.")
+                deleted = len(result.get("deleted", []))
+                await self._notify(
+                    "storage.cleaned",
+                    f"저장소 자동 정리로 {deleted}개 파일을 삭제했습니다.",
+                    {"deleted": deleted},
+                )
         if level == "critical" and not self.storage_stopped:
             self.storage_stopped = True
         elif level != "critical" and self.storage_stopped:
@@ -107,6 +116,9 @@ class HealthJobsMixin:
         max_minutes = int(rule.get("max_duration_minutes", 0) or 0)
         if recording and max_minutes and start_ts and now - start_ts >= max_minutes * 60:
             state, label = "stopping", "최대 시간 도달"
+            with suppress(Exception):
+                from module.recording_catalog import set_active_stop_reason
+                set_active_stop_reason(channel_id, "max_duration")
             asyncio.create_task(self.lar.stopRecordingForChannel(self.app, channel_id))
             self.audit("max_duration_stop", f"channel={channel_id}; minutes={max_minutes}")
 
@@ -115,7 +127,10 @@ class HealthJobsMixin:
             state, label, error = "blocked", "규칙 차단", rule_reason
             self.policy_blocked.add(channel_id)
             with suppress(Exception):
-                await self.app.state.fsm.userStop(channel_id)
+                if fsm and hasattr(fsm, "stop"):
+                    await fsm.stop(channel_id, reason="rule")
+                elif fsm:
+                    await fsm.userStop(channel_id)
             self.audit("rule_enforced", f"channel={channel_id}; reason={rule_reason}", "blocked")
         elif allowed and channel_id in self.policy_blocked:
             self.policy_blocked.discard(channel_id)
@@ -168,25 +183,27 @@ class HealthJobsMixin:
         async with lock:
             try:
                 fsm = self.app.state.fsm
-                await fsm.userStop(channel_id)
+                if hasattr(fsm, "stop"):
+                    await fsm.stop(channel_id, reason="health_restart")
+                else:
+                    await fsm.userStop(channel_id)
                 await asyncio.sleep(2)
                 await fsm.userStart(channel_id)
                 self.audit("health_restart", f"channel={channel_id}; attempt={attempt}")
-                await self._notify(f"{channel_id} 녹화 멈춤을 감지해 자동 재연결을 시도했습니다. ({attempt}회)")
+                await self._notify(
+                    "recording.reconnecting",
+                    f"{channel_id} 녹화 멈춤을 감지해 자동 재연결을 시도했습니다. ({attempt}회)",
+                    {"channel_id": channel_id, "status": f"attempt {attempt}", "attempt": attempt},
+                )
             except Exception as exc:
                 self.audit("health_restart", f"channel={channel_id}; error={exc}", "error")
 
-    async def _notify(self, message: str) -> None:
-        with suppress(Exception):
-            await asyncio.to_thread(self.lar.sendTelegram, f"<b>Live Auto Recorder</b>\n{message}")
-        config = getattr(self.app.state, "config", {}) or {}
-        webhook = str(config.get("discord_webhook_url") or "").strip()
-        if config.get("discord_enabled") and webhook.startswith("https://"):
-            def send_discord() -> None:
-                import requests
-                requests.post(webhook, json={"content": message}, timeout=8)
-            with suppress(Exception):
-                await asyncio.to_thread(send_discord)
+    async def _notify(self, event_type: str, message: str, payload: dict[str, Any] | None = None) -> None:
+        try:
+            from module.operations_platform_v3 import emit_runtime_event
+            emit_runtime_event(event_type, {"detail": message, **(payload or {})})
+        except Exception as exc:
+            self.audit("notification_enqueue_failed", f"event={event_type}; error={exc}", "error")
 
     # --------------------------- post-processing jobs -----------------
     def _wrap_postprocess(self, kind: str, original: Callable[..., Awaitable[Any]]):
