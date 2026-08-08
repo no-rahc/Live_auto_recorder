@@ -52,8 +52,7 @@ STYLESHEETS = (
     Asset("/static/css/project-ui-audit-fixes-v1.css", "data-lar-project-ui-audit-fixes-v1"),
     Asset("/static/css/operations-controls-v1.css", "data-lar-operations-controls-v1"),
     Asset("/static/css/ui-refinement-v1.css", "data-lar-ui-refinement-v1"),
-    Asset("/static/css/ui-refinement-final-v1.css", "data-lar-ui-refinement-final-v1"),
-    Asset("/static/css/local-mode-v1.css", "data-lar-local-mode-v1"),
+    Asset("/static/css/ui-consolidated-v1.css", "data-lar-ui-consolidated-v1"),
     Asset("/static/css/tds-colors-v1.css", "data-lar-tds-colors-v1"),
 )
 

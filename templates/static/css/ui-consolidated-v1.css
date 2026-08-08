@@ -1,5 +1,6 @@
-/* Manual visual-review corrections loaded after the main refinement layer. */
+/* Consolidated late UI corrections. Keep this layer immediately before the color theme. */
 
+/* Manual visual-review corrections. */
 @media (min-width: 1100px) {
   body.lar-auth-mode.lar-sidebar-v3:not(.page-register) #content {
     width: min(500px, calc(100% - 32px)) !important;
@@ -56,4 +57,26 @@ body.page-files .mobile-actionbar > button.lar-file-action-danger:hover:not(:dis
   border-color: var(--lar-danger) !important;
   background: var(--lar-danger) !important;
   color: #fff !important;
+}
+
+/* Compatibility presentation for legacy account/security markup. */
+a[href="/login"],
+a[href="/logout"],
+a[href="/register"],
+#user-info,
+#account-fields,
+body.page-config .config-section:has(#loginMode),
+body.page-config [data-config-tab="security"],
+body.page-config [data-config-panel="security"] {
+  display: none !important;
+}
+
+body.page-config.lar-local-mode .lar-config-tabs {
+  grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+}
+
+@media (max-width: 1180px) {
+  body.page-config.lar-local-mode .lar-config-tabs {
+    grid-template-columns: repeat(5, minmax(132px, 1fr)) !important;
+  }
 }

@@ -1,8 +1,10 @@
 const { test, expect } = require('@playwright/test');
 
 async function expectNoHorizontalOverflow(page) {
-  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
-  expect(overflow).toBeLessThanOrEqual(1);
+  await expect.poll(
+    () => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth),
+    { timeout: 2000, intervals: [50, 100, 200] },
+  ).toBeLessThanOrEqual(1);
 }
 
 test('local mode removes account and logout controls from the sidebar', async ({ page }, testInfo) => {
