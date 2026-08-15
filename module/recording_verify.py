@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+import queue
 import shutil
 import subprocess
 import tempfile
@@ -14,6 +15,22 @@ from module.log_setup import get_logger
 from module.recording_catalog import find_latest_recording, update_recording
 
 logger = get_logger("recording_verify")
+
+
+def _env_int(name: str, default: int, minimum: int, maximum: int) -> int:
+    try:
+        value = int(os.getenv(name, str(default)))
+    except (TypeError, ValueError):
+        value = default
+    return max(minimum, min(value, maximum))
+
+
+_VALIDATION_WORKER_COUNT = _env_int("RECORDING_VALIDATION_WORKERS", 2, 1, 8)
+_VALIDATION_QUEUE_SIZE = _env_int("RECORDING_VALIDATION_QUEUE_SIZE", 64, 4, 512)
+_VALIDATION_QUEUE: queue.Queue[tuple[str, str]] = queue.Queue(maxsize=_VALIDATION_QUEUE_SIZE)
+_VALIDATION_LOCK = threading.RLock()
+_VALIDATION_PENDING: set[tuple[str, str]] = set()
+_VALIDATION_WORKERS_STARTED = False
 
 
 def _recording_root() -> Path:
@@ -126,17 +143,75 @@ def verify_recording(recording_id: int, *, attempt_repair: bool = True) -> dict[
     return {"status": "invalid", "detail": detail[:1500], "path": str(path), "size": path.stat().st_size}
 
 
-def queue_validation(channel_id: str, filename: str = "") -> None:
-    """Validate outside the recorder loop and emit the result to platform services."""
-    def run() -> None:
-        recording = find_latest_recording(str(channel_id), str(filename or ""))
-        if not recording:
-            return
-        result = verify_recording(int(recording["id"]), attempt_repair=True)
-        try:
-            from module.operations_platform_v3 import emit_runtime_event
-            emit_runtime_event("recording.validated", {"recording_id": int(recording["id"]), **result})
-        except Exception as exc:
-            logger.debug(f"validation event skipped: {exc}")
+def _run_validation(channel_id: str, filename: str) -> None:
+    recording = find_latest_recording(str(channel_id), str(filename or ""))
+    if not recording:
+        return
+    result = verify_recording(int(recording["id"]), attempt_repair=True)
+    try:
+        from module.operations_platform_v3 import emit_runtime_event
+        emit_runtime_event("recording.validated", {"recording_id": int(recording["id"]), **result})
+    except Exception as exc:
+        logger.debug(f"validation event skipped: {exc}")
 
-    threading.Thread(target=run, name=f"lar-verify-{channel_id}", daemon=True).start()
+
+def _process_validation_item(item: tuple[str, str]) -> None:
+    try:
+        _run_validation(*item)
+    except Exception as exc:
+        logger.warning(f"recording validation worker failed: channel={item[0]}; file={item[1]}; error={exc}")
+    finally:
+        if item[1]:
+            with _VALIDATION_LOCK:
+                _VALIDATION_PENDING.discard(item)
+
+
+def _validation_worker() -> None:
+    while True:
+        item = _VALIDATION_QUEUE.get()
+        try:
+            _process_validation_item(item)
+        finally:
+            _VALIDATION_QUEUE.task_done()
+
+
+def _ensure_validation_workers() -> None:
+    global _VALIDATION_WORKERS_STARTED
+    with _VALIDATION_LOCK:
+        if _VALIDATION_WORKERS_STARTED:
+            return
+        for index in range(_VALIDATION_WORKER_COUNT):
+            threading.Thread(
+                target=_validation_worker,
+                name=f"lar-verify-worker-{index + 1}",
+                daemon=True,
+            ).start()
+        _VALIDATION_WORKERS_STARTED = True
+
+
+def queue_validation(channel_id: str, filename: str = "") -> bool:
+    """Queue validation on a bounded worker pool without blocking the recorder loop."""
+    _ensure_validation_workers()
+    item = (str(channel_id or ""), str(filename or ""))
+    dedupe = bool(item[1])
+
+    if dedupe:
+        with _VALIDATION_LOCK:
+            if item in _VALIDATION_PENDING:
+                return False
+            _VALIDATION_PENDING.add(item)
+
+    try:
+        _VALIDATION_QUEUE.put_nowait(item)
+    except queue.Full:
+        if dedupe:
+            with _VALIDATION_LOCK:
+                _VALIDATION_PENDING.discard(item)
+        logger.warning(
+            "recording validation queue full: channel=%s; file=%s; capacity=%s",
+            item[0],
+            item[1],
+            _VALIDATION_QUEUE_SIZE,
+        )
+        return False
+    return True
