@@ -6,6 +6,11 @@ from typing import Any
 
 from module.data_manager import loadCookies, yloadCookies
 from module.live_recorder import chzzkStartRecording
+from module.recording_filename import (
+    begin_filename_context,
+    end_filename_context,
+    install_live_recorder_filename_sanitizer,
+)
 from module.recording_trace import begin_session, end_session
 from module.youtube_recorder import ytStartRecording
 
@@ -20,6 +25,11 @@ async def start_session(
     p = (platform or "").lower()
     channel_id = str((channel or {}).get("id") or "unknown")
     session_id, trace_token = begin_session(channel_id, p)
+    filename_token = None
+
+    if p == "chzzk":
+        install_live_recorder_filename_sanitizer()
+        filename_token = begin_filename_context(channel)
 
     try:
         if p == "chzzk":
@@ -82,4 +92,6 @@ async def start_session(
                 is_user_request=is_user_request,
             )
     finally:
+        if filename_token is not None:
+            end_filename_context(filename_token)
         end_session(channel_id, session_id, trace_token)
