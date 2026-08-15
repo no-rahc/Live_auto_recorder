@@ -24,7 +24,7 @@ services:
       - ${TMP_PATH:-./tmp}:/app/tmp
     stop_grace_period: 45s
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:5000/healthz"]
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:5000/readyz"]
       interval: 30s
       timeout: 5s
       start_period: 45s

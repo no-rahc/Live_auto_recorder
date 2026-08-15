@@ -23,6 +23,7 @@ from lar_app.web.middleware import ConsoleAssetsMiddleware, SecurityMiddleware
 from module.config_tools_v1 import install_config_tools
 from module.operations_platform_v3 import install_platform_features
 from module.operations_v2 import install_operations
+from module.readiness import readiness_snapshot
 from module.recording_trace import install_live_recorder_stderr_capture
 
 
@@ -65,6 +66,18 @@ def _install_health_route(app: Any, release: ReleaseInfo) -> None:
     app.add_api_route("/healthz", healthz, methods=["GET"], include_in_schema=False)
 
 
+def _install_readiness_route(app: Any, release: ReleaseInfo, operations: Any, platform: Any) -> None:
+    if any(getattr(route, "path", None) == "/readyz" for route in app.routes):
+        return
+
+    async def readyz():
+        snapshot = readiness_snapshot(operations, platform)
+        snapshot["version"] = release.version
+        return JSONResponse(status_code=200 if snapshot["ready"] else 503, content=snapshot)
+
+    app.add_api_route("/readyz", readyz, methods=["GET"], include_in_schema=False)
+
+
 def _install_local_http_exception_handler(app: Any) -> None:
     """Replace the legacy 401-to-/login redirect with normal HTTP errors."""
 
@@ -101,6 +114,7 @@ def build_application(
     operations = install_operations(app, core)
     platform = install_platform_features(app, core, operations)
     install_config_tools(app, core)
+    _install_readiness_route(app, release, operations, platform)
     _install_operations_lifespan(app, operations, platform, core)
 
     # Preserve the original middleware order: security wraps HTML injection.
