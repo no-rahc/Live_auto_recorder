@@ -51,8 +51,8 @@ class FakeFsm:
     async def userStop(self, channel_id):
         self.stopped.append((channel_id, "user"))
 
-    async def stop(self, channel_id, reason="user", diagnostics=None):
-        self.stopped.append((channel_id, reason, diagnostics))
+    async def stop(self, channel_id, reason="user"):
+        self.stopped.append((channel_id, reason))
 
 
 class FakeLar:
@@ -116,7 +116,6 @@ class OperationsHealthWatchdogTests(unittest.IsolatedAsyncioTestCase):
     async def test_failed_process_restarts_only_after_grace_and_records_reason(self):
         self.lar.recorder_manager.processes["a"] = SimpleNamespace(returncode=7)
         self.runtime.settings["health"]["process_exit_grace_seconds"] = 20
-        self.runtime.settings["health"]["failed_samples"] = 1
         self.runtime.samples["a"] = {
             "size": 1024,
             "mtime": 900.0,
@@ -188,110 +187,6 @@ class OperationsHealthWatchdogTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(args[:3], ("a", 1, "stalled"))
         self.assertEqual(args[3]["stall_checks"], 2)
         self.assertEqual(self.runtime.health["a"]["last_restart"]["reason"], "stalled")
-
-    async def test_startup_grace_suppresses_early_failed_process_restart(self):
-        self.lar.recorder_manager.processes["a"] = SimpleNamespace(returncode=7)
-        self.lar.RecorderManager.recording_start_time["a"] = 990.0
-        self.runtime.settings["health"].update({
-            "startup_grace_seconds": 30,
-            "process_exit_grace_seconds": 20,
-        })
-        self.runtime.samples["a"] = {
-            "size": 1024,
-            "mtime": 900.0,
-            "sample_time": 990.0,
-            "last_growth": 900.0,
-            "proc_exit_seen_at": 970.0,
-            "stall_checks": 0,
-        }
-        with patch("module.operations_health.time.time", return_value=1000.0), patch.object(
-            self.runtime, "_restart_channel", new=AsyncMock()
-        ) as restart:
-            await self.runtime._sample_channel(self.channel)
-            await asyncio.sleep(0)
-
-        restart.assert_not_awaited()
-        self.assertEqual(self.runtime.health["a"]["state"], "recording")
-        self.assertGreater(self.runtime.health["a"]["startup_grace_remaining"], 0)
-
-    async def test_failed_process_requires_consecutive_samples_after_grace(self):
-        self.lar.recorder_manager.processes["a"] = SimpleNamespace(returncode=7)
-        self.runtime.settings["health"].update({
-            "startup_grace_seconds": 0,
-            "process_exit_grace_seconds": 20,
-            "failed_samples": 2,
-        })
-        self.runtime.samples["a"] = {
-            "size": 1024,
-            "mtime": 900.0,
-            "sample_time": 990.0,
-            "last_growth": 900.0,
-            "proc_exit_seen_at": 970.0,
-            "failure_checks": 0,
-            "stall_checks": 0,
-        }
-        with patch("module.operations_health.time.time", return_value=1000.0), patch.object(
-            self.runtime, "_restart_channel", new=AsyncMock()
-        ) as restart:
-            await self.runtime._sample_channel(self.channel)
-            await asyncio.sleep(0)
-
-        restart.assert_not_awaited()
-        self.assertEqual(self.runtime.health["a"]["state"], "checking")
-        self.assertIn("1/2", self.runtime.health["a"]["last_error"])
-
-        self.runtime.samples["a"]["failure_checks"] = 1
-        with patch.object(self.runtime, "_restart_channel", new=restart), patch(
-            "module.operations_health.time.time", return_value=1001.0
-        ):
-            await self.runtime._sample_channel(self.channel)
-            await asyncio.sleep(0)
-
-        restart.assert_awaited_once()
-        self.assertEqual(restart.await_args.args[:3], ("a", 1, "failed"))
-
-    async def test_new_recording_path_resets_stall_clock(self):
-        new_path = self.root / "recording-next.ts"
-        new_path.write_bytes(b"x" * 256)
-        os.utime(new_path, (800.0, 800.0))
-        self.lar.recorder_manager.processes["a"] = SimpleNamespace(returncode=None)
-        self.lar.recorder_manager.filenames["a"] = str(new_path)
-        self.runtime.settings["health"].update({
-            "startup_grace_seconds": 0,
-            "stall_seconds": 120,
-            "stall_confirmations": 2,
-        })
-        self.runtime.samples["a"] = {
-            "path": str(self.path),
-            "size": 1024,
-            "mtime": 800.0,
-            "sample_time": 990.0,
-            "last_growth": 800.0,
-            "stall_checks": 1,
-        }
-        with patch("module.operations_health.time.time", return_value=1000.0), patch.object(
-            self.runtime, "_restart_channel", new=AsyncMock()
-        ) as restart:
-            await self.runtime._sample_channel(self.channel)
-            await asyncio.sleep(0)
-
-        restart.assert_not_awaited()
-        self.assertEqual(self.runtime.health["a"]["state"], "recording")
-        self.assertEqual(self.runtime.health["a"]["stall_checks"], 0)
-
-    async def test_health_restart_passes_diagnostics_to_fsm_stop(self):
-        self.lar.recorder_manager.processes["a"] = SimpleNamespace(returncode=None)
-        diagnostic = {
-            "reason": "stalled",
-            "file_size": 1024,
-            "file_mtime": self.path.stat().st_mtime,
-            "last_write_at": "2026-08-15 12:34:56",
-        }
-        with patch("module.operations_health.asyncio.sleep", new=AsyncMock()):
-            await self.runtime._restart_channel("a", 1, "stalled", diagnostic)
-
-        self.assertEqual(self.fsm.stopped[0][0:2], ("a", "health_restart"))
-        self.assertEqual(self.fsm.stopped[0][2], diagnostic)
 
     async def test_restart_revalidation_cancels_when_file_growth_resumes(self):
         proc = SimpleNamespace(returncode=None)

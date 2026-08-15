@@ -89,7 +89,6 @@ class HealthJobsMixin:
             f"growth_age={diagnostic.get('growth_age_seconds', 0)}s",
             f"write_age={diagnostic.get('write_age_seconds', 0)}s",
             f"stall_checks={diagnostic.get('stall_checks', 0)}",
-            f"failed_checks={diagnostic.get('failed_checks', 0)}",
             f"last_write_at={diagnostic.get('last_write_at', '')}",
             f"fsm_state={diagnostic.get('fsm_state', '')}",
             f"filename={diagnostic.get('filename', '')}",
@@ -167,29 +166,14 @@ class HealthJobsMixin:
                 size, mtime = stat.st_size, stat.st_mtime
 
         previous = self.samples.get(channel_id, {})
-        current_path = str(path or "")
-        previous_path = str(previous.get("path") or "")
-        path_changed = bool(previous_path and previous_path != current_path)
         previous_size = int(previous.get("size", size))
         previous_time = float(previous.get("sample_time", now))
-        previous_mtime = float(previous.get("mtime", mtime) or 0.0)
+        previous_mtime = float(previous.get("mtime", mtime))
         last_growth = float(previous.get("last_growth", now))
         proc_exit_seen_at = float(previous.get("proc_exit_seen_at", 0) or 0)
-        previous_exit_code = previous.get("process_exit_code", proc_returncode if proc_exit_seen_at else None)
-        failure_checks = int(previous.get("failure_checks", 0) or 0)
         stall_checks = int(previous.get("stall_checks", 0) or 0)
 
-        if path_changed:
-            # A restart normally creates a new unique output path. Never carry
-            # the old file's stall clock or sample counters into that session.
-            previous_size = size
-            previous_time = now
-            previous_mtime = mtime
-            last_growth = now
-            proc_exit_seen_at = 0.0
-            failure_checks = 0
-            stall_checks = 0
-        elif size > previous_size or (mtime and mtime > previous_mtime):
+        if size > previous_size or (mtime and mtime > previous_mtime):
             last_growth = now
             stall_checks = 0
         elapsed = max(0.001, now - previous_time)
@@ -202,59 +186,31 @@ class HealthJobsMixin:
         error = ""
         health_cfg = self.settings["health"]
         restart_reason = ""
-        start_ts = float(self.lar.RecorderManager.recording_start_time.get(channel_id, 0) or 0)
-        startup_grace_seconds = max(0, min(int(health_cfg.get("startup_grace_seconds", 30)), 600))
-        startup_grace_remaining = 0.0
-        if recording and start_ts:
-            startup_grace_remaining = max(0.0, startup_grace_seconds - (now - start_ts))
-        failed_samples = max(1, min(int(health_cfg.get("failed_samples", 2) or 2), 10))
 
         if recording:
-            if startup_grace_remaining > 0:
-                proc_exit_seen_at = 0.0
-                failure_checks = 0
+            if proc is not None and proc_returncode is not None:
                 stall_checks = 0
-                state, label = "recording", "녹화 시작 유예 중"
-                error = f"startup grace {startup_grace_remaining:.0f}s"
-            elif proc is not None and proc_returncode is not None:
-                stall_checks = 0
-                if previous_exit_code != proc_returncode or not proc_exit_seen_at:
+                if not proc_exit_seen_at:
                     proc_exit_seen_at = now
-                    failure_checks = 0
                 if proc_returncode == 0:
-                    failure_checks = 0
                     state, label = "checking", "프로세스 종료 정리 중"
                     error = "exit=0; 정상 종료 후 recorder 상태 정리를 기다립니다."
                 else:
                     grace = max(5, min(int(health_cfg.get("process_exit_grace_seconds", 20) or 20), 300))
                     exit_age = max(0.0, now - proc_exit_seen_at)
                     if exit_age >= grace:
-                        failure_checks += 1
-                        if failure_checks >= failed_samples:
-                            state, label, error = "failed", "프로세스 종료", (
-                                f"exit={proc_returncode}; grace={grace}s; "
-                                f"checks={failure_checks}/{failed_samples}"
-                            )
-                            restart_reason = "failed"
-                        else:
-                            state, label = "checking", "프로세스 종료 재확인 중"
-                            error = (
-                                f"exit={proc_returncode}; grace={grace}s; "
-                                f"checks={failure_checks}/{failed_samples}"
-                            )
+                        state, label, error = "failed", "프로세스 종료", f"exit={proc_returncode}; grace={grace}s"
+                        restart_reason = "failed"
                     else:
-                        failure_checks = 0
                         state, label = "checking", "프로세스 종료 확인 중"
                         error = f"exit={proc_returncode}; grace {exit_age:.0f}/{grace}s"
             elif proc is None:
-                proc_exit_seen_at = 0.0
-                failure_checks = 0
+                proc_exit_seen_at = 0
                 stall_checks = 0
                 state, label = "checking", "프로세스 확인 중"
                 error = "recording 상태지만 프로세스 핸들이 없습니다. recorder 상태 정리를 기다립니다."
             else:
-                proc_exit_seen_at = 0.0
-                failure_checks = 0
+                proc_exit_seen_at = 0
                 state, label = "recording", "녹화 중"
                 stall_seconds = max(30, min(int(health_cfg.get("stall_seconds", 120) or 120), 3600))
                 stall_confirmations = max(2, min(int(health_cfg.get("stall_confirmations", 3) or 3), 12))
@@ -282,38 +238,29 @@ class HealthJobsMixin:
                 else:
                     stall_checks = 0
         elif fsm_state == "WATCHING" or reserved:
-            proc_exit_seen_at = 0.0
-            failure_checks = 0
+            proc_exit_seen_at = 0
             stall_checks = 0
             state, label = "checking", "라이브 확인 중"
         elif fsm_state == "ERROR":
-            proc_exit_seen_at = 0.0
+            proc_exit_seen_at = 0
             stall_checks = 0
-            failure_checks += 1
-            health_reason = "녹화 상태가 ERROR입니다."
-            if failure_checks >= failed_samples:
-                state, label, error = "failed", "오류", f"{health_reason} checks={failure_checks}/{failed_samples}"
-                restart_reason = "fsm_error"
-            else:
-                state, label, error = "checking", "오류 재확인 중", f"{health_reason} checks={failure_checks}/{failed_samples}"
+            state, label, error = "failed", "오류", "녹화 상태가 ERROR입니다."
+            restart_reason = "fsm_error"
         else:
-            proc_exit_seen_at = 0.0
-            failure_checks = 0
+            proc_exit_seen_at = 0
             stall_checks = 0
 
         self.samples[channel_id] = {
-            "path": current_path,
             "size": size,
             "mtime": mtime,
             "sample_time": now,
             "last_growth": last_growth,
-            "process_exit_code": proc_returncode,
             "proc_exit_seen_at": proc_exit_seen_at,
-            "failure_checks": failure_checks,
             "stall_checks": stall_checks,
         }
 
         rule = self.settings.get("rules", {}).get(channel_id, {})
+        start_ts = float(self.lar.RecorderManager.recording_start_time.get(channel_id, 0) or 0)
         max_minutes = int(rule.get("max_duration_minutes", 0) or 0)
         if recording and max_minutes and start_ts and now - start_ts >= max_minutes * 60:
             state, label = "stopping", "최대 시간 도달"
@@ -367,7 +314,6 @@ class HealthJobsMixin:
                     "growth_age_seconds": round(growth_age, 1),
                     "write_age_seconds": round(write_age, 1),
                     "stall_checks": stall_checks,
-                    "failed_checks": failure_checks,
                     "fsm_state": fsm_state,
                     "filename": str(path or ""),
                     "scheduled_at": _iso(now),
@@ -399,8 +345,6 @@ class HealthJobsMixin:
             "growth_age_seconds": round(growth_age, 1),
             "write_age_seconds": round(write_age, 1),
             "stall_checks": stall_checks,
-            "failed_checks": failure_checks,
-            "startup_grace_remaining": round(startup_grace_remaining, 2),
             "process_exit_code": proc_returncode,
             "process_exit_seen_at": _iso(proc_exit_seen_at) if proc_exit_seen_at else "",
             "restart_attempts": attempts,
@@ -438,7 +382,7 @@ class HealthJobsMixin:
 
                 fsm = self.app.state.fsm
                 if hasattr(fsm, "stop"):
-                    await fsm.stop(channel_id, reason="health_restart", diagnostics=snapshot)
+                    await fsm.stop(channel_id, reason="health_restart")
                 else:
                     await fsm.userStop(channel_id)
                 await asyncio.sleep(2)
