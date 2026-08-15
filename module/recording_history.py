@@ -67,6 +67,17 @@ def _mirror_event(entry: dict) -> None:
             logger.warning(f"recording validation queue failed: {exc}")
 
 
+def _trace_fields(channel_id: str, event: str) -> dict:
+    try:
+        from module.recording_trace import trace_fields
+        return trace_fields(
+            channel_id,
+            include_tail=event in {"recording_failed", "recording_stop_requested"},
+        )
+    except Exception:
+        return {}
+
+
 def log_event(
     channel_id: str,
     channel_name: str,
@@ -90,6 +101,9 @@ def log_event(
         "duration": duration,
         "error": error[:500] if error else "",
     }
+    trace = _trace_fields(channel_id, event)
+    if trace:
+        entry.update(trace)
     if extra:
         entry.update(extra)
     if filename and not entry.get("file_path"):

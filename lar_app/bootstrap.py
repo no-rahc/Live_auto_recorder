@@ -23,6 +23,7 @@ from lar_app.web.middleware import ConsoleAssetsMiddleware, SecurityMiddleware
 from module.config_tools_v1 import install_config_tools
 from module.operations_platform_v3 import install_platform_features
 from module.operations_v2 import install_operations
+from module.recording_trace import install_live_recorder_stderr_capture
 
 
 @dataclass(frozen=True, slots=True)
@@ -93,6 +94,7 @@ def build_application(
     release = load_release_info(core, root_dir=root_dir)
     apply_release_info(core, release)
     configure_session_middleware(app)
+    install_live_recorder_stderr_capture()
     _install_local_http_exception_handler(app)
     _install_health_route(app, release)
 
