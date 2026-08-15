@@ -7,7 +7,7 @@ import signal
 import random
 import subprocess
 import contextlib
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
 from module.data_manager import RecorderManager, loadConfig
 from module.recording_adapter import startSession
@@ -79,7 +79,13 @@ class ChannelFsm:
             finally:
                 self.rm.guard_release_start(channelId)
 
-    def _recordStopReason(self, channelId: str, reason: str, channel: Optional[dict] = None) -> None:
+    def _recordStopReason(
+        self,
+        channelId: str,
+        reason: str,
+        channel: Optional[dict] = None,
+        diagnostics: Optional[dict[str, Any]] = None,
+    ) -> None:
         ch = channel or self._findChannel(channelId)
         was_active = bool(
             self.rm.get_status_recording(channelId)
@@ -96,21 +102,32 @@ class ChannelFsm:
             logger.warning(f"stop reason catalog write failed: {exc}")
         try:
             from module.recording_history import log_event
+            extra: dict[str, Any] = {"reason": str(reason)[:80]}
+            for key in ("process_exit_code", "file_size", "last_write_at", "restart_attempt"):
+                if diagnostics and key in diagnostics:
+                    extra[key] = diagnostics[key]
+            if diagnostics and "reason" in diagnostics:
+                extra["health_reason"] = str(diagnostics["reason"])[:160]
             log_event(
                 channelId,
                 str((ch or {}).get("name") or channelId),
                 str((ch or {}).get("platform") or ""),
                 "recording_stop_requested",
-                extra={"reason": str(reason)[:80]},
+                extra=extra,
             )
         except Exception as exc:
             logger.warning(f"stop reason history write failed: {exc}")
 
-    async def stop(self, channelId: str, reason: str = "user"):
+    async def stop(
+        self,
+        channelId: str,
+        reason: str = "user",
+        diagnostics: Optional[dict[str, Any]] = None,
+    ):
         """Stop a channel while preserving the control reason for history and diagnostics."""
         async with self._lock(channelId):
             ch = self._findChannel(channelId)
-            self._recordStopReason(channelId, reason, ch)
+            self._recordStopReason(channelId, reason, ch, diagnostics)
 
             # 1) 루프가 즉시 감지할 수 있도록 먼저 STOP 플래그
             self.rm.set_is_user_stopped(channelId, True)
