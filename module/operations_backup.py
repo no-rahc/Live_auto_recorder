@@ -174,6 +174,10 @@ class BackupStatsMixin:
         storage["warning_free_percent"] = max(storage["block_free_percent"], min(float(storage["warning_free_percent"]), 80.0))
         health = candidate["health"]
         health["stall_seconds"] = max(30, min(int(health["stall_seconds"]), 3600))
+        health["startup_grace_seconds"] = max(0, min(int(health.get("startup_grace_seconds", 30)), 600))
+        health["process_exit_grace_seconds"] = max(5, min(int(health.get("process_exit_grace_seconds", 20)), 300))
+        health["failed_samples"] = max(1, min(int(health.get("failed_samples", 2)), 10))
+        health["stall_confirmations"] = max(2, min(int(health.get("stall_confirmations", 3)), 12))
         health["max_restart_attempts"] = max(0, min(int(health["max_restart_attempts"]), 20))
         backup = candidate["backup"]
         backup["keep"] = max(1, min(int(backup["keep"]), 100))
