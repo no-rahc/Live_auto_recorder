@@ -16,7 +16,7 @@ RUN mkdir -p /out \
     && CGO_ENABLED=0 GOOS="${TARGETOS}" GOARCH="${TARGETARCH}" \
         go build -trimpath -ldflags="-s -w" -o /out/ytarchive .
 
-FROM python:3.12-slim-bookworm
+FROM python:3.14-slim-bookworm
 
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONDONTWRITEBYTECODE=1 \
