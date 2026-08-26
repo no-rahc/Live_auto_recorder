@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.1.19 - 2026-08-26
+
+- Improve recording runtime stability and recovery flow
+- Move recording history reads to the SQLite catalog
+- Refactor configuration routing and safety handling
+
 ## v1.1.18 - 2026-08-06
 
 - Removed the persistent username, online indicator, and logout card from the bottom of the navigation sidebar.
