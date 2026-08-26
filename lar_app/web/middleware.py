@@ -3,16 +3,13 @@ from __future__ import annotations
 
 import html as html_module
 import re
-import time
 from typing import Any, Protocol
-from urllib.parse import urlencode
 
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse, RedirectResponse, Response
 
 from lar_app.web.assets import HTML_ROUTES, inject_console_assets
-from module.data_manager import loadConfig, loadTelegram, saveConfig
 
 
 NO_STORE_ROUTES = frozenset({"/config", "/cookies", "/operations"})
@@ -207,89 +204,13 @@ class SecurityMiddleware(BaseHTTPMiddleware):
                 status,
             )
 
-    @staticmethod
-    async def _prepare_config_request(request: Request) -> Response | None:
-        try:
-            submitted = await request.form()
-            pairs = [(str(key), str(value)) for key, value in submitted.multi_items()]
-        except Exception:
-            return JSONResponse(
-                {"status": "error", "message": "설정 요청을 읽을 수 없습니다."},
-                status_code=400,
-            )
-
-        current_config = loadConfig() or {}
-        current_telegram = loadTelegram() or {}
-        _apply_secret_actions(pairs, current_config, current_telegram)
-
-        # The legacy core still couples fileManagerEnabled to loginMode. Feed it
-        # local mode explicitly, then restore the requested file-manager state
-        # after the legacy handler completes.
-        requested_file_manager = _first(
-            pairs,
-            "fileManagerEnabled",
-            str(current_config.get("fileManagerEnabled", False)).lower(),
-        )
-        request.state.local_file_manager_enabled = requested_file_manager
-        _replace_pair(pairs, "loginMode", "false")
-
-        local_current = dict(current_config)
-        local_current["loginMode"] = False
-        error = _validate_dangerous_config(pairs, local_current)
-        if error:
-            return JSONResponse({"status": "error", "message": error}, status_code=400)
-
-        body = urlencode(pairs, doseq=True).encode("utf-8")
-        request._body = body  # Starlette's cached request replays this body to the downstream app.
-
-        async def receive() -> dict[str, Any]:
-            return {"type": "http.request", "body": body, "more_body": False}
-
-        request._receive = receive
-        headers = [
-            (key, value)
-            for key, value in request.scope.get("headers", [])
-            if key.lower() not in {b"content-type", b"content-length"}
-        ]
-        headers.extend(
-            [
-                (b"content-type", b"application/x-www-form-urlencoded"),
-                (b"content-length", str(len(body)).encode("ascii")),
-            ]
-        )
-        request.scope["headers"] = headers
-        return None
-
-    @staticmethod
-    def _normalize_local_config(request: Request) -> None:
-        config = loadConfig() or {}
-        config["loginMode"] = False
-        requested = getattr(request.state, "local_file_manager_enabled", None)
-        if requested is not None:
-            config["fileManagerEnabled"] = _truthy(requested)
-        saveConfig(config)
-        request.app.state.config = config
-
     async def dispatch(self, request: Request, call_next):
         if request.url.path in AUTH_ROUTES:
             response = RedirectResponse(url="/", status_code=302 if request.method == "GET" else 303)
             self._apply_headers(request, response)
             return response
 
-        if request.method == "POST" and request.url.path == "/config":
-            blocked = await self._prepare_config_request(request)
-            if blocked is not None:
-                self._apply_headers(request, blocked)
-                self._audit_response(request, blocked)
-                return blocked
-
         response = await call_next(request)
-
-        if request.method == "POST" and request.url.path == "/config" and response.status_code < 400:
-            self._normalize_local_config(request)
-            location = response.headers.get("location", "")
-            if location.startswith("/register") or location.startswith("/login"):
-                response.headers["location"] = "/"
 
         self._apply_headers(request, response)
         self._audit_response(request, response)

@@ -55,6 +55,9 @@
         <label>정리 방식<select name="cleanup_mode"><option value="age">보관 기간</option><option value="size">총 용량</option><option value="free_space">여유 공간 회복</option></select></label>
         <label>보관 기간(일)<input type="number" name="retention_days" min="1" max="3650"></label>
         <label>최대 총 용량(GB)<input type="number" name="max_total_gb" min="0" step="1"></label>
+        <label>채널별 최근 파일 보존<input type="number" name="keep_recent_per_channel" min="0" max="100"><small>0 = 별도 보존 없음</small></label>
+        <label>채널별 추가 보존<select name="retention_channel"><option value="">채널 선택</option>{% for channel in channels %}<option value="{{ channel.id }}">{{ channel.name or channel.id }}</option>{% endfor %}</select></label>
+        <label>선택 채널 보존 기간(일)<input type="number" name="retention_channel_days" min="0" max="3650"><small>0 = 전역 정책 사용</small></label>
         <label class="ops-check ops-check-card"><input type="checkbox" name="auto_cleanup"> 임계치 도달 시 자동 정리</label>
         <div class="ops-form-actions ops-storage-actions">
           <div class="ops-action-group">
@@ -73,9 +76,13 @@
     <section id="ops-panel-health" class="ops-panel" data-ops-panel="health" role="tabpanel" aria-labelledby="ops-tab-health" aria-hidden="true" tabindex="0">
       <div class="ops-section-head"><div><h2>녹화 건강 상태</h2><p>파일 기록 속도와 프로세스 상태를 감시하고 멈춤이 감지되면 자동 재연결합니다.</p></div></div>
       <form id="ops-health-form" class="ops-form-grid ops-compact-form">
+        <label>설정 대상<select name="channel_id"><option value="">전체 채널 기본값</option>{% for channel in channels %}<option value="{{ channel.id }}">{{ channel.name or channel.id }}</option>{% endfor %}</select></label>
         <label>멈춤 판정(초)<input type="number" name="stall_seconds" min="30" max="3600"></label>
         <label>최대 재연결 횟수<input type="number" name="max_restart_attempts" min="0" max="20"></label>
         <label>재연결 대기(초)<input type="number" name="restart_cooldown_seconds" min="10" max="3600"></label>
+        <label>녹화 시작 누락 판정(초)<input type="number" name="missed_recording_seconds" min="0" max="3600"><small>0 = 사용 안 함</small></label>
+        <label>회로 차단 실패 횟수<input type="number" name="circuit_breaker_after" min="1" max="20"></label>
+        <label>회로 차단 유지(초)<input type="number" name="circuit_breaker_seconds" min="30" max="7200"></label>
         <label class="ops-check ops-check-card"><input type="checkbox" name="auto_restart"> 자동 재연결 사용</label>
         <div class="ops-form-actions"><button type="submit" class="ops-action-primary">감시 설정 저장</button></div>
       </form>

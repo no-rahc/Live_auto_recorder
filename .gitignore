@@ -30,6 +30,10 @@ node_modules/
 playwright-report/
 test-results/
 blob-report/
+.npm-cache/
+.pw-browsers/
+.test-deps/
+.chatgpt2codex/
 
 # Local/editor files
 .DS_Store

@@ -32,6 +32,9 @@ DEFAULT_SETTINGS: dict[str, Any] = {
         "retention_days": 30,
         "max_total_gb": 0.0,
         "minimum_file_age_minutes": 10,
+        "keep_recent_per_channel": 0,
+        "protected_files": [],
+        "retention_days_by_channel": {},
     },
     "health": {
         "enabled": True,
@@ -40,6 +43,12 @@ DEFAULT_SETTINGS: dict[str, Any] = {
         "auto_restart": True,
         "max_restart_attempts": 3,
         "restart_cooldown_seconds": 60,
+        "process_exit_grace_seconds": 20,
+        "stall_confirmations": 3,
+        "missed_recording_seconds": 0,
+        "circuit_breaker_after": 5,
+        "circuit_breaker_seconds": 300,
+        "per_channel": {},
     },
     "backup": {
         "scheduled": True,
@@ -136,6 +145,7 @@ class OperationsBase:
         self._core_queue_last: Callable[..., Awaitable[Any]] | None = None
         self._started = False
         self._restart_locks: dict[str, asyncio.Lock] = {}
+        self._restart_tasks: dict[str, asyncio.Task[Any]] = {}
         self.policy_blocked: set[str] = set()
         self.storage_stopped = False
 
@@ -193,6 +203,9 @@ class OperationsBase:
             self.audit("startup_storage_block", "automatic watchers stopped because storage is critical", "blocked")
         with suppress(Exception):
             await self.monitor_once()
+        with suppress(Exception):
+            if hasattr(self, "reconcile_startup"):
+                await self.reconcile_startup()
         self.background_tasks = [
             asyncio.create_task(self._monitor_loop(), name="operations-health"),
             asyncio.create_task(self._backup_loop(), name="operations-backup"),
@@ -206,6 +219,18 @@ class OperationsBase:
             with suppress(asyncio.CancelledError):
                 await task
         self.background_tasks.clear()
+
+        # Health restarts sleep/revalidate before they touch the recorder.  They
+        # must not outlive the operations runtime, otherwise a shutdown/reload
+        # can be followed by a stale stop/start cycle a few seconds later.
+        restart_tasks = list(self._restart_tasks.values())
+        for task in restart_tasks:
+            if not task.done():
+                task.cancel()
+        for task in restart_tasks:
+            with suppress(asyncio.CancelledError):
+                await task
+        self._restart_tasks.clear()
         self._started = False
 
     def _install_start_guard(self) -> None:
@@ -315,10 +340,16 @@ class OperationsBase:
         min_age = max(1, int(cfg.get("minimum_file_age_minutes", 10) or 10))
         now = time.time()
         busy = self._busy_paths()
+        excluded = set()
+        with suppress(Exception):
+            if hasattr(self, "retention_excluded_paths"):
+                excluded = self.retention_excluded_paths()
         all_files = self._recording_files()
         eligible = [
             item for item in all_files
-            if Path(item["path"]).resolve() not in busy and now - item["mtime"] >= min_age * 60
+            if Path(item["path"]).resolve() not in busy
+            and Path(item["path"]).resolve() not in excluded
+            and now - item["mtime"] >= min_age * 60
         ]
         candidates: list[dict[str, Any]] = []
 
@@ -370,7 +401,8 @@ class OperationsBase:
         root = self.recording_root.resolve()
         for item in preview.pop("_all", []):
             path = Path(item["path"]).resolve()
-            if root not in path.parents or path in self._busy_paths():
+            excluded = self.retention_excluded_paths() if hasattr(self, "retention_excluded_paths") else set()
+            if root not in path.parents or path in self._busy_paths() or path in excluded:
                 continue
             try:
                 path.unlink()

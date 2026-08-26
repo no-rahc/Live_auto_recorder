@@ -132,6 +132,20 @@ def get_history(
     channel_id: Optional[str] = None,
     event: Optional[str] = None,
 ) -> List[Dict]:
+    # SQLite is the primary read source. Import an existing legacy JSONL once
+    # when the catalog is still empty, then keep JSONL only as a compatibility
+    # mirror for older deployments/tools.
+    try:
+        from module.recording_catalog import list_events, migrate_jsonl
+        migrate_jsonl(HISTORY_PATH)
+        return list_events(
+            limit=limit,
+            channel_id=channel_id or "",
+            event=event or "",
+        )
+    except Exception as exc:
+        logger.warning(f"recording catalog read failed; falling back to JSONL: {exc}")
+
     entries: List[Dict] = []
     with _lock:
         try:

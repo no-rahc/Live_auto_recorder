@@ -1,5 +1,7 @@
 import unittest
 
+from lar_app.config_safety import resolve_secret, validate_file_manager_transition
+
 from lar_app.web.middleware import (
     _apply_secret_actions,
     _validate_dangerous_config,
@@ -8,6 +10,35 @@ from lar_app.web.middleware import (
 
 
 class ConfigSafetyMiddlewareTests(unittest.TestCase):
+    def test_route_secret_resolution_preserves_replaces_and_clears(self):
+        self.assertEqual(resolve_secret("", "keep", "stored"), "stored")
+        self.assertEqual(resolve_secret("new", "replace", "stored"), "new")
+        self.assertEqual(resolve_secret("ignored", "clear", "stored"), "")
+
+    def test_route_file_manager_validation_requires_acknowledgement(self):
+        current = {
+            "fileManagerEnabled": False,
+            "fileManagerMode": "whitelist",
+            "fileManagerReadOnly": True,
+            "trashEnabled": True,
+        }
+        error = validate_file_manager_transition(
+            current,
+            enabled=True,
+            mode="blacklist",
+            read_only=False,
+            trash_enabled=False,
+        )
+        self.assertIn("위험한 파일 관리자", error or "")
+        self.assertIsNone(validate_file_manager_transition(
+            current,
+            enabled=True,
+            mode="blacklist",
+            read_only=False,
+            trash_enabled=False,
+            acknowledgement="위험 설정 적용",
+        ))
+
     def test_config_html_never_contains_stored_secrets(self):
         html = """
         <input type="text" id="telegram_bot_token" name="telegram_bot_token" value="telegram-secret">

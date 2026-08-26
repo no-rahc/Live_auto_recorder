@@ -258,6 +258,40 @@ def migrate_jsonl(path: str | Path) -> int:
     return imported
 
 
+def list_events(*, limit: int = 50, channel_id: str = "", event: str = "") -> list[dict[str, Any]]:
+    """Read recording lifecycle events from the durable catalog."""
+    init_catalog()
+    limit = max(1, min(int(limit), 10000))
+    where: list[str] = []
+    args: list[Any] = []
+    if channel_id:
+        where.append("channel_id=?")
+        args.append(str(channel_id))
+    if event:
+        where.append("event=?")
+        args.append(str(event))
+    clause = (" WHERE " + " AND ".join(where)) if where else ""
+    with _LOCK, _connect() as conn:
+        rows = conn.execute(
+            "SELECT epoch,ts,channel_id,channel_name,platform,event,filename,duration,error,extra_json "
+            "FROM events" + clause + " ORDER BY epoch DESC LIMIT ?",
+            [*args, limit],
+        ).fetchall()
+
+    items: list[dict[str, Any]] = []
+    for row in rows:
+        item = dict(row)
+        raw_extra = item.pop("extra_json", "{}")
+        try:
+            extra = json.loads(raw_extra or "{}")
+        except Exception:
+            extra = {}
+        if isinstance(extra, dict):
+            item.update(extra)
+        items.append(item)
+    return items
+
+
 def list_recordings(*, limit: int = 100, offset: int = 0, channel_id: str = "", status: str = "", query: str = "") -> dict[str, Any]:
     init_catalog()
     limit = max(1, min(int(limit), 500))

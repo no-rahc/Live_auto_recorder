@@ -1,5 +1,9 @@
 .git
 .github
+.chatgpt2codex
+.npm-cache
+.pw-browsers
+.test-deps
 .venv
 venv
 __pycache__

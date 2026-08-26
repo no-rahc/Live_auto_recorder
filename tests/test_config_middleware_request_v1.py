@@ -1,5 +1,4 @@
 import unittest
-from unittest.mock import patch
 
 from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
@@ -13,7 +12,7 @@ class _AuditSink:
 
 
 class ConfigMiddlewareRequestTests(unittest.TestCase):
-    def test_posted_form_is_replayed_with_local_mode_and_preserved_secrets(self):
+    def test_posted_form_passes_through_without_private_request_rewrite(self):
         app = FastAPI()
 
         @app.post("/config")
@@ -35,41 +34,15 @@ class ConfigMiddlewareRequestTests(unittest.TestCase):
             "discord_webhook_url": "",
             "discord_webhook_url_action": "keep",
         }
-        stored_config = {
-            "loginMode": True,
-            "fileManagerEnabled": False,
-            "fileManagerMode": "whitelist",
-            "fileManagerReadOnly": True,
-            "trashEnabled": True,
-            "discord_webhook_url": "stored-webhook",
-        }
-
-        def load_config():
-            return dict(stored_config)
-
-        def save_config(config):
-            stored_config.clear()
-            stored_config.update(config)
-
-        with (
-            patch("lar_app.web.middleware.loadConfig", side_effect=load_config),
-            patch("lar_app.web.middleware.saveConfig", side_effect=save_config),
-            patch("lar_app.web.middleware.loadTelegram", return_value={
-                "telegram_bot_token": "stored-token",
-                "telegram_chat_id": "stored-chat",
-            }),
-        ):
-            response = TestClient(app).post("/config", data=payload)
+        response = TestClient(app).post("/config", data=payload)
 
         self.assertEqual(response.status_code, 200)
         body = response.json()
-        self.assertEqual(body["loginMode"], "false")
+        self.assertEqual(body["loginMode"], "true")
         self.assertEqual(body["fileManagerEnabled"], "true")
-        self.assertEqual(body["telegram_bot_token"], "stored-token")
-        self.assertEqual(body["telegram_chat_id"], "stored-chat")
-        self.assertEqual(body["discord_webhook_url"], "stored-webhook")
-        self.assertFalse(stored_config["loginMode"])
-        self.assertTrue(stored_config["fileManagerEnabled"])
+        self.assertEqual(body["telegram_bot_token"], "")
+        self.assertEqual(body["telegram_chat_id"], "")
+        self.assertEqual(body["discord_webhook_url"], "")
 
     def test_legacy_auth_routes_redirect_to_dashboard(self):
         app = FastAPI()

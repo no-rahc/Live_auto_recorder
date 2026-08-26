@@ -105,11 +105,34 @@ class HealthJobsMixin:
     ) -> tuple[bool, str]:
         """Revalidate a destructive health restart against live recorder state."""
         rm = self.lar.recorder_manager
+        channel = next(
+            (item for item in (getattr(self.app.state, "channels", []) or []) if str(item.get("id") or "") == channel_id),
+            None,
+        )
+        if channel is None:
+            return False, "channel removed"
+        if not bool(channel.get("record_enabled", True)):
+            return False, "recording disabled"
+        if hasattr(rm, "get_is_user_stopped") and rm.get_is_user_stopped(channel_id):
+            return False, "user stop requested"
+        if channel_id in self.policy_blocked:
+            return False, "policy blocked"
+        if self.storage_stopped:
+            return False, "storage blocked"
+
         if reason == "fsm_error":
             fsm = getattr(self.app.state, "fsm", None)
             if fsm and fsm.getState(channel_id) == "ERROR":
                 return True, "fsm remains in ERROR"
             return False, "fsm recovered"
+
+        if reason == "missed":
+            fsm = getattr(self.app.state, "fsm", None)
+            if bool(rm.get_status_recording(channel_id)):
+                return False, "recording started"
+            if not fsm or fsm.getState(channel_id) != "WATCHING":
+                return False, "watch state changed"
+            return True, "watching without recording"
 
         if not bool(rm.get_status_recording(channel_id)):
             return False, "recording flag cleared"
@@ -172,6 +195,8 @@ class HealthJobsMixin:
         last_growth = float(previous.get("last_growth", now))
         proc_exit_seen_at = float(previous.get("proc_exit_seen_at", 0) or 0)
         stall_checks = int(previous.get("stall_checks", 0) or 0)
+        watching_since = float(previous.get("watching_since", 0) or 0)
+        last_start_delay = float(previous.get("last_start_delay", 0) or 0)
 
         if size > previous_size or (mtime and mtime > previous_mtime):
             last_growth = now
@@ -184,10 +209,15 @@ class HealthJobsMixin:
         state = "waiting"
         label = "대기 중"
         error = ""
-        health_cfg = self.settings["health"]
+        health_cfg = self.health_config(channel_id) if hasattr(self, "health_config") else self.settings["health"]
         restart_reason = ""
 
         if recording:
+            start_delay_seconds = 0.0
+            if watching_since:
+                start_delay_seconds = max(0.0, now - watching_since)
+                last_start_delay = start_delay_seconds
+                watching_since = 0.0
             if proc is not None and proc_returncode is not None:
                 stall_checks = 0
                 if not proc_exit_seen_at:
@@ -241,6 +271,13 @@ class HealthJobsMixin:
             proc_exit_seen_at = 0
             stall_checks = 0
             state, label = "checking", "라이브 확인 중"
+            if not watching_since:
+                watching_since = now
+            missed_after = max(0, min(int(health_cfg.get("missed_recording_seconds", 0) or 0), 3600))
+            if missed_after and now - watching_since >= missed_after and not rm.get_is_user_stopped(channel_id):
+                state, label = "failed", "녹화 시작 누락"
+                error = f"WATCHING 상태가 {now - watching_since:.0f}s 지속되었습니다."
+                restart_reason = "missed"
         elif fsm_state == "ERROR":
             proc_exit_seen_at = 0
             stall_checks = 0
@@ -249,6 +286,7 @@ class HealthJobsMixin:
         else:
             proc_exit_seen_at = 0
             stall_checks = 0
+            watching_since = 0.0
 
         self.samples[channel_id] = {
             "size": size,
@@ -257,6 +295,8 @@ class HealthJobsMixin:
             "last_growth": last_growth,
             "proc_exit_seen_at": proc_exit_seen_at,
             "stall_checks": stall_checks,
+            "watching_since": watching_since,
+            "last_start_delay": last_start_delay,
         }
 
         rule = self.settings.get("rules", {}).get(channel_id, {})
@@ -299,11 +339,20 @@ class HealthJobsMixin:
 
         if state in {"stalled", "failed"} and restart_reason and health_cfg.get("auto_restart"):
             max_attempts = int(health_cfg.get("max_restart_attempts", 3))
-            if attempts < max_attempts and now >= cooldown_until:
+            pending_restart = self._restart_tasks.get(channel_id)
+            restart_pending = bool(pending_restart and not pending_restart.done())
+            if attempts < max_attempts and now >= cooldown_until and not restart_pending:
                 attempts += 1
-                cooldown = max(10, int(health_cfg.get("restart_cooldown_seconds", 60)))
+                strategy = self.recovery_strategy(channel_id, restart_reason, attempts) if hasattr(self, "recovery_strategy") else {"action": "restart", "delay_seconds": int(health_cfg.get("restart_cooldown_seconds", 60))}
+                cooldown = max(10, int(strategy.get("delay_seconds", health_cfg.get("restart_cooldown_seconds", 60))))
                 cooldown_until = now + cooldown
                 state, label = "reconnecting", f"재연결 {attempts}/{max_attempts}"
+                if strategy.get("action") == "circuit_breaker":
+                    state, label = "blocked", f"자동복구 일시중지 {cooldown}s"
+                    error = f"연속 실패로 자동복구를 {cooldown}s 중지합니다."
+                    self.audit("health_circuit_breaker", f"channel={channel_id}; reason={restart_reason}; cooldown={cooldown}", "blocked")
+                    with suppress(Exception):
+                        await self._notify("recording.circuit_breaker", error, {"channel_id": channel_id, "reason": restart_reason, "cooldown": cooldown})
                 diagnostic = {
                     "reason": restart_reason,
                     "process_exit_code": proc_returncode,
@@ -319,12 +368,29 @@ class HealthJobsMixin:
                     "scheduled_at": _iso(now),
                 }
                 last_restart = diagnostic
+                if restart_reason == "missed":
+                    with suppress(Exception):
+                        await self._notify(
+                            "recording.missed",
+                            f"{channel_id} 채널이 라이브 감시 중이지만 녹화가 시작되지 않아 자동 복구를 시도합니다.",
+                            {"channel_id": channel_id, "attempt": attempts, "reason": restart_reason},
+                        )
                 self.audit(
                     "health_restart_scheduled",
                     self._restart_detail(channel_id, attempts, restart_reason, diagnostic),
                     "warning",
                 )
-                asyncio.create_task(self._restart_channel(channel_id, attempts, restart_reason, diagnostic))
+                if strategy.get("action") != "circuit_breaker":
+                    restart_task = asyncio.create_task(
+                        self._restart_channel(channel_id, attempts, restart_reason, diagnostic)
+                    )
+                    self._restart_tasks[channel_id] = restart_task
+
+                    def _clear_restart_task(done_task: asyncio.Task[Any], cid: str = channel_id) -> None:
+                        if self._restart_tasks.get(cid) is done_task:
+                            self._restart_tasks.pop(cid, None)
+
+                    restart_task.add_done_callback(_clear_restart_task)
 
         self.health[channel_id] = {
             "channel_id": channel_id,
@@ -345,6 +411,8 @@ class HealthJobsMixin:
             "growth_age_seconds": round(growth_age, 1),
             "write_age_seconds": round(write_age, 1),
             "stall_checks": stall_checks,
+            "watching_age_seconds": round(max(0.0, now - watching_since), 1) if watching_since else 0.0,
+            "start_delay_seconds": round(last_start_delay, 1),
             "process_exit_code": proc_returncode,
             "process_exit_seen_at": _iso(proc_exit_seen_at) if proc_exit_seen_at else "",
             "restart_attempts": attempts,

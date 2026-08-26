@@ -10,10 +10,11 @@ from lar_app.security import secret_backups_allowed
 from module.operations_backup import BackupStatsMixin
 from module.operations_catalog_stats import CatalogStatsMixin
 from module.operations_common import OperationsBase, _iso
+from module.operations_features import FeatureOpsMixin
 from module.operations_health import HealthJobsMixin
 
 
-class OperationsRuntime(CatalogStatsMixin, HealthJobsMixin, BackupStatsMixin, OperationsBase):
+class OperationsRuntime(FeatureOpsMixin, CatalogStatsMixin, HealthJobsMixin, BackupStatsMixin, OperationsBase):
     pass
 
 
@@ -46,7 +47,50 @@ def install_operations(app: Any, lar: Any) -> OperationsRuntime:
 
     @router.get("/api/operations/health")
     async def health():
-        return {"channels": list(runtime.health.values()), "updated_at": _iso()}
+        return {
+            "channels": list(runtime.health.values()),
+            "updated_at": _iso(),
+            "storage_runway": runtime.storage_runway(),
+        }
+
+    @router.get("/api/operations/storage/runway")
+    async def storage_runway():
+        return runtime.storage_runway()
+
+    @router.get("/api/operations/metrics/channels")
+    async def channel_metrics(days: int = 30):
+        return runtime.channel_metrics(days)
+
+    @router.get("/api/operations/channels/{channel_id}/trace")
+    async def channel_trace(channel_id: str):
+        return runtime.channel_trace(channel_id)
+
+    @router.post("/api/operations/channels/{channel_id}/recover")
+    async def recover_channel(channel_id: str, payload: dict[str, Any] = Body(default={})):
+        return await runtime.manual_recover(channel_id, str(payload.get("action") or "restart"))
+
+    @router.get("/api/operations/channels/{channel_id}/schedule")
+    async def channel_schedule(channel_id: str):
+        return runtime.channel_schedule(channel_id)
+
+    @router.put("/api/operations/channels/{channel_id}/schedule")
+    async def put_channel_schedule(channel_id: str, payload: dict[str, Any] = Body(...)):
+        return runtime.set_channel_schedule(channel_id, payload)
+
+    @router.get("/api/operations/channels/{channel_id}/health-settings")
+    async def channel_health_settings(channel_id: str):
+        return runtime.channel_health_settings(channel_id)
+
+    @router.put("/api/operations/channels/{channel_id}/health-settings")
+    async def put_channel_health_settings(channel_id: str, payload: dict[str, Any] = Body(...)):
+        return runtime.set_channel_health_settings(channel_id, payload)
+
+    @router.put("/api/operations/files/protection")
+    async def file_protection(payload: dict[str, Any] = Body(...)):
+        return runtime.set_file_protected(
+            str(payload.get("path") or ""),
+            bool(payload.get("protected", True)),
+        )
 
     @router.get("/api/operations/jobs")
     async def jobs():

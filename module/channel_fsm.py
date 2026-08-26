@@ -2,15 +2,16 @@ from module.log_setup import get_logger
 logger = get_logger("channel_fsm")
 import asyncio
 import os
-import time
 import signal
 import random
 import subprocess
 import contextlib
-from typing import Dict, Optional
+from dataclasses import dataclass, field
+from typing import Any, Dict, Optional
 
 from module.data_manager import RecorderManager, loadConfig
 from module.recording_adapter import startSession
+from module.recording_session import SessionOutcome
 
 try:
     from module.common_errors import NotLiveError
@@ -19,19 +20,42 @@ except Exception:  # 폴백
         pass
 
 
+@dataclass(slots=True)
+class ChannelRuntime:
+    state: str = "STOPPED"
+    lock: asyncio.Lock = field(default_factory=asyncio.Lock)
+    watch_task: Optional[asyncio.Task[Any]] = None
+    respawn_task: Optional[asyncio.Task[Any]] = None
+    stop_requested: bool = True
+    last_outcome: Optional[SessionOutcome] = None
+    retry_attempts: int = 0
+
+
 class ChannelFsm:
     def __init__(self):
         self.rm = RecorderManager()
-        self.state: Dict[str, str] = {}                 # cid -> "STOPPED|WATCHING|RECORDING|ERROR"
-        self.locks: Dict[str, asyncio.Lock] = {}        # cid -> lock
-        self.watchTask: Dict[str, asyncio.Task] = {}    # cid -> task
-        self.recordTask: Dict[str, asyncio.Task] = {}   # cid -> task
-        self.backoffUntil: Dict[str, float] = {}        # cid -> monotonic timestamp
-        self.restartAttempts: Dict[str, int] = {}       # cid -> 연속 실패 횟수(백오프 계산용)
+        self.runtimes: Dict[str, ChannelRuntime] = {}
+
+    def _runtime(self, cid: str) -> ChannelRuntime:
+        runtime = self.runtimes.get(cid)
+        if runtime is None:
+            runtime = ChannelRuntime()
+            self.runtimes[cid] = runtime
+        return runtime
+
+    @property
+    def respawnTask(self) -> Dict[str, asyncio.Task[Any]]:
+        """Compatibility view for diagnostics/tests while runtime ownership stays per channel."""
+        return {cid: rt.respawn_task for cid, rt in self.runtimes.items() if rt.respawn_task is not None}
 
     # 공용 API
     def getState(self, channelId: str) -> str:
-        return self.state.get(channelId, "STOPPED")
+        runtime = self.runtimes.get(channelId)
+        return runtime.state if runtime is not None else "STOPPED"
+
+    def isStopRequested(self, channelId: str) -> bool:
+        runtime = self.runtimes.get(channelId)
+        return runtime.stop_requested if runtime is not None else True
 
     # 실제 녹화 프로세스 생존 확인 유틸
     def _procAlive(self, cid: str) -> bool:
@@ -50,8 +74,6 @@ class ChannelFsm:
                 self._setStopped(channelId)
                 return
 
-            self._resetBackoff(channelId)
-
             # 1) 이미 실제 녹화 프로세스가 살아있으면: 상태만 동기화
             if self.rm.get_status_recording(channelId) or self._procAlive(channelId):
                 self._setRecording(channelId)
@@ -67,7 +89,7 @@ class ChannelFsm:
                     return
 
                 if cur == "WATCHING":
-                    wt = self.watchTask.get(channelId)
+                    wt = self._runtime(channelId).watch_task
                     if wt and not wt.done():
                         return
                     self._setWatching(channelId)
@@ -109,6 +131,7 @@ class ChannelFsm:
     async def stop(self, channelId: str, reason: str = "user"):
         """Stop a channel while preserving the control reason for history and diagnostics."""
         async with self._lock(channelId):
+            self._runtime(channelId).stop_requested = True
             ch = self._findChannel(channelId)
             self._recordStopReason(channelId, reason, ch)
 
@@ -208,38 +231,42 @@ class ChannelFsm:
 
     # 내부 유틸
     def _lock(self, cid: str) -> asyncio.Lock:
-        self.locks.setdefault(cid, asyncio.Lock())
-        return self.locks[cid]
+        return self._runtime(cid).lock
 
     def _findChannel(self, cid: str) -> Optional[dict]:
         return next((c for c in (self.rm.getChannels() or []) if c.get("id") == cid), None)
 
     def _setStopped(self, cid: str):
-        self.state[cid] = "STOPPED"
+        runtime = self._runtime(cid)
+        runtime.state = "STOPPED"
+        runtime.stop_requested = True
         self.rm.set_status_reserved(cid, False)
         self.rm.set_status_recording(cid, False)
         self.rm.set_is_user_stopped(cid, True)
-        self.restartAttempts[cid] = 0
-        self.backoffUntil[cid] = 0
 
     def _setWatching(self, cid: str):
-        self.state[cid] = "WATCHING"
+        runtime = self._runtime(cid)
+        runtime.state = "WATCHING"
+        runtime.stop_requested = False
         self.rm.set_is_user_stopped(cid, False)
         self.rm.set_status_reserved(cid, True)
         self.rm.set_status_recording(cid, False)
 
     def _setRecording(self, cid: str):
-        self.state[cid] = "RECORDING"
+        runtime = self._runtime(cid)
+        runtime.state = "RECORDING"
+        runtime.stop_requested = False
         self.rm.set_status_reserved(cid, False)
         self.rm.set_status_recording(cid, True)
         self.rm.set_is_user_stopped(cid, False)
 
     async def _stopAllWorkers(self, cid: str):
-        await self._cancelTask(self.watchTask.pop(cid, None))
-        await self._cancelTask(self.recordTask.pop(cid, None))
+        runtime = self._runtime(cid)
+        respawn_task, runtime.respawn_task = runtime.respawn_task, None
+        watch_task, runtime.watch_task = runtime.watch_task, None
+        await self._cancelTask(respawn_task)
+        await self._cancelTask(watch_task)
         await self._killProcessTree(cid)
-        with contextlib.suppress(Exception):
-            await self.rm.force_terminate_worker(cid)
 
     async def _cancelTask(self, task: Optional[asyncio.Task]):
         if not task:
@@ -249,41 +276,42 @@ class ChannelFsm:
             with contextlib.suppress(asyncio.CancelledError):
                 await task
 
-    def _inBackoff(self, cid: str) -> bool:
-        return self.backoffUntil.get(cid, 0) > time.monotonic()
-
-    def _resetBackoff(self, cid: str):
-        self.restartAttempts[cid] = 0
-        self.backoffUntil[cid] = 0
-
-    def _applyBackoff(self, cid: str):
-        attempts = self.restartAttempts.get(cid, 0) + 1
-        self.restartAttempts[cid] = attempts
-        delay = min(600, 10 * attempts * attempts)
-
-        cfg = loadConfig() or {}
-        if cfg.get("autoRecordingMode", False):
-            base = int(cfg.get("recheckInterval", 60))
-            delay = min(delay, max(10, base))
-
-        self.backoffUntil[cid] = time.monotonic() + delay
-
     async def _sleepWithJitter(self, base_seconds: int):
         jitter = random.uniform(0.85, 1.15)
         await asyncio.sleep(max(5, int(base_seconds * jitter)))
 
+    def _scheduleRespawn(self, cid: str, base_seconds: int):
+        runtime = self._runtime(cid)
+        existing = runtime.respawn_task
+        if existing and not existing.done():
+            return
+
+        async def _respawn():
+            try:
+                await self._sleepWithJitter(base_seconds)
+                ch = self._findChannel(cid)
+                if ch and ch.get("record_enabled", True) and not runtime.stop_requested:
+                    self._spawnWatch(cid)
+            finally:
+                if runtime.respawn_task is asyncio.current_task():
+                    runtime.respawn_task = None
+
+        runtime.respawn_task = asyncio.create_task(_respawn())
+
     # Watch Loop
     def _spawnWatch(self, cid: str, is_user_request: bool = False):
-        if self.watchTask.get(cid) and not self.watchTask[cid].done():
+        runtime = self._runtime(cid)
+        if runtime.watch_task and not runtime.watch_task.done():
             return
 
         async def _run():
+            outcome = None
             ch = self._findChannel(cid)
             if not ch:
                 self._setStopped(cid)
                 return
 
-            if self.rm.get_is_user_stopped(cid):
+            if runtime.stop_requested:
                 self._setStopped(cid)
                 return
 
@@ -295,7 +323,17 @@ class ChannelFsm:
 
             try:
                 cfg = loadConfig() or {}
-                await startSession(ch, (ch.get("platform") or "").lower(), cfg, is_user_request=is_user_request)
+                outcome = await startSession(
+                    ch,
+                    (ch.get("platform") or "").lower(),
+                    cfg,
+                    is_user_request=is_user_request,
+                )
+                runtime.last_outcome = outcome
+                if outcome == SessionOutcome.RETRYABLE_ERROR:
+                    runtime.retry_attempts += 1
+                else:
+                    runtime.retry_attempts = 0
 
             except asyncio.CancelledError:
                 raise
@@ -306,7 +344,16 @@ class ChannelFsm:
 
             finally:
                 ch2 = self._findChannel(cid)
-                if not ch2 or not ch2.get("record_enabled", True) or self.rm.get_is_user_stopped(cid):
+                unsupported = outcome == SessionOutcome.UNSUPPORTED
+                if unsupported:
+                    logger.error(f"unsupported recording platform: channel={cid}; platform={(ch or {}).get('platform')}")
+                terminal = outcome in {
+                    SessionOutcome.USER_STOPPED,
+                    SessionOutcome.DISABLED,
+                    SessionOutcome.FATAL_ERROR,
+                    SessionOutcome.UNSUPPORTED,
+                }
+                if terminal or not ch2 or not ch2.get("record_enabled", True) or runtime.stop_requested:
                     self._setStopped(cid)
 
                 else:
@@ -314,16 +361,17 @@ class ChannelFsm:
 
                     try:
                         cfg = loadConfig() or {}
-                        base = int(cfg.get("recheckInterval", 60))
+                        recheck = max(5, int(cfg.get("recheckInterval", 60)))
                     except Exception:
-                        base = 60
+                        recheck = 60
 
-                    async def _respawn():
-                        await self._sleepWithJitter(base)
-                        ch3 = self._findChannel(cid)
-                        if ch3 and ch3.get("record_enabled", True) and not self.rm.get_is_user_stopped(cid):
-                            self._spawnWatch(cid)
+                    if outcome == SessionOutcome.RETRYABLE_ERROR:
+                        base = min(300, max(5, 5 * (2 ** max(0, runtime.retry_attempts - 1))))
+                    elif outcome == SessionOutcome.COMPLETED:
+                        base = min(recheck, 10)
+                    else:
+                        base = recheck
 
-                    asyncio.create_task(_respawn())
+                    self._scheduleRespawn(cid, base)
 
-        self.watchTask[cid] = asyncio.create_task(_run())
+        runtime.watch_task = asyncio.create_task(_run())

@@ -22,6 +22,11 @@ class AppRuntimeStructureTests(unittest.TestCase):
         self.assertNotIn("STYLESHEETS", source)
         self.assertIn("build_application", source)
 
+    def test_legacy_core_never_installs_dependencies_at_import_time(self):
+        source = (PROJECT_ROOT / "live_auto_recorder.py").read_text(encoding="utf-8")
+        self.assertNotIn("install_missing_modules", source)
+        self.assertNotIn('"-m", "pip", "install"', source)
+
     def test_asset_manifest_has_unique_paths(self):
         paths = all_asset_paths()
         self.assertEqual(len(paths), len(set(paths)))

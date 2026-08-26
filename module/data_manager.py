@@ -233,7 +233,6 @@ class RecorderManager:
     guard_starting        : Set[str]          = set()  # 시작 진입 가드(원자성)
 
     # D) 동시성/자원
-    tasks_worker          : Dict[str, asyncio.Task]                 = {}
     tasks_process         : Dict[str, asyncio.subprocess.Process]   = {}
 
     # E) 녹화 메타
@@ -367,18 +366,6 @@ class RecorderManager:
             self.__class__.guard_starting.discard(channel_id)
 
     # D) 동시성/자원 (태스크/프로세스)
-    def get_tasks_worker(self, channel_id: str) -> Optional[asyncio.Task]:
-        with self._lock:
-            return self.__class__.tasks_worker.get(channel_id)
-
-    def set_tasks_worker(self, channel_id: str, task: asyncio.Task) -> None:
-        with self._lock:
-            self.__class__.tasks_worker[channel_id] = task
-
-    def clear_tasks_worker(self, channel_id: str) -> None:
-        with self._lock:
-            self.__class__.tasks_worker.pop(channel_id, None)
-
     def get_tasks_process(self, channel_id: str) -> Optional[asyncio.subprocess.Process]:
         with self._lock:
             return self.__class__.tasks_process.get(channel_id)
@@ -509,25 +496,6 @@ class RecorderManager:
     def get_recording_status(self, channel_id: str) -> bool:
         return self.get_status_recording(channel_id)
 
-    def set_recording_status(self, channel_id: str, value: bool) -> None:
-        self.set_status_recording(channel_id, value)
-
-    def get_reserved_recording(self, channel_id: str) -> bool:
-        return self.get_status_reserved(channel_id)
-
-    def set_reserved_recording(self, channel_id: str, value: bool) -> None:
-        self.set_status_reserved(channel_id, value)
-
-    # 사용자 중지
-    def is_stop_requested(self, channel_id: str) -> bool:
-        return self.get_is_user_stopped(channel_id)
-
-    def add_stop_requested_channel(self, channel_id: str) -> None:
-        self.set_is_user_stopped(channel_id, True)
-
-    def remove_stop_requested_channel(self, channel_id: str) -> None:
-        self.set_is_user_stopped(channel_id, False)
-
     def recording_get_filename(self, channel_id: str):
         return self.get_recording_filename(channel_id)
 
@@ -536,32 +504,12 @@ class RecorderManager:
         # loop_watchdog 호환용 별칭
         return self.get_watchdog_last_beat(channel_id)
 
-    # 워커 태스크
-    def get_worker_task(self, channel_id: str):
-        return self.get_tasks_worker(channel_id)
-
-    def set_worker_task(self, channel_id: str, task: asyncio.Task):
-        self.set_tasks_worker(channel_id, task)
-
-    def clear_worker_task(self, channel_id: str):
-        self.clear_tasks_worker(channel_id)
-
     # 시작 가드
     def try_acquire_start(self, channel_id: str) -> bool:
         return self.guard_try_acquire_start(channel_id)
 
     def release_start(self, channel_id: str) -> None:
         self.guard_release_start(channel_id)
-
-    # 프로세스
-    def set_recording_process(self, channel_id: str, proc: asyncio.subprocess.Process) -> None:
-        self.set_tasks_process(channel_id, proc)
-
-    def get_recording_process(self, channel_id: str) -> Optional[asyncio.subprocess.Process]:
-        return self.get_tasks_process(channel_id)
-
-    def remove_recording_process(self, channel_id: str) -> None:
-        self.clear_tasks_process(channel_id)
 
     # 시작 시간/파일명
     def set_recording_start_time(self, channel_id: str) -> None:
@@ -592,32 +540,6 @@ class RecorderManager:
             delay = min(600, 10 * cur * cur)
             self.__class__.watchdog_backoff_until[channel_id] = time.monotonic() + delay
             return cur
-
-
-    # 채널 워커 제거
-    async def force_terminate_worker(self, channel_id: str, timeout: float = 5.0) -> bool:
-        with self._lock:
-            task = self.__class__.tasks_worker.get(channel_id)
-
-        if not task:
-            return True
-
-        if task.done():
-            self.clear_tasks_worker(channel_id)
-            return True
-
-        try:
-            task.cancel()
-            try:
-                await asyncio.wait_for(task, timeout=timeout)
-            except asyncio.TimeoutError:
-                pass
-        except Exception:
-            pass
-        finally:
-            self.clear_tasks_worker(channel_id)
-
-        return True
 
 
 

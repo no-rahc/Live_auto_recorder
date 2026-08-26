@@ -41,6 +41,8 @@ DEFAULT_SETTINGS: dict[str, Any] = {
             "recording.failed": True,
             "recording.validated": True,
             "recording.reconnecting": True,
+            "recording.missed": True,
+            "recording.circuit_breaker": True,
             "postprocess.failed": True,
             "storage.warning": True,
             "storage.cleaned": True,

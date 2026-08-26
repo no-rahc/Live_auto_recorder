@@ -80,11 +80,14 @@ async def watchdogLoop(get_channels, start_recording_for_channel, stop_recording
                 if not cid: 
                     continue
                 rec = bool(rm.get_status_recording(cid) or rm.get_status_reserved(cid))
-                task = rm.get_tasks_worker(cid)
+                proc = rm.get_tasks_process(cid)
                 last = rm.watchdog_get_last_beat(cid)
                 unhealthy = False
 
-                if rec and (not task or task.done()):
+                # Recorder worker ownership lives in ChannelFsm. This legacy
+                # watchdog only needs to validate the externally observable
+                # recorder process/heartbeat, not keep a duplicate task registry.
+                if rm.get_status_recording(cid) and (not proc or proc.returncode is not None):
                     unhealthy = True
                 if rec and last and (now - last) > beat_timeout_sec:
                     unhealthy = True

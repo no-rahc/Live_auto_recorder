@@ -66,7 +66,7 @@
       <button id="ops-history-refresh" type="button" class="ops-action-secondary">조회</button>
     </div>
     <div class="ops-table-wrap"><table><thead><tr><th>시작</th><th>채널</th><th>파일</th><th>녹화</th><th>검증</th><th>보관</th><th>작업</th></tr></thead><tbody id="ops-history-body"></tbody></table></div>
-    <div id="ops-history-meta" class="ops-empty"></div>`);
+    <div id="ops-history-meta" class="ops-empty"></div><div id="ops-history-detail" class="ops-platform-card" hidden></div>`);
 
   panel("notifications", "알림 센터", "이벤트별 알림을 선택하고 실패한 전송을 자동 재시도합니다.", `
     <form id="ops-notification-form" class="ops-platform-form">
@@ -156,7 +156,7 @@
         <td>${statusBadge(item.status)}<br><small>${esc(item.duration || "")}</small></td>
         <td>${statusBadge(item.validation_status)}<br><small>${esc((item.validation_detail || "").slice(0,90))}</small></td>
         <td>${statusBadge(item.archive_status)}<br><small>${esc(item.archive_target || "")}</small></td>
-        <td><div class="ops-inline-buttons"><button type="button" class="ops-action-secondary" data-verify="${item.id}">검증·복구</button><button type="button" class="ops-action-secondary" data-archive="${item.id}">외부 보관</button></div></td>
+        <td><div class="ops-inline-buttons"><button type="button" class="ops-action-secondary" data-detail="${item.id}">상세</button><button type="button" class="ops-action-secondary" data-verify="${item.id}">검증·복구</button><button type="button" class="ops-action-secondary" data-protect="${esc(item.file_path || "")}">보호</button><button type="button" class="ops-action-secondary" data-archive="${item.id}">외부 보관</button></div></td>
       </tr>`).join("") : '<tr><td colspan="7" class="ops-empty">녹화 기록이 없습니다.</td></tr>';
       $("#ops-history-meta").textContent = `총 ${data.total}건 · SQLite 기록은 JSONL 500건 제한과 별도로 유지됩니다.`;
     } catch (error) { body.innerHTML = `<tr><td colspan="7" class="ops-empty">${esc(error.message)}</td></tr>`; }
@@ -166,14 +166,18 @@
   $("#ops-history-body")?.addEventListener("click", async (event) => {
     const verify = event.target.closest("[data-verify]");
     const archive = event.target.closest("[data-archive]");
+    const protect = event.target.closest("[data-protect]");
+    const detail = event.target.closest("[data-detail]");
     try {
       if (verify) { verify.disabled = true; notice("파일을 검사하고 있습니다."); await api(`/api/v3/recordings/${verify.dataset.verify}/verify`, {method:"POST", body:JSON.stringify({repair:true})}); notice("파일 검증을 완료했습니다."); await loadHistory(); }
       if (archive) { archive.disabled = true; await api(`/api/v3/recordings/${archive.dataset.archive}/archive`, {method:"POST", body:"{}"}); notice("외부 보관 대기열에 추가했습니다."); }
+      if (protect) { if (!protect.dataset.protect) throw new Error("보호할 파일 경로가 없습니다."); await api("/api/operations/files/protection", {method:"PUT", body:JSON.stringify({path:protect.dataset.protect, protected:true})}); notice("자동 정리에서 제외하도록 파일을 보호했습니다."); }
+      if (detail) { const item = await api(`/api/v3/recordings/${detail.dataset.detail}`); const box = $("#ops-history-detail"); if (box) { box.hidden = false; box.innerHTML = `<h3>${esc(item.channel_name || item.channel_id || "녹화 상세")}</h3><dl class="ops-detail-list"><div><dt>세션</dt><dd>${esc(item.session_id || "-")}</dd></div><div><dt>종료 이유</dt><dd>${esc(item.stop_reason || "-")}</dd></div><div><dt>재연결</dt><dd>${esc(item.reconnects || 0)}회</dd></div><div><dt>녹화 시간</dt><dd>${esc(item.duration || "-")}</dd></div><div><dt>검증</dt><dd>${esc(item.validation_status || "미검사")} · ${esc(item.validation_detail || "")}</dd></div><div><dt>후처리</dt><dd>${esc(item.postprocess_status || "-")} ${esc(item.postprocess_error || "")}</dd></div><div><dt>파일</dt><dd>${esc(item.file_path || item.filename || "-")}</dd></div></dl>`; } }
     } catch (error) { notice(error.message, "error"); if (verify) verify.disabled = false; if (archive) archive.disabled = false; }
   });
 
   let platformSettings = null;
-  const eventLabels = {"recording.started":"녹화 시작","recording.completed":"녹화 완료","recording.failed":"녹화 실패","recording.validated":"파일 검증","postprocess.failed":"후처리 실패","storage.warning":"저장소 경고","archive.completed":"외부 보관 완료","archive.failed":"외부 보관 실패"};
+  const eventLabels = {"recording.started":"녹화 시작","recording.completed":"녹화 완료","recording.failed":"녹화 실패","recording.validated":"파일 검증","recording.reconnecting":"자동 재연결","recording.missed":"녹화 시작 누락","recording.circuit_breaker":"자동 복구 일시중지","postprocess.failed":"후처리 실패","storage.warning":"저장소 경고","archive.completed":"외부 보관 완료","archive.failed":"외부 보관 실패"};
   async function loadPlatformSettings() {
     try {
       platformSettings = await api("/api/v3/platform/settings");

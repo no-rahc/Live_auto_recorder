@@ -27,6 +27,8 @@ from module.data_manager import (
 from module.loop_watchdog import (
     spawnHeartbeat, cancelTaskSafely
 )
+from module.recording_process import grouped_subprocess_kwargs
+from module.recording_attempt import RecorderAttemptOutcome
 
 
 # RecorderManager 인스턴스 생성
@@ -1470,14 +1472,8 @@ async def runSegLoop(updated_channel: dict, channel_id: str, channel_name: str, 
     )
     logger.debug(f"export RWEB_TM_SHIFT={env.get('RWEB_TM_SHIFT')} (seg path)")
 
-    kwargs_sl, kwargs_ff = {}, {}
-    if os.name == "nt":
-        kwargs_sl["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
-        kwargs_ff["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
-    else:
-        if hasattr(os, "setsid"):
-            kwargs_sl["preexec_fn"] = os.setsid
-            kwargs_ff["preexec_fn"] = os.setsid
+    kwargs_sl = grouped_subprocess_kwargs()
+    kwargs_ff = grouped_subprocess_kwargs()
 
     try:
         streamlink = await asyncio.create_subprocess_exec(
@@ -1849,7 +1845,8 @@ def uniqueSessionDir(base_dir: str, base_noext: str) -> str:
 
 # 치지직용 녹화시작 함수
 async def chzzkStartRecording(channel, cookies, recheckInterval, autoStopInterval, autoPostProcessing, filenamePattern,
-                              plugin_type, timemachine_time_shift, is_user_request=False, splitRecordingMode=False, post_cfg=None):
+                              plugin_type, timemachine_time_shift, is_user_request=False, splitRecordingMode=False,
+                              post_cfg=None, single_attempt: bool = False):
 
 
     recent_live_block = {"live_id": None, "until": 0.0}
@@ -1861,7 +1858,7 @@ async def chzzkStartRecording(channel, cookies, recheckInterval, autoStopInterva
         channel_id = str(channel) if channel is not None else None
     if not channel_id:
         logger.error("chzzkStartRecording: 유효하지 않은 채널 인자")
-        return
+        return RecorderAttemptOutcome.FATAL_ERROR if single_attempt else None
 
 
     # 1) 현재 상태에서 dict 재조회 (메모리 동기화 보장 + 디스크 폴백)
@@ -1875,7 +1872,7 @@ async def chzzkStartRecording(channel, cookies, recheckInterval, autoStopInterva
             channel_obj = None
     if not channel_obj:
         logger.error(f"chzzkStartRecording: '{channel_id}' 채널을 찾을 수 없습니다.")
-        return
+        return RecorderAttemptOutcome.FATAL_ERROR if single_attempt else None
 
     channel = channel_obj
     channel_id = channel["id"]
@@ -1884,7 +1881,7 @@ async def chzzkStartRecording(channel, cookies, recheckInterval, autoStopInterva
     # 하드 가드: 사용자 중지면 어떤 경로로도 시작하지 않음
     if recorder_manager.get_is_user_stopped(channel_id):
         logger.debug(f"{channel_name} 중지 요청 상태(하드 가드). 시작하지 않습니다.")
-        return
+        return RecorderAttemptOutcome.USER_STOPPED if single_attempt else None
 
 
     # 2) 녹화 플래그가 True인데 실제 프로세스가 없으면 상태 치유(힐링)
@@ -1903,12 +1900,12 @@ async def chzzkStartRecording(channel, cookies, recheckInterval, autoStopInterva
     # 4) 중지 요청 상태면 시작 거절
     if recorder_manager.get_is_user_stopped(channel_id):
         logger.debug(f"{channel_name} 채널은 중지 요청 상태. 시작하지 않음.")
-        return
+        return RecorderAttemptOutcome.USER_STOPPED if single_attempt else None
 
     # 5) 이미 '진짜' 녹화 중이면 거절
     if recorder_manager.get_status_recording(channel_id) and procAlive(channel_id):
         logger.debug(f"{channel_name} 채널은 이미 녹화 중입니다.")
-        return
+        return RecorderAttemptOutcome.COMPLETED if single_attempt else None
 
     # 6) 예약 상태 선표시: 토글 ON & stop 아님 → 예약 표기, 그 외는 예약 해제
     if channel.get("record_enabled", True) and not recorder_manager.get_is_user_stopped(channel_id):
@@ -1977,11 +1974,15 @@ async def chzzkStartRecording(channel, cookies, recheckInterval, autoStopInterva
             # 7-2) 자동-재탐색 경로: 사용자 트리거가 아니고 토글 OFF면 감시 루프 종료
             if not is_user_request and not rec_enabled:
                 logger.debug(f"{channel_name} 자동녹화 OFF → 루프 종료(감시 안 함).")
+                if single_attempt:
+                    return RecorderAttemptOutcome.DISABLED
                 break
 
             # 7-3) 중지 버튼 감지 시 종료
             if recorder_manager.get_is_user_stopped(channel_id):
                 logger.debug(f"{channel_name} 중지 요청 감지. 루프 종료.")
+                if single_attempt:
+                    return RecorderAttemptOutcome.USER_STOPPED
                 break
 
             # 7-4) 메타데이터 조회 (OPEN 여부)
@@ -2054,6 +2055,9 @@ async def chzzkStartRecording(channel, cookies, recheckInterval, autoStopInterva
                         sendTelegram(f"<b>{channel_name}</b> 채널은 <i>예약녹화 중</i>으로 전환되었습니다.")
                         last_notified_state[channel_id] = new_state
 
+                    if single_attempt:
+                        return RecorderAttemptOutcome.OFFLINE
+
                     _base = max(10, int(recheckInterval))
                     _jit  = max(1, int(_base * JITTER_RATIO))
                     _seed = int(hashlib.blake2b(str(channel_id).encode(), digest_size=4).hexdigest(), 16)
@@ -2090,6 +2094,8 @@ async def chzzkStartRecording(channel, cookies, recheckInterval, autoStopInterva
                     except Exception:
                         pass
                     logger.debug(f"{channel_name} 토글 OFF이므로 '대기 중' 전환 후 루프 종료.")
+                    if single_attempt:
+                        return RecorderAttemptOutcome.DISABLED
                     break
 
             # 7-5) OPEN 상태 → '같이보기만 녹화' 옵션 + 태그 제외 필터
@@ -2097,6 +2103,10 @@ async def chzzkStartRecording(channel, cookies, recheckInterval, autoStopInterva
                 # 7-5-1) 같이보기 미활성 → 스킵
                 if metadata.get("watchPartyNo") is None:
                     ...
+                    if single_attempt:
+                        recorder_manager.set_status_recording(channel_id, False)
+                        recorder_manager.set_status_reserved(channel_id, bool(rec_enabled))
+                        return RecorderAttemptOutcome.OFFLINE if rec_enabled else RecorderAttemptOutcome.DISABLED
                     await asyncio.sleep(recheckInterval)
                     continue
 
@@ -2112,11 +2122,15 @@ async def chzzkStartRecording(channel, cookies, recheckInterval, autoStopInterva
                         recorder_manager.set_status_recording(channel_id, False)
                         if rec_enabled:
                             recorder_manager.set_status_reserved(channel_id, True)
+                            if single_attempt:
+                                return RecorderAttemptOutcome.OFFLINE
                             await asyncio.sleep(recheckInterval)
                             continue
                         else:
                             recorder_manager.set_status_reserved(channel_id, False)
                             logger.debug(f"{channel_name} 토글 OFF(1회성). '대기 중' 전환 후 루프 종료.")
+                            if single_attempt:
+                                return RecorderAttemptOutcome.DISABLED
                             break
 
             # 7-6) 후처리 플래그 초기화 & 같이보기 알림 플래그 리셋
@@ -2229,6 +2243,8 @@ async def chzzkStartRecording(channel, cookies, recheckInterval, autoStopInterva
                             os.rmdir(session_dir)
 
                 # 분할 경로는 다음 감시 루프로
+                if single_attempt:
+                    return RecorderAttemptOutcome.COMPLETED
                 continue
 
 
@@ -2246,11 +2262,15 @@ async def chzzkStartRecording(channel, cookies, recheckInterval, autoStopInterva
                 # 토글 ON이면 예약 유지하고 재시도, OFF면 종료
                 if rec_enabled:
                     recorder_manager.set_status_reserved(channel_id, True)
+                    if single_attempt:
+                        return RecorderAttemptOutcome.RETRYABLE_ERROR
                     await asyncio.sleep(recheckInterval)
                     continue
                 else:
                     recorder_manager.set_status_reserved(channel_id, False)
                     logger.debug(f"{channel_name} 토글 OFF이므로 명령 실패 후 루프 종료.")
+                    if single_attempt:
+                        return RecorderAttemptOutcome.DISABLED
                     break
 
             try:
@@ -2259,12 +2279,7 @@ async def chzzkStartRecording(channel, cookies, recheckInterval, autoStopInterva
                 logger.debug(f"{channel_name} cmd: " + " ".join(str(x) for x in cmd))
 
             # 7-9) 프로세스 실행
-            kwargs = {}
-            if os.name == "nt":
-                kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
-            else:
-                if hasattr(os, "setsid"):
-                    kwargs["preexec_fn"] = os.setsid
+            kwargs = grouped_subprocess_kwargs()
 
             proc = await asyncio.create_subprocess_exec(
                 *cmd,
@@ -2388,6 +2403,8 @@ async def chzzkStartRecording(channel, cookies, recheckInterval, autoStopInterva
             if recorder_manager.get_is_user_stopped(channel_id):
                 recorder_manager.set_status_reserved(channel_id, False)
                 logger.debug(f"{channel_name} 사용자 중지로 루프 종료.")
+                if single_attempt:
+                    return RecorderAttemptOutcome.USER_STOPPED
                 break
             else:
                 if rec_enabled:
@@ -2396,6 +2413,9 @@ async def chzzkStartRecording(channel, cookies, recheckInterval, autoStopInterva
                     if last_notified_state.get(channel_id) != new_state:
                         sendTelegram(f"<b>{channel_name}</b> 채널은 <i>예약녹화 중</i>으로 전환되었습니다.")
                         last_notified_state[channel_id] = new_state
+
+                    if single_attempt:
+                        return RecorderAttemptOutcome.COMPLETED
 
                     _base = max(10, int(recheckInterval))
                     _jit  = max(1, int(_base * JITTER_RATIO))
@@ -2431,6 +2451,8 @@ async def chzzkStartRecording(channel, cookies, recheckInterval, autoStopInterva
                     # 1회성: 예약 없이 종료
                     recorder_manager.set_status_reserved(channel_id, False)
                     logger.debug(f"{channel_name} 토글 OFF(1회성). 루프 종료.")
+                    if single_attempt:
+                        return RecorderAttemptOutcome.DISABLED
                     break
 
         except asyncio.CancelledError:
@@ -2646,6 +2668,8 @@ async def chzzkStartRecording(channel, cookies, recheckInterval, autoStopInterva
         except Exception:
             pass
         logger.debug(f"{channel_name} 사용자 요청으로 완전히 중지.")
+        if single_attempt:
+            return RecorderAttemptOutcome.USER_STOPPED
 
     else:
         # 자연 종료 케이스: 다음 방송을 대비해 예약 상태로 복귀
@@ -2661,12 +2685,16 @@ async def chzzkStartRecording(channel, cookies, recheckInterval, autoStopInterva
                 latest_ch["status"] = "예약녹화 중"
             except Exception:
                 pass
+            if single_attempt:
+                return RecorderAttemptOutcome.COMPLETED
         else:
             recorder_manager.set_status_reserved(channel_id, False)
             try:
                 latest_ch["status"] = "대기 중"
             except Exception:
                 pass
+            if single_attempt:
+                return RecorderAttemptOutcome.DISABLED
 
 
 # 치지직용 녹화중지 함수

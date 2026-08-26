@@ -17,6 +17,7 @@ class FakeManager:
         self.reserved = {}
         self.processes = {}
         self.filenames = {}
+        self.user_stopped = {}
 
     def get_status_recording(self, channel_id):
         return bool(self.recording.get(channel_id))
@@ -29,6 +30,9 @@ class FakeManager:
 
     def get_recording_filename(self, channel_id):
         return self.filenames.get(channel_id)
+
+    def get_is_user_stopped(self, channel_id):
+        return bool(self.user_stopped.get(channel_id))
 
 
 class FakeRecorderClass:
@@ -188,6 +192,55 @@ class OperationsHealthWatchdogTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(args[3]["stall_checks"], 2)
         self.assertEqual(self.runtime.health["a"]["last_restart"]["reason"], "stalled")
 
+    async def test_pending_restart_is_not_scheduled_twice_or_counted_twice(self):
+        self.lar.recorder_manager.processes["a"] = SimpleNamespace(returncode=7)
+        self.runtime.settings["health"]["process_exit_grace_seconds"] = 0
+        self.runtime.settings["health"]["restart_cooldown_seconds"] = 0
+        self.runtime.samples["a"] = {
+            "size": 1024,
+            "mtime": 900.0,
+            "sample_time": 990.0,
+            "last_growth": 900.0,
+            "proc_exit_seen_at": 970.0,
+            "stall_checks": 0,
+        }
+        release_restart = asyncio.Event()
+
+        async def blocked_restart(*args, **kwargs):
+            await release_restart.wait()
+
+        with patch("module.operations_health.time.time", return_value=1000.0), patch.object(
+            self.runtime, "_restart_channel", side_effect=blocked_restart
+        ) as restart:
+            await self.runtime._sample_channel(self.channel)
+            await asyncio.sleep(0)
+            self.assertEqual(restart.await_count, 1)
+            self.assertEqual(self.runtime.health["a"]["restart_attempts"], 1)
+
+            await self.runtime._sample_channel(self.channel)
+            await asyncio.sleep(0)
+
+            self.assertEqual(restart.await_count, 1)
+            self.assertEqual(self.runtime.health["a"]["restart_attempts"], 1)
+            release_restart.set()
+            await asyncio.sleep(0)
+
+    async def test_runtime_stop_cancels_pending_health_restart(self):
+        started = asyncio.Event()
+
+        async def pending_restart():
+            started.set()
+            await asyncio.sleep(60)
+
+        task = asyncio.create_task(pending_restart())
+        self.runtime._restart_tasks["a"] = task
+        await started.wait()
+
+        await self.runtime.stop()
+
+        self.assertTrue(task.cancelled())
+        self.assertEqual(self.runtime._restart_tasks, {})
+
     async def test_restart_revalidation_cancels_when_file_growth_resumes(self):
         proc = SimpleNamespace(returncode=None)
         self.lar.recorder_manager.processes["a"] = proc
@@ -202,6 +255,49 @@ class OperationsHealthWatchdogTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertFalse(needed)
         self.assertEqual(reason, "file size resumed")
+
+    async def test_watching_too_long_can_trigger_missed_recording_recovery(self):
+        self.lar.recorder_manager.recording["a"] = False
+        self.lar.recorder_manager.reserved["a"] = True
+        self.fsm.states["a"] = "WATCHING"
+        self.runtime.settings["health"]["missed_recording_seconds"] = 60
+        self.runtime.samples["a"] = {
+            "size": 0,
+            "mtime": 0.0,
+            "sample_time": 990.0,
+            "last_growth": 990.0,
+            "proc_exit_seen_at": 0,
+            "stall_checks": 0,
+            "watching_since": 900.0,
+        }
+        with patch("module.operations_health.time.time", return_value=1000.0), patch.object(
+            self.runtime, "_restart_channel", new=AsyncMock()
+        ) as restart, patch.object(self.runtime, "_notify", new=AsyncMock()) as notify:
+            await self.runtime._sample_channel(self.channel)
+            await asyncio.sleep(0)
+
+        restart.assert_awaited_once()
+        self.assertEqual(restart.await_args.args[:3], ("a", 1, "missed"))
+        notify.assert_awaited_once()
+        self.assertEqual(notify.await_args.args[0], "recording.missed")
+
+    async def test_restart_revalidation_respects_user_stop(self):
+        self.lar.recorder_manager.user_stopped["a"] = True
+        self.lar.recorder_manager.processes["a"] = SimpleNamespace(returncode=7)
+
+        needed, reason = self.runtime._restart_still_needed("a", "failed", {"file_size": 1024})
+
+        self.assertFalse(needed)
+        self.assertEqual(reason, "user stop requested")
+
+    async def test_restart_revalidation_respects_recording_disabled(self):
+        self.channel["record_enabled"] = False
+        self.lar.recorder_manager.processes["a"] = SimpleNamespace(returncode=7)
+
+        needed, reason = self.runtime._restart_still_needed("a", "failed", {"file_size": 1024})
+
+        self.assertFalse(needed)
+        self.assertEqual(reason, "recording disabled")
 
 
 if __name__ == "__main__":

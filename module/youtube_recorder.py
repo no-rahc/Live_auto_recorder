@@ -35,6 +35,8 @@ from module.data_manager import (
 from module.loop_watchdog import (
     spawnHeartbeat, cancelTaskSafely
 )
+from module.recording_process import grouped_subprocess_kwargs
+from module.recording_attempt import RecorderAttemptOutcome
 
 # RecorderManager 클래스 인스턴스 생성
 recorder_manager = RecorderManager()
@@ -861,7 +863,8 @@ async def moveAfterProcessingTask(*, mp_enabled: bool, mp_dir: str, prefix_path:
 
 # 유튜브용 녹화 시작 함수
 async def ytStartRecording(channel, recheckInterval: int, filenamePattern: str, moveAfterProcessingEnabled: bool,
-                           moveAfterProcessing: str, ycookie_path: str | None, is_user_request: bool = False):
+                           moveAfterProcessing: str, ycookie_path: str | None, is_user_request: bool = False,
+                           single_attempt: bool = False):
 
     logger.debug("youtube_recorder loaded from:", __file__, "cleanupTmp id:", id(globals().get("cleanupTmp", None)), flush=True)
 
@@ -897,7 +900,7 @@ async def ytStartRecording(channel, recheckInterval: int, filenamePattern: str, 
     state_channels = RecorderManager.getChannels() or []
     channel = next((c for c in state_channels if c["id"] == channel["id"]), None)
     if not channel or channel.get("platform") != "youtube":
-        return
+        return RecorderAttemptOutcome.FATAL_ERROR if single_attempt else None
 
     channel_id = channel["id"]
     channel_name = channel["name"]
@@ -906,11 +909,11 @@ async def ytStartRecording(channel, recheckInterval: int, filenamePattern: str, 
     if is_user_request:
         recorder_manager.set_is_user_stopped(channel_id, False)
     elif recorder_manager.get_is_user_stopped(channel_id):
-        return
+        return RecorderAttemptOutcome.USER_STOPPED if single_attempt else None
 
     # 3) 이미 녹화 중이면 거절
     if recorder_manager.get_status_recording(channel_id) and recorder_manager.get_tasks_process(channel_id):
-        return
+        return RecorderAttemptOutcome.COMPLETED if single_attempt else None
 
     try:
         while True:
@@ -919,7 +922,7 @@ async def ytStartRecording(channel, recheckInterval: int, filenamePattern: str, 
             # 4) 사용자 중지 즉시 탈출
             if recorder_manager.get_is_user_stopped(channel_id):
                 recorder_manager.set_status_recording(channel_id, False)
-                return
+                return RecorderAttemptOutcome.USER_STOPPED if single_attempt else None
 
             # 5) 토글 최신화
             current_channels = RecorderManager.getChannels() or []
@@ -949,6 +952,9 @@ async def ytStartRecording(channel, recheckInterval: int, filenamePattern: str, 
                     except Exception as _e:
                         logger.warning(f"yt reserved telegram failed(1): {_e}")
 
+                    if single_attempt:
+                        return RecorderAttemptOutcome.OFFLINE
+
                     # 결정적 지터 대기 블록
                     _base = max(10, int(recheckInterval))
                     _jit  = max(1, int(_base * JITTER_RATIO))
@@ -975,6 +981,8 @@ async def ytStartRecording(channel, recheckInterval: int, filenamePattern: str, 
                     recorder_manager.set_status_reserved(channel_id, False)
                     recorder_manager.recording_remove_start_time(channel_id)
                     logger.debug(f"{channel_name} 토글 OFF(1회성). 라이브 미오픈이므로 종료.")
+                    if single_attempt:
+                        return RecorderAttemptOutcome.DISABLED
                     break
 
             # 8) 화질/확장자 계산
@@ -1018,11 +1026,15 @@ async def ytStartRecording(channel, recheckInterval: int, filenamePattern: str, 
 
                 if rec_enabled:
                     recorder_manager.set_status_reserved(channel_id, True)
+                    if single_attempt:
+                        return RecorderAttemptOutcome.RETRYABLE_ERROR
                     await asyncio.sleep(recheckInterval)
                     continue
                 else:
                     recorder_manager.set_status_reserved(channel_id, False)
                     logger.debug(f"{channel_name} 토글 OFF(1회성). 명령 생성 실패 후 종료.")
+                    if single_attempt:
+                        return RecorderAttemptOutcome.DISABLED
                     break
 
 
@@ -1033,12 +1045,7 @@ async def ytStartRecording(channel, recheckInterval: int, filenamePattern: str, 
             env = os.environ.copy()
             env["PATH"] = os.pathsep.join([ffmpeg_dir, env.get("PATH", "")])
 
-            kwargs = {}
-            if os.name == "nt":
-                kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
-            else:
-                import os as _posix_os
-                kwargs["preexec_fn"] = _posix_os.setsid
+            kwargs = grouped_subprocess_kwargs()
 
             proc = await asyncio.create_subprocess_exec(
                 *record_cmd,
@@ -1356,6 +1363,8 @@ async def ytStartRecording(channel, recheckInterval: int, filenamePattern: str, 
             if recorder_manager.get_is_user_stopped(channel_id):
                 recorder_manager.set_status_reserved(channel_id, False)
                 logger.debug(f"{channel_name} 사용자 중지로 루프 종료.")
+                if single_attempt:
+                    return RecorderAttemptOutcome.USER_STOPPED
                 break
 
             if latest_rec_enabled:
@@ -1369,6 +1378,9 @@ async def ytStartRecording(channel, recheckInterval: int, filenamePattern: str, 
                         last_notified_state[channel_id] = new_state
                 except Exception as _e:
                     logger.warning(f"yt reserved telegram failed(2): {_e}")
+
+                if single_attempt:
+                    return RecorderAttemptOutcome.COMPLETED
 
                 _base = max(10, int(recheckInterval))
                 _jit  = max(1, int(_base * JITTER_RATIO))
@@ -1393,10 +1405,14 @@ async def ytStartRecording(channel, recheckInterval: int, filenamePattern: str, 
             else:
                 recorder_manager.set_status_reserved(channel_id, False)
                 logger.debug(f"{channel_name} 토글 OFF(1회성). 종료.")
+                if single_attempt:
+                    return RecorderAttemptOutcome.DISABLED
                 break
 
     except Exception as e:
         logger.error(f"{channel_name} 녹화 중 예외: {e}")
+        if single_attempt:
+            return RecorderAttemptOutcome.RETRYABLE_ERROR
 
     finally:
 
@@ -1437,6 +1453,15 @@ async def ytStartRecording(channel, recheckInterval: int, filenamePattern: str, 
 
         except Exception:
             pass
+
+    if single_attempt:
+        if recorder_manager.get_is_user_stopped(channel_id):
+            return RecorderAttemptOutcome.USER_STOPPED
+        latest = RecorderManager.getChannels() or []
+        latest_ch = next((c for c in latest if c.get("id") == channel_id), None) or channel
+        if not bool(latest_ch.get("record_enabled", True)):
+            return RecorderAttemptOutcome.DISABLED
+        return RecorderAttemptOutcome.COMPLETED
 
         if is_user_request:
             recorder_manager.set_is_user_stopped(channel_id, False)
