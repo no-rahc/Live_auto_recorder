@@ -178,6 +178,14 @@ class BackupStatsMixin:
         backup = candidate["backup"]
         backup["keep"] = max(1, min(int(backup["keep"]), 100))
         backup["interval_hours"] = max(1, min(int(backup["interval_hours"]), 720))
+        database = candidate["database"]
+        database["keep"] = max(1, min(int(database["keep"]), 100))
+        database["interval_hours"] = max(1, min(int(database["interval_hours"]), 720))
+        maintenance = candidate["maintenance"]
+        maintenance["cookie_check_hours"] = max(1, min(int(maintenance["cookie_check_hours"]), 168))
+        maintenance["update_check_hours"] = max(1, min(int(maintenance["update_check_hours"]), 168))
+        groups = candidate["recording_groups"]
+        groups["quiet_seconds"] = max(30, min(int(groups["quiet_seconds"]), 7200))
         self.settings = candidate
         self.save_settings()
         self.audit("settings_updated")

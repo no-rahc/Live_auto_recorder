@@ -6,12 +6,13 @@ import os
 import sqlite3
 import threading
 import time
+import uuid
 from pathlib import Path
 from typing import Any
 
 _DATA_DIR = Path(os.getenv("LAR_DATA_DIR", Path(__file__).resolve().parents[1] / "json"))
 DB_PATH = _DATA_DIR / "recordings.sqlite3"
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 _LOCK = threading.RLock()
 
 
@@ -149,6 +150,38 @@ def _migrate_v3(conn: sqlite3.Connection) -> None:
     )
 
 
+def _migrate_v4(conn: sqlite3.Connection) -> None:
+    columns = _columns(conn, "recordings")
+    additions = {
+        "broadcast_id": "TEXT NOT NULL DEFAULT ''",
+        "segment_index": "INTEGER NOT NULL DEFAULT 1",
+        "failure_code": "TEXT NOT NULL DEFAULT ''",
+        "failure_detail": "TEXT NOT NULL DEFAULT ''",
+        "failure_remedy": "TEXT NOT NULL DEFAULT ''",
+    }
+    for name, declaration in additions.items():
+        if name not in columns:
+            conn.execute(f"ALTER TABLE recordings ADD COLUMN {name} {declaration}")
+    conn.executescript(
+        """
+        CREATE INDEX IF NOT EXISTS idx_recordings_broadcast ON recordings(broadcast_id, segment_index);
+        CREATE TABLE IF NOT EXISTS broadcast_merges (
+          broadcast_id TEXT PRIMARY KEY,
+          status TEXT NOT NULL DEFAULT '',
+          output_path TEXT NOT NULL DEFAULT '',
+          error TEXT NOT NULL DEFAULT '',
+          updated_epoch REAL NOT NULL DEFAULT 0
+        );
+        """
+    )
+    rows = conn.execute("SELECT id FROM recordings WHERE broadcast_id='' OR broadcast_id IS NULL").fetchall()
+    for row in rows:
+        conn.execute(
+            "UPDATE recordings SET broadcast_id=?,segment_index=1 WHERE id=?",
+            (f"legacy-{row['id']}", row["id"]),
+        )
+
+
 def init_catalog() -> None:
     existed_before = DB_PATH.exists() and DB_PATH.stat().st_size > 0
     with _LOCK, _connect() as conn:
@@ -166,6 +199,10 @@ def init_catalog() -> None:
         if current < 3:
             _migrate_v3(conn)
             conn.execute("PRAGMA user_version=3")
+            current = 3
+        if current < 4:
+            _migrate_v4(conn)
+            conn.execute("PRAGMA user_version=4")
         conn.commit()
 
 
@@ -174,6 +211,40 @@ def _session_key(entry: dict[str, Any]) -> str:
     filename = str(entry.get("filename") or "")
     epoch = int(float(entry.get("epoch") or time.time()))
     return f"{channel}:{filename or epoch}"
+
+
+def _broadcast_assignment(conn: sqlite3.Connection, entry: dict[str, Any], extra: dict[str, Any], epoch: float) -> tuple[str, int]:
+    explicit = str(extra.get("broadcast_id") or "").strip()
+    if explicit:
+        row = conn.execute("SELECT COUNT(*) AS n FROM recordings WHERE broadcast_id=?", (explicit,)).fetchone()
+        return explicit, int(row["n"] or 0) + 1
+    channel_id = str(entry.get("channel_id") or "")
+    title = str(extra.get("title") or extra.get("live_title") or "").strip()
+    source_url = str(extra.get("source_url") or extra.get("url") or "").strip()
+    gap = max(30, min(int(os.getenv("LAR_BROADCAST_GROUP_GAP_SECONDS", "900")), 7200))
+    previous = conn.execute(
+        "SELECT * FROM recordings WHERE channel_id=? AND ended_epoch>0 AND ?-ended_epoch BETWEEN 0 AND ? ORDER BY ended_epoch DESC LIMIT 1",
+        (channel_id, epoch, gap),
+    ).fetchone()
+    if previous:
+        previous_title = str(previous["title"] or "").strip()
+        previous_url = str(previous["source_url"] or "").strip()
+        # A channel URL is often stable across different live broadcasts. If both
+        # sides have titles, require the title to match so two back-to-back shows
+        # are never grouped just because they share the same channel URL.
+        if title and previous_title:
+            same_identity = title == previous_title
+        elif source_url and previous_url:
+            same_identity = source_url == previous_url
+        else:
+            same_identity = not title and not source_url
+        if same_identity:
+            broadcast_id = str(previous["broadcast_id"] or f"broadcast-{previous['id']}")
+            if not previous["broadcast_id"]:
+                conn.execute("UPDATE recordings SET broadcast_id=? WHERE id=?", (broadcast_id, previous["id"]))
+            row = conn.execute("SELECT COUNT(*) AS n FROM recordings WHERE broadcast_id=?", (broadcast_id,)).fetchone()
+            return broadcast_id, int(row["n"] or 0) + 1
+    return f"broadcast-{uuid.uuid4().hex}", 1
 
 
 def record_event(entry: dict[str, Any]) -> None:
@@ -199,16 +270,17 @@ def record_event(entry: dict[str, Any]) -> None:
         epoch = float(entry.get("epoch") or time.time())
         if event == "recording_started":
             key = _session_key(entry)
+            broadcast_id, segment_index = _broadcast_assignment(conn, entry, extra, epoch)
             conn.execute(
-                """INSERT INTO recordings(session_key,channel_id,channel_name,platform,title,category,source_url,filename,file_path,started_at,started_epoch,status,reconnects,updated_epoch)
-                   VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-                   ON CONFLICT(session_key) DO UPDATE SET channel_name=excluded.channel_name, title=excluded.title, category=excluded.category, source_url=excluded.source_url, filename=excluded.filename, file_path=excluded.file_path, status='recording', stop_reason='', updated_epoch=excluded.updated_epoch""",
+                """INSERT INTO recordings(session_key,channel_id,channel_name,platform,title,category,source_url,filename,file_path,started_at,started_epoch,status,reconnects,broadcast_id,segment_index,updated_epoch)
+                   VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                   ON CONFLICT(session_key) DO UPDATE SET channel_name=excluded.channel_name, title=excluded.title, category=excluded.category, source_url=excluded.source_url, filename=excluded.filename, file_path=excluded.file_path, status='recording', stop_reason='', failure_code='', failure_detail='', failure_remedy='', updated_epoch=excluded.updated_epoch""",
                 (
                     key, channel_id, str(entry.get("channel_name") or ""), str(entry.get("platform") or ""),
                     str(extra.get("title") or extra.get("live_title") or ""), str(extra.get("category") or ""),
                     str(extra.get("source_url") or extra.get("url") or ""), filename,
                     str(extra.get("file_path") or filename), str(entry.get("ts") or ""), epoch,
-                    "recording", int(extra.get("restart_attempts") or 0), epoch,
+                    "recording", int(extra.get("restart_attempts") or 0), broadcast_id, segment_index, epoch,
                 ),
             )
         elif event in {"recording_stopped", "recording_failed"}:
@@ -219,10 +291,32 @@ def record_event(entry: dict[str, Any]) -> None:
             status = "completed" if event == "recording_stopped" else "failed"
             stop_reason = str(extra.get("stop_reason") or "")
             if row:
+                failure_code = failure_detail = failure_remedy = ""
+                if event == "recording_failed":
+                    try:
+                        from module.failure_diagnostics import classify_failure
+                        stderr = str(extra.get("process_stderr_tail") or "")
+                        if not stderr:
+                            try:
+                                from module.recording_trace import trace_fields
+                                stderr = str(trace_fields(channel_id, include_tail=True).get("process_stderr_tail") or "")
+                            except Exception:
+                                stderr = ""
+                        diagnostic = classify_failure(
+                            str(entry.get("error") or ""),
+                            stderr,
+                            platform=str(entry.get("platform") or ""),
+                            exit_code=extra.get("process_exit_code"),
+                        )
+                        failure_code = diagnostic.get("code", "")
+                        failure_detail = diagnostic.get("summary", "")
+                        failure_remedy = diagnostic.get("remedy", "")
+                    except Exception:
+                        pass
                 conn.execute(
-                    "UPDATE recordings SET ended_at=?,ended_epoch=?,duration=?,status=?,error=?,filename=CASE WHEN ?<>'' THEN ? ELSE filename END,stop_reason=CASE WHEN ?<>'' THEN ? ELSE stop_reason END,updated_epoch=? WHERE id=?",
+                    "UPDATE recordings SET ended_at=?,ended_epoch=?,duration=?,status=?,error=?,failure_code=?,failure_detail=?,failure_remedy=?,filename=CASE WHEN ?<>'' THEN ? ELSE filename END,stop_reason=CASE WHEN ?<>'' THEN ? ELSE stop_reason END,updated_epoch=? WHERE id=?",
                     (str(entry.get("ts") or ""), epoch, str(entry.get("duration") or ""), status,
-                     str(entry.get("error") or "")[:1000], filename, filename,
+                     str(entry.get("error") or "")[:1000], failure_code, failure_detail, failure_remedy, filename, filename,
                      stop_reason, stop_reason, epoch, row["id"]),
                 )
         elif event in {"postprocess_done", "postprocess_failed"}:
@@ -316,6 +410,121 @@ def list_recordings(*, limit: int = 100, offset: int = 0, channel_id: str = "", 
             [*args, limit, offset],
         ).fetchall()
     return {"total": total, "items": [dict(row) for row in rows], "limit": limit, "offset": offset}
+
+
+def list_broadcasts(*, limit: int = 100, offset: int = 0, channel_id: str = "", query: str = "") -> dict[str, Any]:
+    """Return recording rows grouped into one logical live broadcast."""
+    init_catalog()
+    limit = max(1, min(int(limit), 500))
+    offset = max(0, int(offset))
+    where: list[str] = []
+    args: list[Any] = []
+    if channel_id:
+        where.append("r.channel_id=?")
+        args.append(channel_id)
+    if query:
+        where.append("(r.channel_name LIKE ? OR r.title LIKE ? OR r.filename LIKE ? OR r.error LIKE ?)")
+        needle = f"%{query}%"
+        args.extend([needle] * 4)
+    clause = (" WHERE " + " AND ".join(where)) if where else ""
+    base = " FROM recordings r" + clause
+    with _LOCK, _connect() as conn:
+        total = conn.execute("SELECT COUNT(DISTINCT r.broadcast_id)" + base, args).fetchone()[0]
+        rows = conn.execute(
+            """SELECT r.broadcast_id,
+                      MAX(r.channel_id) AS channel_id, MAX(r.channel_name) AS channel_name,
+                      MAX(r.platform) AS platform,
+                      COALESCE(NULLIF(MAX(r.title),''), '') AS title,
+                      MIN(r.started_at) AS started_at, MIN(r.started_epoch) AS started_epoch,
+                      MAX(r.ended_at) AS ended_at, MAX(r.ended_epoch) AS ended_epoch,
+                      COUNT(*) AS segment_count, SUM(r.file_size) AS file_size,
+                      SUM(r.reconnects) AS reconnects,
+                      SUM(CASE WHEN r.status='recording' THEN 1 ELSE 0 END) AS active_segments,
+                      SUM(CASE WHEN r.status='failed' THEN 1 ELSE 0 END) AS failed_segments,
+                      MAX(r.failure_code) AS failure_code, MAX(r.failure_detail) AS failure_detail,
+                      MAX(r.failure_remedy) AS failure_remedy,
+                      COALESCE(m.status,'') AS merge_status,
+                      COALESCE(m.output_path,'') AS merged_path,
+                      COALESCE(m.error,'') AS merge_error
+                 FROM recordings r
+            LEFT JOIN broadcast_merges m ON m.broadcast_id=r.broadcast_id"""
+            + clause
+            + " GROUP BY r.broadcast_id ORDER BY MIN(r.started_epoch) DESC LIMIT ? OFFSET ?",
+            [*args, limit, offset],
+        ).fetchall()
+    items: list[dict[str, Any]] = []
+    for row in rows:
+        item = dict(row)
+        segments = int(item.get("segment_count") or 0)
+        active = int(item.pop("active_segments", 0) or 0)
+        failed = int(item.pop("failed_segments", 0) or 0)
+        item["status"] = "recording" if active else ("failed" if failed == segments and segments else "completed")
+        items.append(item)
+    return {"total": int(total or 0), "items": items, "limit": limit, "offset": offset}
+
+
+def get_broadcast(broadcast_id: str) -> dict[str, Any] | None:
+    init_catalog()
+    bid = str(broadcast_id or "")
+    with _LOCK, _connect() as conn:
+        rows = conn.execute(
+            "SELECT * FROM recordings WHERE broadcast_id=? ORDER BY segment_index,started_epoch,id",
+            (bid,),
+        ).fetchall()
+        if not rows:
+            return None
+        merge = conn.execute("SELECT * FROM broadcast_merges WHERE broadcast_id=?", (bid,)).fetchone()
+    segments = [dict(row) for row in rows]
+    first = segments[0]
+    return {
+        "broadcast_id": bid,
+        "channel_id": first.get("channel_id", ""),
+        "channel_name": first.get("channel_name", ""),
+        "platform": first.get("platform", ""),
+        "title": first.get("title", ""),
+        "started_at": first.get("started_at", ""),
+        "started_epoch": min(float(item.get("started_epoch") or 0) for item in segments),
+        "ended_at": segments[-1].get("ended_at", ""),
+        "ended_epoch": max(float(item.get("ended_epoch") or 0) for item in segments),
+        "segment_count": len(segments),
+        "file_size": sum(int(item.get("file_size") or 0) for item in segments),
+        "reconnects": sum(int(item.get("reconnects") or 0) for item in segments),
+        "status": "recording" if any(item.get("status") == "recording" for item in segments) else ("failed" if all(item.get("status") == "failed" for item in segments) else "completed"),
+        "merge": dict(merge) if merge else {"broadcast_id": bid, "status": "", "output_path": "", "error": ""},
+        "segments": segments,
+    }
+
+
+def set_broadcast_merge(broadcast_id: str, *, status: str, output_path: str = "", error: str = "") -> None:
+    init_catalog()
+    now = time.time()
+    with _LOCK, _connect() as conn:
+        conn.execute(
+            """INSERT INTO broadcast_merges(broadcast_id,status,output_path,error,updated_epoch)
+               VALUES(?,?,?,?,?)
+               ON CONFLICT(broadcast_id) DO UPDATE SET status=excluded.status,output_path=excluded.output_path,error=excluded.error,updated_epoch=excluded.updated_epoch""",
+            (str(broadcast_id), str(status)[:40], str(output_path), str(error)[:1000], now),
+        )
+
+
+def list_merge_candidates(*, quiet_seconds: int = 900, limit: int = 10) -> list[str]:
+    """Return completed multi-segment broadcasts old enough to be safe to merge."""
+    init_catalog()
+    cutoff = time.time() - max(30, int(quiet_seconds))
+    with _LOCK, _connect() as conn:
+        rows = conn.execute(
+            """SELECT r.broadcast_id
+                 FROM recordings r
+            LEFT JOIN broadcast_merges m ON m.broadcast_id=r.broadcast_id
+             GROUP BY r.broadcast_id
+               HAVING COUNT(*)>1
+                  AND SUM(CASE WHEN r.status='recording' THEN 1 ELSE 0 END)=0
+                  AND MAX(r.ended_epoch)>0 AND MAX(r.ended_epoch)<=?
+                  AND COALESCE(MAX(m.status),'') NOT IN ('merging','completed')
+             ORDER BY MAX(r.ended_epoch) ASC LIMIT ?""",
+            (cutoff, max(1, min(int(limit), 50))),
+        ).fetchall()
+    return [str(row["broadcast_id"]) for row in rows]
 
 
 def get_recording(recording_id: int) -> dict[str, Any] | None:

@@ -20,7 +20,9 @@ from module.recording_catalog import (
     _LOCK as DB_LOCK,
     _connect,
     get_recording,
+    get_broadcast,
     init_catalog,
+    list_broadcasts,
     list_recordings,
     migrate_jsonl,
     update_recording,
@@ -48,6 +50,11 @@ DEFAULT_SETTINGS: dict[str, Any] = {
             "storage.cleaned": True,
             "archive.completed": True,
             "archive.failed": True,
+            "auth.cookie_warning": True,
+            "database.integrity_failed": True,
+            "system.update_available": True,
+            "recording.merged": True,
+            "recording.merge_failed": True,
         },
     },
     "archive": {
@@ -543,6 +550,32 @@ def install_platform_features(app: Any, lar: Any, operations: Any) -> PlatformRu
         if not item:
             raise HTTPException(status_code=404, detail="녹화 기록을 찾을 수 없습니다.")
         return item
+
+    @router.get("/api/v3/broadcasts")
+    async def broadcasts(limit: int = Query(100, ge=1, le=500), offset: int = Query(0, ge=0), channel_id: str = "", q: str = ""):
+        return list_broadcasts(limit=limit, offset=offset, channel_id=channel_id, query=q)
+
+    @router.get("/api/v3/broadcasts/{broadcast_id}")
+    async def broadcast(broadcast_id: str):
+        item = get_broadcast(broadcast_id)
+        if not item:
+            raise HTTPException(status_code=404, detail="방송 묶음을 찾을 수 없습니다.")
+        return item
+
+    @router.post("/api/v3/broadcasts/{broadcast_id}/merge")
+    async def merge_segments(broadcast_id: str, payload: dict[str, Any] = Body(default={})):
+        from module.recording_merge import merge_broadcast
+        try:
+            result = await asyncio.to_thread(
+                merge_broadcast,
+                broadcast_id,
+                delete_segments=bool(payload.get("delete_segments", False)),
+            )
+        except Exception as exc:
+            runtime.enqueue_notification("recording.merge_failed", {"broadcast_id": broadcast_id, "detail": str(exc)[:500]})
+            raise HTTPException(status_code=409, detail=str(exc)[:500]) from exc
+        runtime.enqueue_notification("recording.merged", result)
+        return result
 
     @router.post("/api/v3/recordings/{recording_id}/verify")
     async def verify(recording_id: int, payload: dict[str, Any] = Body(default={})):

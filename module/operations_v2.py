@@ -1,6 +1,7 @@
 """Install the operational safety extension and its local API routes."""
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 from fastapi import APIRouter, Body, HTTPException, Request
@@ -12,9 +13,10 @@ from module.operations_catalog_stats import CatalogStatsMixin
 from module.operations_common import OperationsBase, _iso
 from module.operations_features import FeatureOpsMixin
 from module.operations_health import HealthJobsMixin
+from module.operations_maintenance import MaintenanceOpsMixin
 
 
-class OperationsRuntime(FeatureOpsMixin, CatalogStatsMixin, HealthJobsMixin, BackupStatsMixin, OperationsBase):
+class OperationsRuntime(MaintenanceOpsMixin, FeatureOpsMixin, CatalogStatsMixin, HealthJobsMixin, BackupStatsMixin, OperationsBase):
     pass
 
 
@@ -56,6 +58,30 @@ def install_operations(app: Any, lar: Any) -> OperationsRuntime:
     @router.get("/api/operations/storage/runway")
     async def storage_runway():
         return runtime.storage_runway()
+
+    @router.get("/api/operations/diagnostics")
+    async def diagnostics():
+        return await asyncio.to_thread(runtime.system_diagnostics)
+
+    @router.get("/api/operations/database")
+    async def database_health():
+        return await asyncio.to_thread(runtime.database_health)
+
+    @router.get("/api/operations/database/backups")
+    async def database_backups():
+        return {"backups": runtime.list_database_backups()}
+
+    @router.post("/api/operations/database/backups")
+    async def create_database_backup():
+        return await asyncio.to_thread(runtime.create_database_backup, "manual")
+
+    @router.get("/api/operations/version")
+    async def version_status(force: bool = False):
+        return await asyncio.to_thread(runtime.version_status, force)
+
+    @router.get("/api/operations/cookies/health")
+    async def cookie_health():
+        return await asyncio.to_thread(runtime.cookie_health)
 
     @router.get("/api/operations/metrics/channels")
     async def channel_metrics(days: int = 30):

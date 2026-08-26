@@ -56,6 +56,20 @@ DEFAULT_SETTINGS: dict[str, Any] = {
         "keep": 7,
         "include_secrets": False,
     },
+    "database": {
+        "scheduled": True,
+        "interval_hours": 24,
+        "keep": 7,
+    },
+    "maintenance": {
+        "cookie_check_hours": 6,
+        "update_check_hours": 24,
+    },
+    "recording_groups": {
+        "auto_merge": False,
+        "quiet_seconds": 900,
+        "delete_segments_after_merge": False,
+    },
     "rules": {},
 }
 
@@ -194,6 +208,8 @@ class OperationsBase:
         self._started = True
         self.recording_root.mkdir(parents=True, exist_ok=True)
         self.backup_dir.mkdir(parents=True, exist_ok=True)
+        if hasattr(self, "_maintenance_init"):
+            self._maintenance_init()
         self.install_hooks()
         self._install_start_guard()
         if self.storage_info().get("recording_blocked"):
@@ -210,6 +226,8 @@ class OperationsBase:
             asyncio.create_task(self._monitor_loop(), name="operations-health"),
             asyncio.create_task(self._backup_loop(), name="operations-backup"),
         ]
+        if hasattr(self, "_maintenance_loop"):
+            self.background_tasks.append(asyncio.create_task(self._maintenance_loop(), name="operations-maintenance"))
         self.audit("runtime_started", f"recording_root={self.recording_root}")
 
     async def stop(self) -> None:

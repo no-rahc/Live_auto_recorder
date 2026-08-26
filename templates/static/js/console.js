@@ -4035,6 +4035,7 @@
 
   const tabDefs = [
     ["history", "녹화 기록"],
+    ["system", "시스템 점검"],
     ["notifications", "알림 센터"],
     ["archive", "외부 보관"],
     ["automation", "API·웹훅"]
@@ -4069,11 +4070,19 @@
   panel("history", "녹화 기록", "SQLite에 누적된 녹화 이력, 파일 검증, 복구와 외부 보관 상태를 확인합니다.", `
     <div class="ops-platform-toolbar">
       <label>검색<input id="ops-history-query" placeholder="채널·제목·파일·오류"></label>
+      <label>보기<select id="ops-history-view"><option value="broadcasts">방송 단위</option><option value="segments">세그먼트 단위</option></select></label>
       <label>상태<select id="ops-history-status"><option value="">전체</option><option value="recording">녹화 중</option><option value="completed">완료</option><option value="failed">실패</option></select></label>
       <button id="ops-history-refresh" type="button" class="ops-action-secondary">조회</button>
     </div>
     <div class="ops-table-wrap"><table><thead><tr><th>시작</th><th>채널</th><th>파일</th><th>녹화</th><th>검증</th><th>보관</th><th>작업</th></tr></thead><tbody id="ops-history-body"></tbody></table></div>
     <div id="ops-history-meta" class="ops-empty"></div><div id="ops-history-detail" class="ops-platform-card" hidden></div>`);
+
+  panel("system", "시스템 점검", "녹화에 필요한 도구, 저장소, SQLite, 쿠키, 알림, 네트워크와 업데이트 상태를 한 번에 확인합니다.", `
+    <div class="ops-platform-actions"><button id="ops-diagnostics-run" type="button" class="ops-action-primary">전체 점검 실행</button><button id="ops-version-check" type="button" class="ops-action-secondary">새 버전 확인</button><button id="ops-db-backup" type="button" class="ops-action-secondary">DB 지금 백업</button></div>
+    <div id="ops-system-summary" class="ops-platform-card" style="margin-top:14px"></div>
+    <div id="ops-diagnostics-list" class="ops-platform-grid" style="margin-top:14px"></div>
+    <div class="ops-platform-grid" style="margin-top:14px"><div id="ops-version-card" class="ops-platform-card"></div><div id="ops-cookie-card" class="ops-platform-card"></div><div id="ops-db-card" class="ops-platform-card"></div></div>
+    <form id="ops-group-settings" class="ops-platform-form" style="margin-top:14px"><h3 class="is-wide">재연결 세그먼트 자동 합치기</h3><label>자동 합치기<select name="auto_merge"><option value="false">사용 안 함</option><option value="true">사용</option></select></label><label>방송 종료 대기(초)<input name="quiet_seconds" type="number" min="30" max="7200" value="900"></label><label>합친 뒤 원본 삭제<select name="delete_segments_after_merge"><option value="false">보존</option><option value="true">삭제</option></select></label><div class="is-wide ops-platform-actions"><button class="ops-action-primary" type="submit">합치기 설정 저장</button><span class="ops-platform-status is-warn">원본 삭제는 기본적으로 꺼져 있습니다.</span></div></form>`);
 
   panel("notifications", "알림 센터", "이벤트별 알림을 선택하고 실패한 전송을 자동 재시도합니다.", `
     <form id="ops-notification-form" class="ops-platform-form">
@@ -4132,6 +4141,7 @@
       section.setAttribute("aria-hidden", active ? "false" : "true");
     });
     if (id === "history") loadHistory();
+    if (id === "system") loadSystemStatus();
     if (id === "notifications") loadNotifications();
     if (id === "archive" || id === "automation") loadPlatformSettings();
     if (id === "automation") loadTokens();
@@ -4154,9 +4164,21 @@
     if (!body) return;
     const q = encodeURIComponent($("#ops-history-query")?.value || "");
     const status = encodeURIComponent($("#ops-history-status")?.value || "");
+    const view = $("#ops-history-view")?.value || "broadcasts";
     try {
-      const data = await api(`/api/v3/recordings?limit=150&q=${q}&status=${status}`);
-      body.innerHTML = data.items.length ? data.items.map((item) => `<tr>
+      const data = view === "broadcasts"
+        ? await api(`/api/v3/broadcasts?limit=150&q=${q}`)
+        : await api(`/api/v3/recordings?limit=150&q=${q}&status=${status}`);
+      const rows = view === "broadcasts" ? data.items.filter((item) => !status || item.status === status) : data.items;
+      body.innerHTML = rows.length ? rows.map((item) => view === "broadcasts" ? `<tr>
+        <td>${esc(item.started_at || "-")}</td>
+        <td><strong>${esc(item.channel_name || item.channel_id || "-")}</strong><br><small>${esc(item.platform || "")}</small></td>
+        <td class="ops-recording-title">${esc(item.title || "방송")}${item.segment_count > 1 ? `<span class="ops-recording-path">세그먼트 ${esc(item.segment_count)}개 · 재연결 ${esc(item.reconnects || 0)}회</span>` : ""}</td>
+        <td>${statusBadge(item.status)}${item.failure_detail ? `<br><small>${esc(item.failure_detail.slice(0,90))}</small>` : ""}</td>
+        <td>${statusBadge(item.merge_status)}<br><small>${esc(item.merged_path || "")}</small></td>
+        <td>${esc(item.file_size ? `${Math.round(item.file_size/1024/1024)} MB` : "-")}</td>
+        <td><div class="ops-inline-buttons"><button type="button" class="ops-action-secondary" data-broadcast-detail="${esc(item.broadcast_id)}">상세</button>${item.segment_count > 1 && item.status !== "recording" ? `<button type="button" class="ops-action-secondary" data-merge="${esc(item.broadcast_id)}">세그먼트 합치기</button>` : ""}</div></td>
+      </tr>` : `<tr>
         <td>${esc(item.started_at || "-")}</td>
         <td><strong>${esc(item.channel_name || item.channel_id || "-")}</strong><br><small>${esc(item.platform || "")}</small></td>
         <td class="ops-recording-title">${esc(item.title || item.filename || "-")}<span class="ops-recording-path" title="${esc(item.file_path || "")}">${esc(item.file_path || item.filename || "")}</span></td>
@@ -4165,26 +4187,48 @@
         <td>${statusBadge(item.archive_status)}<br><small>${esc(item.archive_target || "")}</small></td>
         <td><div class="ops-inline-buttons"><button type="button" class="ops-action-secondary" data-detail="${item.id}">상세</button><button type="button" class="ops-action-secondary" data-verify="${item.id}">검증·복구</button><button type="button" class="ops-action-secondary" data-protect="${esc(item.file_path || "")}">보호</button><button type="button" class="ops-action-secondary" data-archive="${item.id}">외부 보관</button></div></td>
       </tr>`).join("") : '<tr><td colspan="7" class="ops-empty">녹화 기록이 없습니다.</td></tr>';
-      $("#ops-history-meta").textContent = `총 ${data.total}건 · SQLite 기록은 JSONL 500건 제한과 별도로 유지됩니다.`;
+      $("#ops-history-meta").textContent = `총 ${view === "broadcasts" ? rows.length : data.total}건 · ${view === "broadcasts" ? "재연결 세그먼트는 같은 방송으로 묶어 표시합니다." : "세그먼트 원본 기록입니다."}`;
     } catch (error) { body.innerHTML = `<tr><td colspan="7" class="ops-empty">${esc(error.message)}</td></tr>`; }
   }
   $("#ops-history-refresh")?.addEventListener("click", loadHistory);
+  $("#ops-history-view")?.addEventListener("change", loadHistory);
   $("#ops-history-query")?.addEventListener("keydown", (e) => { if (e.key === "Enter") loadHistory(); });
   $("#ops-history-body")?.addEventListener("click", async (event) => {
     const verify = event.target.closest("[data-verify]");
     const archive = event.target.closest("[data-archive]");
     const protect = event.target.closest("[data-protect]");
     const detail = event.target.closest("[data-detail]");
+    const broadcastDetail = event.target.closest("[data-broadcast-detail]");
+    const merge = event.target.closest("[data-merge]");
     try {
       if (verify) { verify.disabled = true; notice("파일을 검사하고 있습니다."); await api(`/api/v3/recordings/${verify.dataset.verify}/verify`, {method:"POST", body:JSON.stringify({repair:true})}); notice("파일 검증을 완료했습니다."); await loadHistory(); }
       if (archive) { archive.disabled = true; await api(`/api/v3/recordings/${archive.dataset.archive}/archive`, {method:"POST", body:"{}"}); notice("외부 보관 대기열에 추가했습니다."); }
       if (protect) { if (!protect.dataset.protect) throw new Error("보호할 파일 경로가 없습니다."); await api("/api/operations/files/protection", {method:"PUT", body:JSON.stringify({path:protect.dataset.protect, protected:true})}); notice("자동 정리에서 제외하도록 파일을 보호했습니다."); }
       if (detail) { const item = await api(`/api/v3/recordings/${detail.dataset.detail}`); const box = $("#ops-history-detail"); if (box) { box.hidden = false; box.innerHTML = `<h3>${esc(item.channel_name || item.channel_id || "녹화 상세")}</h3><dl class="ops-detail-list"><div><dt>세션</dt><dd>${esc(item.session_id || "-")}</dd></div><div><dt>종료 이유</dt><dd>${esc(item.stop_reason || "-")}</dd></div><div><dt>재연결</dt><dd>${esc(item.reconnects || 0)}회</dd></div><div><dt>녹화 시간</dt><dd>${esc(item.duration || "-")}</dd></div><div><dt>검증</dt><dd>${esc(item.validation_status || "미검사")} · ${esc(item.validation_detail || "")}</dd></div><div><dt>후처리</dt><dd>${esc(item.postprocess_status || "-")} ${esc(item.postprocess_error || "")}</dd></div><div><dt>파일</dt><dd>${esc(item.file_path || item.filename || "-")}</dd></div></dl>`; } }
+      if (broadcastDetail) { const item = await api(`/api/v3/broadcasts/${broadcastDetail.dataset.broadcastDetail}`); const box = $("#ops-history-detail"); if (box) { box.hidden = false; box.innerHTML = `<h3>${esc(item.channel_name || item.channel_id || "방송 상세")}</h3><p>${esc(item.title || "")}</p><dl class="ops-detail-list"><div><dt>방송 ID</dt><dd>${esc(item.broadcast_id)}</dd></div><div><dt>세그먼트</dt><dd>${esc(item.segment_count)}개</dd></div><div><dt>재연결</dt><dd>${esc(item.reconnects || 0)}회</dd></div><div><dt>합친 파일</dt><dd>${esc(item.merge?.output_path || "-")}</dd></div></dl><div class="ops-table-wrap"><table><thead><tr><th>#</th><th>시작</th><th>상태</th><th>파일</th><th>실패 원인</th></tr></thead><tbody>${item.segments.map((segment)=>`<tr><td>${esc(segment.segment_index)}</td><td>${esc(segment.started_at)}</td><td>${statusBadge(segment.status)}</td><td>${esc(segment.file_path || segment.filename || "-")}</td><td>${esc(segment.failure_detail || segment.error || "-")}<br><small>${esc(segment.failure_remedy || "")}</small></td></tr>`).join("")}</tbody></table></div>`; } }
+      if (merge) { merge.disabled = true; notice("세그먼트를 합치고 있습니다."); await api(`/api/v3/broadcasts/${merge.dataset.merge}/merge`, {method:"POST", body:JSON.stringify({delete_segments:false})}); notice("세그먼트 합치기를 완료했습니다."); await loadHistory(); }
     } catch (error) { notice(error.message, "error"); if (verify) verify.disabled = false; if (archive) archive.disabled = false; }
   });
 
+  async function loadSystemStatus() {
+    const summary = $("#ops-system-summary");
+    try {
+      const [version, cookies, database, settings] = await Promise.all([api("/api/operations/version"), api("/api/operations/cookies/health"), api("/api/operations/database"), api("/api/operations/settings")]);
+      if (summary) summary.innerHTML = `<h3>현재 상태</h3><p>버전 ${esc(version.current || "-")} · DB ${esc(database.integrity || "-")} · 쿠키 ${esc(cookies.status || "-")}</p>`;
+      const versionCard = $("#ops-version-card"); if (versionCard) versionCard.innerHTML = `<h3>업데이트</h3><p>현재 <strong>${esc(version.current || "-")}</strong><br>최신 <strong>${esc(version.latest || "확인 실패")}</strong></p>${version.update_available ? `<p class="ops-platform-status is-warn">새 버전 사용 가능</p><p>${esc((version.notes || "").slice(0,600))}</p>` : ""}`;
+      const cookieCard = $("#ops-cookie-card"); if (cookieCard) cookieCard.innerHTML = `<h3>쿠키 상태</h3>${cookies.items.map((item)=>`<p><strong>${esc(item.platform.toUpperCase())}</strong> · ${esc(item.status)}<br><small>${esc(item.detail)}</small></p>`).join("")}`;
+      const dbCard = $("#ops-db-card"); if (dbCard) dbCard.innerHTML = `<h3>SQLite</h3><p>무결성 <strong>${esc(database.integrity || "-")}</strong><br>${esc(database.size_text || "")}</p>`;
+      const gf = $("#ops-group-settings"); const groups = settings.recording_groups || {}; if (gf) { gf.elements.auto_merge.value=String(Boolean(groups.auto_merge)); gf.elements.quiet_seconds.value=groups.quiet_seconds || 900; gf.elements.delete_segments_after_merge.value=String(Boolean(groups.delete_segments_after_merge)); }
+    } catch (error) { if (summary) summary.textContent = error.message; }
+  }
+  async function runDiagnostics() { const host=$("#ops-diagnostics-list"); try { notice("전체 시스템을 점검하고 있습니다."); const data=await api("/api/operations/diagnostics"); if(host) host.innerHTML=data.checks.map((item)=>`<div class="ops-platform-card"><h3>${esc(item.name)} · ${esc(item.status)}</h3><p>${esc(item.detail)}</p>${item.remedy?`<small>${esc(item.remedy)}</small>`:""}</div>`).join(""); notice(`점검 완료 · 정상 ${data.counts.ok} / 경고 ${data.counts.warning} / 문제 ${data.counts.problem}`); } catch(error){notice(error.message,"error");} }
+  $("#ops-diagnostics-run")?.addEventListener("click", runDiagnostics);
+  $("#ops-version-check")?.addEventListener("click", async()=>{try{await api("/api/operations/version?force=true"); await loadSystemStatus(); notice("최신 버전을 확인했습니다.");}catch(error){notice(error.message,"error");}});
+  $("#ops-db-backup")?.addEventListener("click", async()=>{try{await api("/api/operations/database/backups",{method:"POST",body:"{}"}); await loadSystemStatus(); notice("SQLite 백업을 생성했습니다.");}catch(error){notice(error.message,"error");}});
+  $("#ops-group-settings")?.addEventListener("submit", async(event)=>{event.preventDefault(); const f=event.currentTarget; try{const settings=await api("/api/operations/settings"); settings.recording_groups={...(settings.recording_groups||{}),auto_merge:boolValue(f.elements.auto_merge.value),quiet_seconds:Number(f.elements.quiet_seconds.value||900),delete_segments_after_merge:boolValue(f.elements.delete_segments_after_merge.value)}; await api("/api/operations/settings",{method:"PUT",body:JSON.stringify(settings)}); notice("자동 합치기 설정을 저장했습니다.");}catch(error){notice(error.message,"error");}});
+
   let platformSettings = null;
-  const eventLabels = {"recording.started":"녹화 시작","recording.completed":"녹화 완료","recording.failed":"녹화 실패","recording.validated":"파일 검증","recording.reconnecting":"자동 재연결","recording.missed":"녹화 시작 누락","recording.circuit_breaker":"자동 복구 일시중지","postprocess.failed":"후처리 실패","storage.warning":"저장소 경고","archive.completed":"외부 보관 완료","archive.failed":"외부 보관 실패"};
+  const eventLabels = {"recording.started":"녹화 시작","recording.completed":"녹화 완료","recording.failed":"녹화 실패","recording.validated":"파일 검증","recording.reconnecting":"자동 재연결","recording.missed":"녹화 시작 누락","recording.circuit_breaker":"자동 복구 일시중지","recording.merged":"세그먼트 합치기 완료","recording.merge_failed":"세그먼트 합치기 실패","auth.cookie_warning":"쿠키 인증 경고","database.integrity_failed":"DB 무결성/백업 실패","system.update_available":"새 버전 알림","postprocess.failed":"후처리 실패","storage.warning":"저장소 경고","archive.completed":"외부 보관 완료","archive.failed":"외부 보관 실패"};
   async function loadPlatformSettings() {
     try {
       platformSettings = await api("/api/v3/platform/settings");
