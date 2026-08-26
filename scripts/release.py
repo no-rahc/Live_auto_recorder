@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import json
 import re
 import subprocess
 from datetime import date
@@ -12,7 +11,6 @@ from typing import NoReturn
 
 ROOT = Path(__file__).resolve().parents[1]
 VERSION_FILE = ROOT / "VERSION"
-PACKAGE_FILE = ROOT / "package.json"
 CHANGELOG_FILE = ROOT / "CHANGELOG.md"
 RELEASE_MODULE_FILE = ROOT / "lar_app" / "release.py"
 DOCKER_WORKFLOW_FILE = ROOT / ".github" / "workflows" / "docker-publish.yml"
@@ -24,7 +22,6 @@ CHANGELOG_VERSION_RE = re.compile(
 
 RELEASE_FILES = (
     "VERSION",
-    "package.json",
     "CHANGELOG.md",
 )
 
@@ -54,15 +51,6 @@ def bump_version(parts: tuple[int, int, int], level: str) -> tuple[int, int, int
     return major, minor, patch + 1
 
 
-def update_package(version: str) -> None:
-    payload = json.loads(PACKAGE_FILE.read_text(encoding="utf-8"))
-    payload["version"] = version.removeprefix("v")
-    PACKAGE_FILE.write_text(
-        json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
-        encoding="utf-8",
-    )
-
-
 def update_changelog(version: str, summaries: list[str]) -> None:
     text = (
         CHANGELOG_FILE.read_text(encoding="utf-8")
@@ -83,15 +71,6 @@ def update_changelog(version: str, summaries: list[str]) -> None:
 def check_release_metadata() -> None:
     version = format_version(read_version())
     errors: list[str] = []
-
-    package_version = json.loads(PACKAGE_FILE.read_text(encoding="utf-8")).get(
-        "version"
-    )
-    expected_package_version = version.removeprefix("v")
-    if package_version != expected_package_version:
-        errors.append(
-            f"package.json={package_version!r}, expected {expected_package_version!r}"
-        )
 
     changelog_text = CHANGELOG_FILE.read_text(encoding="utf-8")
     changelog_match = CHANGELOG_VERSION_RE.search(changelog_text)
@@ -144,7 +123,6 @@ def command_bump(args: argparse.Namespace) -> None:
     current = read_version()
     next_version = format_version(bump_version(current, args.level))
 
-    update_package(next_version)
     update_changelog(next_version, args.summary)
     VERSION_FILE.write_text(next_version + "\n", encoding="utf-8")
 
@@ -163,7 +141,7 @@ def build_parser() -> argparse.ArgumentParser:
     commands.add_parser("check", help="validate synchronized release metadata")
 
     bump_parser = commands.add_parser(
-        "bump", help="bump VERSION, package.json, and CHANGELOG.md together"
+        "bump", help="bump VERSION and CHANGELOG.md together"
     )
     bump_parser.add_argument(
         "level",

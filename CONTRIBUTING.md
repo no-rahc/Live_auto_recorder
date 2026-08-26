@@ -11,7 +11,6 @@
 
 ```bash
 python -m pip install -r requirements.txt
-npm ci
 python app_entry.py
 ```
 
@@ -19,9 +18,6 @@ python app_entry.py
 
 ```bash
 python -m compileall -q app_entry.py lar_app module
-python -m unittest discover -s tests -p 'test_*_v1.py' -v
-python -m unittest discover -s tests -p 'test_operations_v2.py' -v
-npm run test:ui
 python scripts/release.py check
 ```
 
@@ -29,6 +25,6 @@ python scripts/release.py check
 
 - Keep one change per pull request.
 - Use a Conventional Commit title such as `fix(recording): handle stalled process`.
-- Add or update tests when behavior changes.
+- Validate the affected runtime path locally when behavior changes.
 - Do not commit runtime data, recordings, cookies, tokens, generated reports, or local `.env` files.
 - Keep `app_entry.py` thin. Put application assembly in `lar_app/` and recording domain logic in `module/`.

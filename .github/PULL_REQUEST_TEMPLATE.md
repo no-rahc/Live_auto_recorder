@@ -21,7 +21,7 @@
 ## 릴리스
 
 - 대상 버전: `vX.Y.Z`
-- [ ] `VERSION`, `package.json`, `CHANGELOG.md`를 함께 갱신했습니다.
+- [ ] `VERSION`, `CHANGELOG.md`를 함께 갱신했습니다.
 - [ ] 버전은 특별한 이유가 없으면 patch 단위로 올렸습니다.
 
 ## 배포 영향

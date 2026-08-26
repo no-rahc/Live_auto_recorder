@@ -6,8 +6,6 @@ on:
       - '**/*.py'
       - '**/*.js'
       - 'requirements.txt'
-      - 'package.json'
-      - 'package-lock.json'
       - '.github/workflows/security-check.yml'
   push:
     branches: [main]
@@ -15,8 +13,6 @@ on:
       - '**/*.py'
       - '**/*.js'
       - 'requirements.txt'
-      - 'package.json'
-      - 'package-lock.json'
       - '.github/workflows/security-check.yml'
   public:
   schedule:

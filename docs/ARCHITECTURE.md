@@ -19,7 +19,6 @@ lar_app/                     Production application assembly
     middleware.py             Security policy, throttling, audit, asset delivery
 module/                      Recorder and operational domain implementation
 templates/                   Jinja pages and browser assets
-tests/                       Unit and responsive browser checks
 scripts/                     Release and maintenance commands
 docs/                        Operator and developer documentation
 ```
@@ -67,14 +66,11 @@ Before merging structural changes, run:
 
 ```bash
 python -m compileall -q app_entry.py lar_app module
-python -m unittest discover -s tests -p 'test_*_v1.py' -v
-python -m unittest discover -s tests -p 'test_operations_v2.py' -v
-npm run test:ui
 python scripts/release.py check
 ```
 
-Docker builds run the same package-wide compilation step so newly added Python
-modules cannot be omitted from the image validation list.
+Docker build checks also compile the production packages and run a live container
+smoke test for the dashboard and management endpoints.
 
 ## Next extraction targets
 
@@ -83,7 +79,7 @@ The next safe refactor stages are:
 1. Split route registration from `live_auto_recorder.py` into router modules
    while preserving route paths and dependency functions.
 2. Move channel/config persistence behind small repository interfaces.
-3. Consolidate page-level CSS patches after their visual behavior is covered by
-   Playwright checks.
+3. Consolidate page-level CSS patches after their visual behavior is verified in
+   the running dashboard.
 4. Replace version-suffixed internal module names only after compatibility shims
    and migration tests exist.

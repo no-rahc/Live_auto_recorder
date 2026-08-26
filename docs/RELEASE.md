@@ -35,7 +35,6 @@ python scripts/release.py bump \
 위 명령은 다음 파일을 함께 갱신합니다.
 
 - `VERSION`
-- `package.json`
 - `CHANGELOG.md`
 
 minor 또는 major 증가가 필요한 경우에만 명시적으로 지정합니다.
@@ -58,7 +57,7 @@ GitHub Actions와 Docker 게시 워크플로도 같은 검사를 실행하므로
 기능 변경을 먼저 별도 커밋한 뒤, 버전 파일만 릴리스 커밋으로 분리하는 방식을 권장합니다.
 
 ```bash
-git add VERSION package.json CHANGELOG.md
+git add VERSION CHANGELOG.md
 git commit -m "chore(release): v1.1.5"
 ```
 

@@ -53,7 +53,12 @@ RUN chmod 0755 /usr/local/bin/ytarchive \
     && rclone version \
     && ffprobe -version >/dev/null
 
-COPY . .
+COPY app_entry.py live_auto_recorder.py VERSION ./
+COPY lar_app ./lar_app
+COPY module ./module
+COPY templates ./templates
+COPY dependent ./dependent
+COPY LICENSE THIRD_PARTY_NOTICES.md ./
 
 RUN mkdir -p /app/chzzk /app/json /app/logs /app/tmp/ytarchive \
     && python -m compileall -q app_entry.py lar_app module

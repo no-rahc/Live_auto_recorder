@@ -25,15 +25,14 @@ venv/
 .coverage
 htmlcov/
 
-# Node and browser tests
-node_modules/
-playwright-report/
-test-results/
-blob-report/
+# Local tooling
+.chatgpt2codex/
 .npm-cache/
 .pw-browsers/
 .test-deps/
-.chatgpt2codex/
+node_modules/
+playwright-report/
+test-results/
 
 # Local/editor files
 .DS_Store
