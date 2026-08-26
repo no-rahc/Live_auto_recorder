@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="theme-color" content="#f2f4f6">
     <title>녹화현황</title>
-    <link rel="stylesheet" href="{{ url_for('static', path='css/style.css') }}?v={{ program_version|default('') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='css/app.css') }}?v={{ program_version|default('') }}">
 </head>
 <body class="page-recording">
     <div class="navbar-container">
@@ -218,7 +218,7 @@
         </section>
     </div>
 
-    <script src="{{ url_for('static', path='js/script.js') }}?v={{ program_version|default('') }}"></script>
+    <script src="{{ url_for('static', path='js/app.js') }}?v={{ program_version|default('') }}"></script>
     <script>
     // ── 녹화 이력 로드 ──
     (function(){

@@ -153,7 +153,7 @@ async def lifespan(app: FastAPI):
         # 메타 루프 정리
         if meta_task and not meta_task.done():
             meta_task.cancel()
-            with suppress(Exception):
+            with suppress(asyncio.CancelledError, Exception):
                 await meta_task
 
         # 시드 태스크 정리
@@ -161,7 +161,7 @@ async def lifespan(app: FastAPI):
             seed_task  # 존재하면 NameError 아님
             if seed_task and not seed_task.done():
                 seed_task.cancel()
-                with suppress(Exception):
+                with suppress(asyncio.CancelledError, Exception):
                     await seed_task
 
         except NameError:
@@ -173,7 +173,7 @@ async def lifespan(app: FastAPI):
             for t in pending:
                 t.cancel()
             for t in pending:
-                with suppress(Exception):
+                with suppress(asyncio.CancelledError, Exception):
                     await t
         except Exception as e:
             logger.warning(f"bg_tasks cleanup error: {e}")

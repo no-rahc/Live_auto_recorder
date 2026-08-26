@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="theme-color" content="#f2f4f6">
     <title>쿠키관리</title>
-    <link rel="stylesheet" href="{{ url_for('static', path='css/style.css') }}?v={{ program_version|default('') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='css/app.css') }}?v={{ program_version|default('') }}">
 </head>
 <body class="page-cookies">
     <div class="navbar-container">
@@ -99,6 +99,6 @@
             4. <code>Live Auto Recorder/json/ycookie.txt</code> 파일을 열어 붙여넣기 후에 저장합니다.<br>
         </div>
     </div>
-    <script src="{{ url_for('static', path='js/script.js') }}?v={{ program_version|default('') }}"></script>
+    <script src="{{ url_for('static', path='js/app.js') }}?v={{ program_version|default('') }}"></script>
 </body>
 </html>
