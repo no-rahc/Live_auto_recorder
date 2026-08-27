@@ -201,25 +201,25 @@ async def getLiveMetadata(channel, cookies):
         live_image_url = metadata_content.get("liveImageUrl")
         if live_image_url:
             thumbnail_url = live_image_url.format(type="360")
-            logger.info(f"Generated thumbnail URL: {thumbnail_url}")
+            logger.debug(f"Generated thumbnail URL: {thumbnail_url}")
         else:
             thumbnail_url = "/static/img/default_thumbnail.png"
-            logger.info("Using default thumbnail as no liveImageUrl provided.")
+            logger.debug("Using default thumbnail as no liveImageUrl provided.")
 
         # 성인 채널이면 쿠키 검증
         if metadata_content.get("adult", False) and thumbnail_url.startswith(("http://","https://")):
             ok = await checkUrlOkWithRetry(thumbnail_url, headers=headers, retries=2)
             if not ok:
-                logger.info("쿠키값이 유효하지 않습니다. 기본 썸네일을 사용합니다.")
+                logger.warning("쿠키값이 유효하지 않습니다. 기본 썸네일을 사용합니다.")
                 thumbnail_url = "/static/img/default_thumbnail.png"
 
         # 방송 상태에 따라 닫힘 썸네일
         if metadata_content.get("status") != "OPEN":
             thumbnail_url = "/static/img/liveclosed_thumbnail.png"
-            logger.info(f"Final thumbnail URL for {channel['name']}: {thumbnail_url}")
+            logger.debug(f"Final thumbnail URL for {channel['name']}: {thumbnail_url}")
         elif not thumbnail_url:
             thumbnail_url = "/static/img/default_thumbnail.png"
-            logger.info("Thumbnail URL is empty, using default thumbnail.")
+            logger.debug("Thumbnail URL is empty, using default thumbnail.")
 
         # 이름 보존
         if channel.get('name'):
