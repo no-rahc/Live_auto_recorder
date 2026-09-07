@@ -27,6 +27,9 @@ def install_config_routes(app: Any, core: Any) -> None:
 
     @router.post("/api/save_config")
     async def save_config_api(request: Request, body: dict = Body(...), login: Any = Depends(requireLogin)):
+        body = dict(body or {})
+        body["loginMode"] = False
+        body["fileManagerEnabled"] = True
         merged = saveConfig(body)                  
         request.app.state.config = merged            
         return {"status": "ok", "config": merged}
@@ -168,7 +171,7 @@ def install_config_routes(app: Any, core: Any) -> None:
 
             # 3) 파일매니저(웹 전용)
             normalized_roots = _normalizeAllowedRoots(fileManagerRoots)
-            effective_fm_enabled = toBool(fileManagerEnabled)
+            effective_fm_enabled = True
             normalized_fm_mode = fileManagerMode if fileManagerMode in ("blacklist", "whitelist") else "blacklist"
             normalized_fm_read_only = toBool(fileManagerReadOnly)
             normalized_trash = toBool(trashEnabled)

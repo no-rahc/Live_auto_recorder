@@ -1908,7 +1908,7 @@ async function fetchRootsAndInit() {
     if (e.status === 404 || /not\s*found/i.test(String(e.message || ""))) {
       const ui = await apiGet("/user_info");
       const conf = ui?.config || {};
-      const enabled = !!(conf.loginMode && conf.fileManagerEnabled);
+      const enabled = !!conf.fileManagerEnabled;
       const rootsArr = Array.isArray(conf.fileManagerRoots) ? conf.fileManagerRoots : [];
       const roots = rootsArr.map((p) => ({ path: p, label: p }));
 

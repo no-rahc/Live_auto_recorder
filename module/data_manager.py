@@ -682,7 +682,7 @@ def loadConfig():
         "enableTray": False,
         "minimizeToTrayOnClose": False,
         "minimizeToTrayOnStart": False,
-        "fileManagerEnabled": False,
+        "fileManagerEnabled": True,
         "fileManagerRoots": [],
         "fileManagerMode": "blacklist",
         "fileManagerReadOnly": False,
@@ -696,6 +696,10 @@ def loadConfig():
         data = {}
 
     merged = {**defaults, **data}
+
+    # Personal single-user deployment: passwordless local mode with files enabled.
+    merged["loginMode"] = False
+    merged["fileManagerEnabled"] = True
 
     # 플러그인/타임시프트 정규화
     raw_plugin = str((merged.get("plugin_type") or "basic")).strip().lower()
@@ -748,8 +752,8 @@ def loadConfig():
         mode = "blacklist"
     merged["fileManagerMode"] = mode
 
-    # loginMode가 꺼져 있으면 fileManagerEnabled는 항상 False
-    merged["fileManagerEnabled"] = bool(merged.get("loginMode", False)) and bool(merged.get("fileManagerEnabled", False))
+    # Personal deployment keeps the file manager available independently of login state.
+    merged["fileManagerEnabled"] = True
     merged["fileManagerReadOnly"] = bool(merged.get("fileManagerReadOnly", False))
     merged["trashEnabled"] = bool(merged.get("trashEnabled", False))
 

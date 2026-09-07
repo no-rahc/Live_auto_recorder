@@ -351,14 +351,8 @@ async def initChannelStates(app: FastAPI):
 
 # 로그인 인증 의존성 함수 정의
 async def requireLogin(request: Request):
-    if not request.app.state.config.get('loginMode', False):
-        return True
-    if request.session.get('logged_in'):
-        return True
-    # API엔 401 JSON
-    if request.url.path.startswith('/api/') or 'application/json' in (request.headers.get('accept','')):
-        raise HTTPException(status_code=401, detail="Login required")
-    return RedirectResponse(url="/login", status_code=302)
+    # Personal/single-user deployment: authentication is intentionally disabled.
+    return True
 
 
 # 자동 녹화 모드 함수
@@ -1139,7 +1133,7 @@ async def api_sys_metrics():
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     config = request.app.state.config
-    loginMode = config.get('loginMode', False)  # 로그인 모드 상태 확인
+    loginMode = False
 
     # 로그인되지 않은 상태에서 로그인 모드가 활성화된 경우
     if loginMode and not request.session.get('logged_in'):
@@ -1164,34 +1158,10 @@ async def index(request: Request):
 # 로그인 라우트
 @app.post("/login")
 async def login(request: Request, username: str = Form(...), password: str = Form(...)):
-    try:
-        # 계정 정보를 로드합니다.
-        account = loadAccount()
-        
-        # 계정 정보가 존재하고 비밀번호가 일치할 경우
-        if account and account['username'] == username and check_password_hash(account['password'], password):
-            # 세션에 로그인 상태 저장
-            request.session['logged_in'] = True
-            return JSONResponse(
-                content={"status": "success", "message": "로그인 성공", "redirect_url": "/"},
-                status_code=200
-            )
-        
-        else:
-            # 로그인 실패 시 JSON 응답을 반환 (리다이렉션 없음)
-            return JSONResponse(
-                content={"status": "error", "message": "아이디 또는 비밀번호가 올바르지 않습니다."},
-                status_code=401,  # 401 Unauthorized 상태 코드
-                headers={"Content-Type": "application/json"}
-            )
-    
-    except Exception as e:
-        # 예외 처리
-        logger.info(f"로그인 중 오류 발생: {e}")
-        return JSONResponse(
-            content={"status": "error", "message": "로그인 처리 중 오류가 발생했습니다."},
-            status_code=500
-        )
+    return JSONResponse(
+        content={"status": "disabled", "message": "로그인 기능을 사용하지 않습니다.", "redirect_url": "/"},
+        status_code=200,
+    )
 
 
 # 로그아웃 라우트
@@ -1204,60 +1174,13 @@ async def logout(request: Request):
 # GET 요청을 처리하여 계정 생성 페이지를 렌더링
 @app.get("/register")
 async def register_page(request: Request):
-    account = loadAccount()
-    loginMode = request.app.state.config.get('loginMode', False)
-    need_account = request.query_params.get('need_account') 
-
-    if account:
-        error_message = "이미 계정이 존재합니다. 추가 계정을 만들 수 없습니다."
-
-        return templates.TemplateResponse(
-            'register.html',
-            {'request': request, 'error_message': error_message, 'loginMode': loginMode, 'program_version': PROGRAM_VERSION},
-            status_code=400
-        )
-
-    return templates.TemplateResponse(
-        'register.html',
-        {
-            'request': request,
-            'loginMode': loginMode,
-            'info_message': "로그인 모드를 켰습니다. 먼저 관리자 계정을 생성하세요." if need_account else None,
-            'program_version': PROGRAM_VERSION
-        }
-    )
+    return RedirectResponse(url="/", status_code=302)
 
 
 # 계정 생성 폼을 처리하는 POST 요청
 @app.post("/register")
 async def register(request: Request, username: str = Form(...), password: str = Form(...), password_confirm: str = Form(...)):
-    account = loadAccount()
-    
-    # 계정이 이미 존재하면 계정 생성 금지
-    if account:
-        error_message = "이미 계정이 존재합니다. 추가 계정을 만들 수 없습니다."
-        return templates.TemplateResponse('register.html', {
-            'request': request,
-            'error_message': error_message,
-            'program_version': PROGRAM_VERSION
-        }, status_code=400)
-
-    # 비밀번호 확인
-    if password != password_confirm:
-
-        return templates.TemplateResponse('register.html', {
-            'request': request,
-            'error_message': "비밀번호가 일치하지 않습니다.",
-            'program_version': PROGRAM_VERSION
-        })
-
-    # 비밀번호 해시화 후 계정 저장
-    hashed_password = generate_password_hash(password)
-    account = {"username": username, "password": hashed_password}
-    saveAccount(account)
-
-    # 계정 생성 후 메인 페이지로 리다이렉트
-    return RedirectResponse(url='/', status_code=302)
+    return RedirectResponse(url="/", status_code=303)
 
 
 # 계정 수정/삭제 관련 라우트
@@ -1339,21 +1262,19 @@ async def updateAccount(
 async def user_info(request: Request):
     account = loadAccount()
     config = request.app.state.config or {}
-    loginMode  = bool(config.get('loginMode', False))
+    loginMode  = False
     enableTray = bool(config.get('enableTray', False))
 
     payload = {
         "config": {
-            "loginMode":  loginMode,
-            "enableTray": enableTray,   
+            "loginMode": False,
+            "enableTray": enableTray,
+            "fileManagerEnabled": bool(config.get("fileManagerEnabled", True)),
+            "fileManagerRoots": config.get("fileManagerRoots") or [],
         }
     }
 
-    if account and request.session.get('logged_in'):
-        username = account.get('username', 'Unknown User')
-        payload.update({"logged_in": True, "username": username})
-    else:
-        payload.update({"logged_in": False, "username": None})
+    payload.update({"logged_in": True, "username": "로컬 사용자"})
 
     return JSONResponse(content=payload)
 
