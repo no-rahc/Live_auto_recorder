@@ -5,6 +5,12 @@ import asyncio
 import csv
 import io
 import json
+import math
+import os
+import stat
+import tempfile
+import uuid
+import threading
 import re
 import shutil
 import time
@@ -17,7 +23,36 @@ from typing import Any
 
 from fastapi import HTTPException
 
+from lar_app.backup_policy import preserve_existing_secrets, sanitize_secrets, secret_backups_allowed
 from module.operations_common import DEFAULT_SETTINGS, _bytes_human, _deep_merge, _duration_seconds, _iso, _safe_json
+
+
+_BACKUP_LOCK = threading.RLock()
+_PROTECTED_BACKUPS: set[Path] = set()
+
+
+def _validate_settings(value: dict[str, Any], defaults: dict[str, Any], prefix: str = "") -> None:
+    for key, default in defaults.items():
+        if key not in value:
+            continue
+        item = value[key]
+        field = f"{prefix}{key}"
+        if isinstance(default, dict):
+            if not isinstance(item, dict):
+                raise ValueError(f"Invalid settings section: {field}")
+            _validate_settings(item, default, field + ".")
+        elif isinstance(default, bool):
+            if not isinstance(item, bool):
+                raise ValueError(f"Invalid boolean setting: {field}")
+        elif isinstance(default, (int, float)):
+            if isinstance(item, bool) or not isinstance(item, (int, float)) or not math.isfinite(item):
+                raise ValueError(f"Invalid numeric setting: {field}")
+            if isinstance(default, int) and not isinstance(item, int):
+                raise ValueError(f"Invalid integer setting: {field}")
+            if item < 0:
+                raise ValueError(f"Negative setting: {field}")
+        elif not isinstance(item, type(default)):
+            raise ValueError(f"Invalid setting: {field}")
 
 
 class BackupStatsMixin:
@@ -29,18 +64,64 @@ class BackupStatsMixin:
         return [self.data_dir / name for name in names if (self.data_dir / name).exists()]
 
     def create_backup(self, include_secrets: bool | None = None, reason: str = "manual") -> dict[str, Any]:
+        with _BACKUP_LOCK:
+            return self._create_backup(include_secrets, reason)
+
+    def _create_backup(self, include_secrets: bool | None = None, reason: str = "manual") -> dict[str, Any]:
         include = self.settings["backup"].get("include_secrets", False) if include_secrets is None else bool(include_secrets)
-        filename = f"backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{reason}.zip"
+        if include and not secret_backups_allowed():
+            if include_secrets is True and reason == "manual":
+                raise HTTPException(status_code=403, detail="Secret backups require ALLOW_SECRET_BACKUPS=true.")
+            include = False
+        if not re.fullmatch(r"[A-Za-z0-9_-]+", reason):
+            raise HTTPException(status_code=400, detail="Invalid backup reason.")
+        filename = f"backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{reason}_{uuid.uuid4().hex[:8]}.zip"
         path = self.backup_dir / filename
         self.backup_dir.mkdir(parents=True, exist_ok=True)
-        with zipfile.ZipFile(path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
-            manifest = {"created_at": _iso(), "include_secrets": include, "reason": reason, "version": 2}
-            archive.writestr("manifest.json", json.dumps(manifest, ensure_ascii=False, indent=2))
-            for source in self._backup_sources(include):
-                archive.write(source, arcname=source.name)
+        temporary = path.with_suffix(".partial")
+        temporary_owned = False
+        try:
+            # Exclusive private creation: no partially written downloadable zip.
+            descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            temporary_owned = True
+            os.close(descriptor)
+            with zipfile.ZipFile(temporary, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+                manifest = {"created_at": _iso(), "include_secrets": include, "reason": reason, "version": 2}
+                omitted: list[str] = []
+                for source in self._backup_sources(include):
+                    if source.is_symlink() or not source.is_file():
+                        raise ValueError(f"Unsafe backup source: {source.name}")
+                    if not include and source.suffix == ".json":
+                        try:
+                            value = json.loads(source.read_text(encoding="utf-8"))
+                        except (ValueError, UnicodeError):
+                            if reason != "pre_restore":
+                                raise
+                            # Never copy malformed JSON verbatim: it can still
+                            # contain credentials that cannot be safely parsed.
+                            omitted.append(source.name)
+                            continue
+                        archive.writestr(source.name, json.dumps(sanitize_secrets(value), ensure_ascii=False, indent=2))
+                    else:
+                        archive.write(source, arcname=source.name)
+                if omitted:
+                    manifest["omitted_files"] = omitted
+                    manifest["omission_reason"] = "invalid JSON"
+                archive.writestr("manifest.json", json.dumps(manifest, ensure_ascii=False, indent=2))
+            # Atomic publication without replacing an existing archive, even
+            # when a generated name collides with another process's output.
+            os.link(temporary, path)
+            temporary.unlink()
+        except Exception:
+            if temporary_owned:
+                temporary.unlink(missing_ok=True)
+            raise
         self._trim_backups()
         self.audit("backup_created", f"name={filename}; secrets={include}")
-        return self._backup_meta(path)
+        result = self._backup_meta(path)
+        if omitted:
+            result.update(omitted_files=omitted, omission_reason="invalid JSON")
+        return result
 
     def _backup_meta(self, path: Path) -> dict[str, Any]:
         stat = path.stat()
@@ -54,6 +135,8 @@ class BackupStatsMixin:
         keep = max(1, min(int(self.settings["backup"].get("keep", 7)), 100))
         backups = sorted(self.backup_dir.glob("backup_*.zip"), key=lambda item: item.stat().st_mtime, reverse=True)
         for path in backups[keep:]:
+            if path.resolve() in _PROTECTED_BACKUPS:
+                continue
             with suppress(OSError):
                 path.unlink()
 
@@ -65,28 +148,130 @@ class BackupStatsMixin:
             raise HTTPException(status_code=404, detail="백업을 찾을 수 없습니다.")
         return path
 
-    def restore_backup(self, name: str) -> dict[str, Any]:
+    def restore_backup(self, name: str, *, acknowledgement: str = "") -> dict[str, Any]:
+        with _BACKUP_LOCK:
+            path = self.backup_path(name)
+            _PROTECTED_BACKUPS.add(path)
+            completed = False
+            try:
+                result = self._restore_backup(name, acknowledgement=acknowledgement)
+                completed = True
+                return result
+            finally:
+                _PROTECTED_BACKUPS.discard(path)
+                if completed:
+                    self._trim_backups()
+
+    def _restore_backup(self, name: str, *, acknowledgement: str = "") -> dict[str, Any]:
+        """Validate and stage all content before backup retention or live writes.
+
+        Each replacement is atomic; a failed commit/runtime reload rolls back
+        every changed file. The staged source survives pre-restore retention.
+        """
+        from lar_app.config_validation import normalize_config_update
+
         path = self.backup_path(name)
-        pre = self.create_backup(include_secrets=True, reason="pre_restore")
         allowed = {"config.json", "channels.json", "operations_v2.json", "cookie.json", "ycookie.txt", "login.json", "telegram.json"}
-        restored: list[str] = []
-        with zipfile.ZipFile(path) as archive:
-            for info in archive.infolist():
-                base = Path(info.filename).name
-                if base not in allowed or info.is_dir():
-                    continue
-                target = (self.data_dir / base).resolve()
-                if self.data_dir.resolve() not in target.parents:
-                    continue
-                target.write_bytes(archive.read(info))
-                restored.append(base)
-        with suppress(Exception):
-            self.app.state.config = self.lar.loadConfig()
-        with suppress(Exception):
-            channels = self.lar.loadChannels()
-            self.app.state.channels[:] = channels
-            self.lar.RecorderManager.setChannels(channels)
-        self.settings = _deep_merge(DEFAULT_SETTINGS, _safe_json(self.settings_path, {}))
+        staged: dict[str, bytes] = {}
+        originals: dict[str, bytes | None] = {}
+        config = None
+        settings = self.settings
+        try:
+            with zipfile.ZipFile(path) as archive:
+                infos = archive.infolist()
+                if len(infos) > len(allowed) + 1 or sum(info.file_size for info in infos) > 32 * 1024 * 1024:
+                    raise ValueError("Backup is too large.")
+                seen: set[str] = set()
+                for info in infos:
+                    base = info.filename
+                    if base not in allowed | {"manifest.json"} or base in seen or info.is_dir():
+                        raise ValueError("Backup contains unexpected or duplicate paths.")
+                    if stat.S_ISLNK(info.external_attr >> 16):
+                        raise ValueError("Backup contains a symbolic link.")
+                    seen.add(base)
+                    raw = archive.read(info)  # Verify CRC of every member before any writes.
+                    if base == "manifest.json":
+                        if not isinstance(json.loads(raw), dict):
+                            raise ValueError("Invalid backup manifest.")
+                        continue
+                    target = self.data_dir / base
+                    if target.is_symlink() or (target.exists() and not target.is_file()):
+                        raise ValueError("Restore destination is not a regular file.")
+                    originals[base] = target.read_bytes() if target.exists() else None
+                    if base.endswith(".json"):
+                        value = json.loads(raw)
+                        if base == "channels.json":
+                            if not isinstance(value, list) or any(not isinstance(item, dict) for item in value):
+                                raise ValueError("channels.json must contain a list of objects.")
+                            ids = [str(item.get("id", "")).strip() for item in value]
+                            if any(not identifier for identifier in ids) or len(ids) != len(set(ids)):
+                                raise ValueError("Channels require unique, nonempty IDs.")
+                        elif not isinstance(value, dict):
+                            raise ValueError(f"{base} must contain an object.")
+                        empty = [] if base == "channels.json" else {}
+                        try:
+                            old = json.loads(originals[base]) if originals[base] is not None else empty
+                        except (ValueError, UnicodeError):
+                            old = empty
+                        if not isinstance(old, type(empty)):
+                            old = empty
+                        value = preserve_existing_secrets(value, old)
+                        if base == "config.json":
+                            current = dict(getattr(self.app.state, "config", {}) or {})
+                            current.update(old)
+                            value = normalize_config_update(current, value, acknowledgement=acknowledgement)
+                            config = value
+                        if base == "operations_v2.json":
+                            _validate_settings(value, DEFAULT_SETTINGS)
+                            settings = _deep_merge(DEFAULT_SETTINGS, value)
+                        raw = json.dumps(value, ensure_ascii=False, indent=2).encode("utf-8")
+                    else:
+                        raw.decode("utf-8")
+                    staged[base] = raw
+            if not staged:
+                raise ValueError("Backup contains no restorable files.")
+        except (ValueError, OSError, zipfile.BadZipFile, RuntimeError) as exc:
+            raise HTTPException(status_code=400, detail=f"Invalid backup: {exc}") from exc
+
+        # Stage on the destination filesystem before creation can trim source.
+        with tempfile.TemporaryDirectory(prefix=".restore-", dir=self.data_dir) as directory:
+            stage_dir = Path(directory)
+            for base, raw in staged.items():
+                (stage_dir / base).write_bytes(raw)
+                os.chmod(stage_dir / base, 0o600)
+            pre = self.create_backup(include_secrets=secret_backups_allowed(), reason="pre_restore")
+            changed: list[str] = []
+            old_config = getattr(self.app.state, "config", None)
+            old_channels = list(getattr(self.app.state, "channels", []))
+            old_settings = self.settings
+            try:
+                for base in staged:
+                    os.replace(stage_dir / base, self.data_dir / base)
+                    changed.append(base)
+                if config is not None:
+                    self.app.state.config = config
+                if "channels.json" in staged:
+                    channels = self.lar.loadChannels()
+                    self.app.state.channels[:] = channels
+                    self.lar.RecorderManager.setChannels(channels)
+                self.settings = settings
+            except Exception as exc:
+                for base in reversed(changed):
+                    original = originals[base]
+                    if original is None:
+                        (self.data_dir / base).unlink(missing_ok=True)
+                    else:
+                        rollback = stage_dir / base
+                        rollback.write_bytes(original)
+                        os.chmod(rollback, 0o600)
+                        os.replace(rollback, self.data_dir / base)
+                self.app.state.config = old_config
+                self.app.state.channels[:] = old_channels
+                self.settings = old_settings
+                with suppress(Exception):
+                    self.lar.RecorderManager.setChannels(old_channels)
+                raise HTTPException(status_code=500, detail="Restore failed; original files restored.") from exc
+        restored = list(staged)
         self.audit("backup_restored", f"name={name}; files={','.join(restored)}")
         return {"restored": restored, "pre_restore_backup": pre}
 

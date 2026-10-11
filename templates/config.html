@@ -721,10 +721,15 @@
         reader.onload = function(){
           try {
             var data = JSON.parse(reader.result);
-            fetch('/api/config_import', {
-              method:'POST', headers:{'Content-Type':'application/json'},
+            const restoreConfig = (ack = '') => fetch('/api/config_import', {
+              method:'POST', headers:{'Content-Type':'application/json', 'X-Config-Danger-Ack': encodeURIComponent(ack)},
               body: JSON.stringify(data)
-            }).then(r=>r.json()).then(d=>{
+            }).then(r=>r.json());
+            restoreConfig().then(async d=>{
+              if (d.status !== 'success' && String(d.message).includes('위험 설정 적용')) {
+                const ack = prompt(d.message + '\n확인 문구: 위험 설정 적용') || '';
+                if (ack.trim() === '위험 설정 적용') d = await restoreConfig(ack.trim());
+              }
               statusEl.textContent = d.status==='success' ? '✅ 복원 완료! 페이지를 새로고침합니다.' : '❌ '+d.message;
               if(d.status==='success') setTimeout(()=>location.reload(), 1500);
             }).catch(e=>{ statusEl.textContent='❌ 오류: '+e; });

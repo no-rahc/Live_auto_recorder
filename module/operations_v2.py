@@ -163,7 +163,7 @@ def install_operations(app: Any, lar: Any) -> OperationsRuntime:
     async def restore_backup(name: str, payload: dict[str, Any] = Body(...)):
         if payload.get("confirm") != name:
             raise HTTPException(status_code=400, detail="confirm 값에 백업 파일명을 입력해야 합니다.")
-        return runtime.restore_backup(name)
+        return runtime.restore_backup(name, acknowledgement=payload.get("danger_ack", ""))
 
     @router.get("/api/operations/statistics")
     async def statistics():

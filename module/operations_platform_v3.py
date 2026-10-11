@@ -564,13 +564,15 @@ def install_platform_features(app: Any, lar: Any, operations: Any) -> PlatformRu
 
     @router.post("/api/v3/broadcasts/{broadcast_id}/merge")
     async def merge_segments(broadcast_id: str, payload: dict[str, Any] = Body(default={})):
-        from module.recording_merge import merge_broadcast
+        from module.recording_merge import MergeInProgressError, merge_broadcast
         try:
             result = await asyncio.to_thread(
                 merge_broadcast,
                 broadcast_id,
                 delete_segments=bool(payload.get("delete_segments", False)),
             )
+        except MergeInProgressError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)[:500]) from exc
         except Exception as exc:
             runtime.enqueue_notification("recording.merge_failed", {"broadcast_id": broadcast_id, "detail": str(exc)[:500]})
             raise HTTPException(status_code=409, detail=str(exc)[:500]) from exc

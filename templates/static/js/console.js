@@ -2572,6 +2572,7 @@
       const control = form.elements.namedItem(name);
       values.set(name, control && !(control instanceof RadioNodeList) ? control.value : "");
     });
+    values.set("fileManagerRoots", new FormData(form).getAll("fileManagerRoots").map(String).join("\u001f"));
     return values;
   }
 
@@ -2585,11 +2586,13 @@
       ["fileManagerEnabled", baseline.get("fileManagerEnabled") || "false"],
       ["fileManagerMode", baseline.get("fileManagerMode") || "whitelist"],
       ["fileManagerReadOnly", baseline.get("fileManagerReadOnly") || "true"],
-      ["trashEnabled", baseline.get("trashEnabled") || "true"]
+      ["trashEnabled", baseline.get("trashEnabled") || "true"],
+      ["fileManagerRoots", baseline.get("fileManagerRoots") || ""]
     ]);
-    const riskyFieldsChanged = ["fileManagerEnabled", "fileManagerMode", "fileManagerReadOnly", "trashEnabled"]
+    const riskyFieldsChanged = ["fileManagerEnabled", "fileManagerMode", "fileManagerReadOnly", "trashEnabled", "fileManagerRoots"]
       .some((name) => (baseRiskValues.get(name) || "") !== (next.get(name) || ""));
-    const riskyFileManager = fileRisk(next) && (!fileRisk(baseRiskValues) || riskyFieldsChanged);
+    const rootsChanged = (baseRiskValues.get("fileManagerRoots") || "") !== (next.get("fileManagerRoots") || "");
+    const riskyFileManager = (truthy(next.get("fileManagerEnabled")) && rootsChanged) || (fileRisk(next) && (!fileRisk(baseRiskValues) || riskyFieldsChanged));
     return { loginOff, riskyFileManager };
   }
 
@@ -3890,7 +3893,31 @@
       try {
         if (retry) { await request(`/api/operations/jobs/${retry.dataset.jobRetry}/retry`, { method: "POST" }); notice("후처리 재시도를 요청했습니다.", "success"); await loadAll(); }
         if (cancel && confirm("실행 중인 후처리 작업을 취소할까요?")) { await request(`/api/operations/jobs/${cancel.dataset.jobCancel}/cancel`, { method: "POST" }); notice("취소를 요청했습니다.", "success"); await loadAll(); }
-        if (restore) { const name = restore.dataset.backupRestore; const typed = prompt(`복원하려면 백업 파일명을 입력하세요.\n${name}`); if (typed !== name) return; await request(`/api/operations/backups/${encodeURIComponent(name)}/restore`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ confirm: name }) }); notice("백업을 복원했습니다. 컨테이너 재시작을 권장합니다.", "success"); await loadAll(); }
+        if (restore) {
+          const name = restore.dataset.backupRestore;
+          const typed = prompt(`복원하려면 백업 파일명을 입력하세요.\n${name}`);
+          if (typed !== name) return;
+          // Restore confirmation and result reporting share one path for retries.
+          const restoreBackup = (danger_ack = "") => request(`/api/operations/backups/${encodeURIComponent(name)}/restore`, {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ confirm: name, danger_ack })
+          });
+          let restored;
+          try {
+            restored = await restoreBackup();
+          } catch (error) {
+            if (!String(error.message).includes("위험 설정 적용")) throw error;
+            const ack = prompt(`${error.message}\n확인 문구: 위험 설정 적용`) || "";
+            if (ack.trim() !== "위험 설정 적용") return;
+            restored = await restoreBackup(ack.trim());
+          }
+          const omitted = restored?.pre_restore_backup?.omitted_files || [];
+          notice(omitted.length
+            ? `백업을 복원했습니다. 복원 전 안전 백업에서 손상된 JSON 파일이 제외되었습니다: ${omitted.join(", ")}. 컨테이너 재시작을 권장합니다.`
+            : "백업을 복원했습니다. 컨테이너 재시작을 권장합니다.", omitted.length ? "warning" : "success");
+          // End restore result reporting.
+          await loadAll();
+        }
         if (recover) { const id = recover.dataset.healthRecover; await request(`/api/operations/channels/${encodeURIComponent(id)}/recover`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "restart" }) }); notice("채널 복구를 요청했습니다.", "success"); await loadAll(); }
         if (trace) { const id = trace.dataset.healthTrace; const output = document.querySelector(`[data-trace-output="${id}"]`); const data = await request(`/api/operations/channels/${encodeURIComponent(id)}/trace`); if (output) { output.hidden = false; output.textContent = data.process_stderr_tail || "현재 수집된 stderr 로그가 없습니다."; } }
       } catch (error) { notice(error.message, "error"); }

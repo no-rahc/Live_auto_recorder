@@ -1361,13 +1361,17 @@ async def api_config_export(login: Any = Depends(requireLogin)):
     """전체 설정 + 채널 목록 JSON 백업."""
     try:
         from starlette.responses import Response as StarletteResponse
+        from lar_app.backup_policy import sanitize_secrets
         backup = {
             "export_version": 1,
+            "include_secrets": False,
             "exported_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "config": loadConfig(),
             "channels": loadChannels(),
             "telegram": loadTelegram(),
         }
+        backup = sanitize_secrets(backup)
+        backup["include_secrets"] = False
         content = json.dumps(backup, ensure_ascii=False, indent=2)
         filename = f"live-auto-recorder_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
         return StarletteResponse(
@@ -1383,6 +1387,8 @@ async def api_config_export(login: Any = Depends(requireLogin)):
 async def api_config_import(request: Request, login: Any = Depends(requireLogin)):
     """JSON 백업 파일로 설정 복원."""
     try:
+        from urllib.parse import unquote
+        from lar_app.backup_policy import preserve_existing_secrets
         body = await request.json()
         if not isinstance(body, dict) or "config" not in body:
             return JSONResponse(
@@ -1390,20 +1396,36 @@ async def api_config_import(request: Request, login: Any = Depends(requireLogin)
                 status_code=400
             )
 
-        # 설정 복원
-        if "config" in body:
-            saveConfig(body["config"])
-            request.app.state.config = loadConfig()
+        from lar_app.config_validation import ConfigValidationError, normalize_config_update
+        try:
+            restored_config = normalize_config_update(
+                loadConfig() or {}, preserve_existing_secrets(body["config"], loadConfig() or {}),
+                acknowledgement=unquote(request.headers.get("X-Config-Danger-Ack", "")),
+            )
+        except ConfigValidationError as exc:
+            return JSONResponse({"status": "error", "message": str(exc)}, status_code=400)
+        if "channels" in body and (not isinstance(body["channels"], list) or any(not isinstance(ch, dict) for ch in body["channels"])):
+            return JSONResponse({"status": "error", "message": "channels: 채널 객체 목록이 필요합니다."}, status_code=400)
+        if "channels" in body:
+            ids = [item.get("id") for item in body["channels"]]
+            if any(not isinstance(identifier, str) or not identifier.strip() for identifier in ids) or len(ids) != len(set(ids)):
+                return JSONResponse({"status": "error", "message": "Channels require unique, nonempty IDs."}, status_code=400)
+        if "telegram" in body and (not isinstance(body["telegram"], dict) or any(not isinstance(value, str) for value in body["telegram"].values())):
+            return JSONResponse({"status": "error", "message": "telegram: JSON 객체가 필요합니다."}, status_code=400)
+        saveConfig(restored_config)
+        request.app.state.config = loadConfig()
 
         # 채널 복원
         if "channels" in body and isinstance(body["channels"], list):
-            saveChannels(body["channels"])
+            saveChannels(preserve_existing_secrets(body["channels"], loadChannels()))
 
         # 텔레그램 복원
         if "telegram" in body and isinstance(body["telegram"], dict):
-            saveTelegram(body["telegram"])
+            saveTelegram(preserve_existing_secrets(body["telegram"], loadTelegram()))
 
         return {"status": "success", "message": "설정이 복원되었습니다."}
+    except (ValueError, TypeError) as e:
+        return JSONResponse(content={"status": "error", "message": str(e)}, status_code=400)
     except Exception as e:
         return JSONResponse(content={"status": "error", "message": str(e)}, status_code=500)
 

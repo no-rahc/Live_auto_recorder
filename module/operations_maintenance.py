@@ -383,7 +383,7 @@ class MaintenanceOpsMixin:
                 group_cfg = self.settings.get("recording_groups", {})
                 if group_cfg.get("auto_merge"):
                     from module.recording_catalog import list_merge_candidates
-                    from module.recording_merge import merge_broadcast
+                    from module.recording_merge import MergeInProgressError, merge_broadcast
                     candidates = list_merge_candidates(
                         quiet_seconds=max(30, int(group_cfg.get("quiet_seconds", 900) or 900)),
                         limit=2,
@@ -397,6 +397,9 @@ class MaintenanceOpsMixin:
                             )
                             await self._notify("recording.merged", f"방송 세그먼트 {result.get('segment_count')}개를 합쳤습니다.", result)
                             self.audit("broadcast_merged", f"broadcast={broadcast_id}; output={result.get('output_path')}")
+                        except MergeInProgressError:
+                            # An API request already owns this broadcast merge.
+                            continue
                         except Exception as exc:
                             await self._notify("recording.merge_failed", str(exc), {"broadcast_id": broadcast_id})
                             self.audit("broadcast_merge_failed", f"broadcast={broadcast_id}; error={exc}", "error")
