@@ -1313,6 +1313,17 @@ async def batchEncodeSegments(session_dir: str, base_noext: str, overlap_sec: in
     do_copy = toBool(post_cfg.get("stream_copy", True))
     vopts, _aopts = encodeOpts(post_cfg)
     aopts = ["-c:a", "aac", "-b:a", "192k"]  # 항상 aac 192k
+    successful_outputs = []
+
+    def verified_output(source: str, output: str) -> bool:
+        try:
+            return (
+                os.path.isfile(output)
+                and os.path.getsize(output) > 0
+                and not os.path.samefile(source, output)
+            )
+        except OSError:
+            return False
 
     for i, (idx, cur) in enumerate(segs):
         # 너무 작은/깨진 세그먼트 스킵
@@ -1324,6 +1335,13 @@ async def batchEncodeSegments(session_dir: str, base_noext: str, overlap_sec: in
             pass
 
         out = os.path.join(session_dir, f"fixed_{base_noext}_{idxName(idx)}.mp4")
+        # Never overwrite an existing output (including a source alias). A stale
+        # file must not make a failed/no-output encode look successful either.
+        output_stem, output_ext = os.path.splitext(out)
+        suffix = 1
+        while os.path.lexists(out):
+            out = f"{output_stem} ({suffix}){output_ext}"
+            suffix += 1
         logger.info(f"-> {os.path.basename(out)}")
 
         # 마지막 세그먼트 길이(트림 폴백용)
@@ -1403,32 +1421,37 @@ async def batchEncodeSegments(session_dir: str, base_noext: str, overlap_sec: in
                     logger.info(f"[WARN] 2nd pass failed on {os.path.basename(cur)} → skip")
                     continue
 
+        if not verified_output(cur, out):
+            logger.warning(f"encoded output missing, empty, or aliases source; keeping {os.path.basename(cur)}")
+            continue
+        successful_outputs.append((idx, cur, out))
 
     # 후처리 옵션: 원본 세그먼트(ts) 삭제/이동 유지
-    if post_cfg.get("deleteAfterPostProcessing", False):
-        for _, p in segs:
+    if toBool(post_cfg.get("deleteAfterPostProcessing", False)):
+        for _, source, output in successful_outputs:
+            if not verified_output(source, output):
+                continue
             with contextlib.suppress(Exception):
-                os.remove(p)
-        logger.info(f"후처리 전 원본 파일을 삭제했습니다.")
+                os.remove(source)
 
-    if post_cfg.get("removeFixedPrefix", False):
-        for i, (idx, _) in enumerate(segs):
-            src = os.path.join(session_dir, f"fixed_{base_noext}_{idxName(idx)}.mp4")
-            dst = os.path.join(session_dir, f"{base_noext}_{idxName(idx)}.mp4")
-            if os.path.exists(src):
+    outputs_to_move = []
+    for idx, _, output in successful_outputs:
+        if toBool(post_cfg.get("removeFixedPrefix", False)):
+            destination = os.path.join(session_dir, f"{base_noext}_{idxName(idx)}.mp4")
+            # The original may be an MP4 that the user chose to keep, or a
+            # previous output may already occupy the plain filename.
+            if not os.path.lexists(destination):
                 with contextlib.suppress(Exception):
-                    os.replace(src, dst)
+                    os.replace(output, destination)
+                    output = destination
+        outputs_to_move.append(output)
 
-    if post_cfg.get("moveAfterProcessingEnabled", False) and post_cfg.get("moveAfterProcessing"):
+    if toBool(post_cfg.get("moveAfterProcessingEnabled", False)) and post_cfg.get("moveAfterProcessing"):
         target = post_cfg["moveAfterProcessing"]
         os.makedirs(target, exist_ok=True)
-        for i, (idx, _) in enumerate(segs):
-            name = f"{base_noext}_{idxName(idx)}.mp4"
-            src_fixed = os.path.join(session_dir, f"fixed_{name}")
-            src_plain = os.path.join(session_dir, name)
-            src = src_plain if os.path.exists(src_plain) else (src_fixed if os.path.exists(src_fixed) else None)
-            if src:
-                await moveDirectory(src, target)
+        for output in outputs_to_move:
+            if os.path.isfile(output):
+                await moveDirectory(output, target)
 
 
 # 분할 파이프라인 루프

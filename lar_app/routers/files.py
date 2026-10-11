@@ -9,6 +9,8 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
 from fastapi.responses import FileResponse
 from fastapi.responses import HTMLResponse
 
+from module.file_manager import validateBasename
+
 
 def install_file_routes(app: Any, core: Any) -> None:
     """Register file-manager page/API routes using the legacy domain helpers."""
@@ -155,12 +157,24 @@ def install_file_routes(app: Any, core: Any) -> None:
         _ensure_writable(request)
         parent = body.get("path")
         new_name = body.get("new_name")
-        if not parent or not new_name:
+        if not isinstance(parent, str) or not parent or not new_name:
             raise HTTPException(status_code=400, detail="path/new_name required")
-        async with request.app.state.channels_lock:
-            roots = core.buildAllowedRoots(request.app.state.config, request.app.state.channels)
-        parent = core.ensureInRoots(parent, roots)
-        return {"status": "ok", "created": core.mkdirPath(parent, new_name)}
+        roots, busy = await _roots_and_busy(request)
+        try:
+            new_name = validateBasename(new_name)
+            parent = core.ensureInRoots(parent, roots)
+            dst = core.ensureInRoots(os.path.join(parent, new_name), roots)
+            if core.isLocked(dst, busy):
+                raise HTTPException(status_code=423, detail="Locked (recording)")
+            return {"status": "ok", "created": core.mkdirPath(parent, new_name)}
+        except (TypeError, ValueError) as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        except PermissionError as exc:
+            raise HTTPException(status_code=403, detail="Path is not allowed") from exc
+        except FileExistsError as exc:
+            raise HTTPException(status_code=409, detail="Destination already exists") from exc
+        except (FileNotFoundError, NotADirectoryError) as exc:
+            raise HTTPException(status_code=404, detail="Path not found") from exc
 
     @router.post("/api/files/rename")
     async def api_files_rename(
@@ -172,13 +186,24 @@ def install_file_routes(app: Any, core: Any) -> None:
         _ensure_writable(request)
         src = body.get("path")
         new_name = body.get("new_name")
-        if not src or not new_name:
+        if not isinstance(src, str) or not src or not new_name:
             raise HTTPException(status_code=400, detail="path/new_name required")
         roots, busy = await _roots_and_busy(request)
-        src = core.ensureInRoots(src, roots)
-        if core.isLocked(src, busy):
-            raise HTTPException(status_code=423, detail="Locked (recording)")
-        return {"status": "ok", "path": core.renamePath(src, new_name)}
+        try:
+            new_name = validateBasename(new_name)
+            src = core.ensureInRoots(src, roots)
+            dst = core.ensureInRoots(os.path.join(os.path.dirname(src), new_name), roots)
+            if core.isLocked(src, busy) or core.isLocked(dst, busy):
+                raise HTTPException(status_code=423, detail="Locked (recording)")
+            return {"status": "ok", "path": core.renamePath(src, new_name)}
+        except (TypeError, ValueError) as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        except PermissionError as exc:
+            raise HTTPException(status_code=403, detail="Path is not allowed") from exc
+        except FileExistsError as exc:
+            raise HTTPException(status_code=409, detail="Destination already exists") from exc
+        except (FileNotFoundError, NotADirectoryError) as exc:
+            raise HTTPException(status_code=404, detail="Path not found") from exc
 
     @router.post("/api/files/move")
     async def api_files_move(

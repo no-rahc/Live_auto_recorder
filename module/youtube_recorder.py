@@ -12,7 +12,6 @@ import subprocess
 import shutil
 import contextlib
 import psutil
-import glob
 import signal
 import errno
 import sys
@@ -774,18 +773,33 @@ async def checkStopRequest(channel_id: str, proc):
             break
 
 
+def findSessionOutput(prefix_path: str) -> str | None:
+    """Find only this invocation's exact output prefix, allowing container changes.
+
+    Output directories and TMP_ROOT can be shared by concurrent recordings.
+    Recency (or a basename match in TMP_ROOT) does not establish ownership;
+    other paths may only be accepted when reported by this recording's process.
+    """
+    for ext in (".mp4", ".mkv", ".ts"):
+        candidate = prefix_path + ext
+        if os.path.isfile(candidate):
+            return candidate
+    return None
+
+
 # 유튜브 병합 후 파일 이동 공통 함수
 async def moveAfterProcessingTask(*, mp_enabled: bool, mp_dir: str, prefix_path: str, move_src: str | None,
                                   base_dir: str = base_directory, scan_window_sec: int = 900, settle_sec: float = 5.0, 
                                   retries: int = 8, retry_delay: float = 1.2, channel_id: str | None = None, channel_name: str | None = None):
 
+    # scan_window_sec remains accepted for compatibility; recency is not ownership.
     # 0) 설정 로깅 및 빠른 실패 사유 노출
-    logger.info(f"enabled={mp_enabled} dest='{mp_dir}' prefix='{prefix_path}' src='{move_src}'", flush=True)
+    logger.info(f"enabled={mp_enabled} dest='{mp_dir}' prefix='{prefix_path}' src='{move_src}'")
     if not mp_enabled:
-        logger.info("skip: moveAfterProcessingEnabled=False", flush=True)
+        logger.info("skip: moveAfterProcessingEnabled=False")
         return
     if not mp_dir or not mp_dir.strip():
-        logger.info("skip: moveAfterProcessing path is empty", flush=True)
+        logger.info("skip: moveAfterProcessing path is empty")
         return
 
     # 1) 목적지 절대경로화
@@ -793,38 +807,20 @@ async def moveAfterProcessingTask(*, mp_enabled: bool, mp_dir: str, prefix_path:
     if not os.path.isabs(dest_dir):
         dest_dir = os.path.join(base_dir, dest_dir)
 
-    # 2) 후보 파일 확보 (우선순위: 인자로 받은 move_src → prefix 확장자 매칭 → 최근 스캔)
-    candidate = move_src if (move_src and os.path.exists(move_src)) else None
+    # 2) Only a process-reported path or this session's exact output prefix.
+    candidate = move_src if (move_src and os.path.isfile(move_src)) else None
     if not candidate:
-        for ext in (".mp4", ".mkv", ".ts"):
-            p = prefix_path + ext
-            if os.path.exists(p):
-                candidate = p
-                break
-
-    if not candidate:
-        root_dir = os.path.dirname(prefix_path)
-        now = time.time()
-        cands = []
-        for root in (root_dir, TMP_ROOT):
-            for ext in (".mp4", ".mkv", ".ts"):
-                cands.extend(glob.glob(os.path.join(root, f"*{ext}")))
-        # 최근 파일만
-        cands = [p for p in cands if os.path.getmtime(p) >= now - scan_window_sec]
-        same_stem = [p for p in cands if os.path.splitext(p)[0] == prefix_path]
-        pick = same_stem[0] if same_stem else (max(cands, key=os.path.getmtime) if cands else None)
-        if pick and os.path.exists(pick):
-            candidate = pick
+        candidate = findSessionOutput(prefix_path)
 
     if not candidate or not os.path.exists(candidate):
-        logger.info(f"no-candidate: prefix='{prefix_path}' window={scan_window_sec}s", flush=True)
+        logger.info(f"no session-owned candidate: prefix='{prefix_path}'")
         return
 
     # 3) 같은 폴더면 이동 불필요
     src_dir = os.path.normcase(os.path.abspath(os.path.dirname(candidate)))
     dst_dir = os.path.normcase(os.path.abspath(dest_dir))
     if src_dir == dst_dir:
-        logger.info(f"skip: destination equals source dir: {dst_dir}", flush=True)
+        logger.info(f"skip: destination equals source dir: {dst_dir}")
         return
 
     # 4) 작업 안정화를 위해 잠깐 대기
@@ -833,9 +829,9 @@ async def moveAfterProcessingTask(*, mp_enabled: bool, mp_dir: str, prefix_path:
     # 5) PermissionError(특히 WinError 32) 등에 대한 재시도 래핑
     for i in range(1, retries + 1):
         try:
-            logger.info(f"try {i}/{retries}: '{candidate}' → '{dest_dir}'", flush=True)
+            logger.info(f"try {i}/{retries}: '{candidate}' → '{dest_dir}'")
             await moveDirectory(candidate, dest_dir)
-            logger.info("done", flush=True)
+            logger.info("done")
 
             # 병합 완료 안전망 알림 (파이프/메인 경로에서 놓친 경우)
             try:
@@ -845,7 +841,7 @@ async def moveAfterProcessingTask(*, mp_enabled: bool, mp_dir: str, prefix_path:
                     )
                     last_notified_state[channel_id] = "병합완료"
             except Exception as _e:
-                logger.warning(f"yt merge-done telegram (late-move) failed: {_e}", flush=True)
+                logger.warning(f"yt merge-done telegram (late-move) failed: {_e}")
 
             return
 
@@ -855,10 +851,10 @@ async def moveAfterProcessingTask(*, mp_enabled: bool, mp_dir: str, prefix_path:
             if isinstance(e, PermissionError) or "used by another process" in str(e).lower():
                 await asyncio.sleep(retry_delay)
                 continue
-            logger.info(f"failed (non-retry): {e}", flush=True)
+            logger.info(f"failed (non-retry): {e}")
             return
 
-    logger.info(f"failed: all retries exhausted for '{candidate}'", flush=True)
+    logger.info(f"failed: all retries exhausted for '{candidate}'")
 
 
 # 유튜브용 녹화 시작 함수
@@ -1230,7 +1226,7 @@ async def ytStartRecording(channel, recheckInterval: int, filenamePattern: str, 
                     break
                 await asyncio.sleep(0.5)
 
-            # 15-1) 우선순위: 패턴 경로 → pipe → 스캔
+            # 15-1) 우선순위: 패턴 경로 → pipe → 동일 세션의 다른 확장자
             if not move_src:
                 if real_final and os.path.exists(real_final):
                     wanted = output_path if not os.path.exists(output_path) else \
@@ -1240,21 +1236,13 @@ async def ytStartRecording(channel, recheckInterval: int, filenamePattern: str, 
                         logger.debug(f"rename -> '{wanted}' (from pipe)", flush=True)
                         move_src = wanted
                 if not move_src:
-                    root_dir = os.path.dirname(prefix_path)
-                    now = time.time()
-                    candidates = []
-                    for root in (root_dir, TMP_ROOT):
-                        for _ext in (".mp4", ".mkv", ".ts"):
-                            candidates.extend(glob.glob(os.path.join(root, f"*{_ext}")))
-                    candidates = [p for p in candidates if os.path.getmtime(p) >= now - 900]
-                    same_stem = [p for p in candidates if os.path.splitext(p)[0] == prefix_path]
-                    pick = same_stem[0] if same_stem else (max(candidates, key=os.path.getmtime) if candidates else None)
+                    pick = findSessionOutput(prefix_path)
                     if pick and os.path.exists(pick):
                         wanted = output_path if not os.path.exists(output_path) else \
                                  uniqueFilename(os.path.dirname(output_path), os.path.basename(output_path), add_suffix=True)
                         ok = await safeRename(pick, wanted) if pick != wanted else True
                         if ok:
-                            logger.debug(f"adopt scanned -> '{wanted}'", flush=True)
+                            logger.debug(f"adopt session output -> '{wanted}'", flush=True)
                             move_src = wanted
 
             # 15-2) cleanup & 진행파일 삭제

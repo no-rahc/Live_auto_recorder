@@ -782,15 +782,14 @@ async function startRecording(channelId) {
       body: JSON.stringify({ is_user_request: true })
     });
 
-    // 에러 응답 처리
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.detail || '녹화 시작 요청에 실패했습니다.');
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || data.status !== 'success') {
+      throw new Error(data.message || data.detail || '녹화 시작 요청에 실패했습니다.');
     }
 
     // 성공 응답 처리
-    const data = await response.json().catch(() => ({}));
     if (data.status === 'success') {
+      window.LiveAutoRecorderUI?.toast(data.message || '녹화 요청이 처리되었습니다.', 'success');
       const st   = data.state || '녹화 중';
   	  const file = data.filename || data.recording_filename
 			    || (data.output_path ? String(data.output_path).split(/[\\/]/).pop() : '')
@@ -807,6 +806,11 @@ async function startRecording(channelId) {
     }
   } catch (error) {
     console.error(`녹화 시작 오류 - 채널 ID: ${channelId}:`, error);
+    if (window.LiveAutoRecorderUI?.toast) {
+      window.LiveAutoRecorderUI.toast(error.message, 'error');
+    } else {
+      alert(error.message);
+    }
   } finally {
     isStartingRecordings = false;
   }
@@ -2358,7 +2362,7 @@ function setupFilesPage() {
     const name = prompt("새 폴더 이름을 입력하세요", "새 폴더");
     if (!name) return;
     try {
-      await apiPost("/api/files/mkdir", { path: filesCurrentPath, name });
+      await apiPost("/api/files/mkdir", { path: filesCurrentPath, new_name: name });
       await listAndRender(filesCurrentPath);
     } catch (e) {
       alert(`폴더 생성 실패: ${e.message}`);

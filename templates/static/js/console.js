@@ -1162,7 +1162,8 @@
       const request = input instanceof Request ? input : null;
       const method = String(init?.method || request?.method || "GET").toUpperCase();
       const url = String(request?.url || input || "");
-      const silent = /\/api\/sys_metrics|\/ws\/sys_metrics|recording_history/i.test(url);
+      // The recording-start UI handles its structured result and error message.
+      const silent = /\/api\/sys_metrics|\/ws\/sys_metrics|recording_history|\/api\/start_recording\//i.test(url);
 
       return nativeFetch(input, init).then(function (response) {
         if (!silent && method !== "GET") {

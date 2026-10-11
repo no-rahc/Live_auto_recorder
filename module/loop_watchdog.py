@@ -54,14 +54,15 @@ def spawnHeartbeat(channel_id: str, get_proc: Callable[[], Optional[asyncio.subp
 
 # 안전취소 헬퍼
 async def cancelTaskSafely(task: Optional[asyncio.Task]) -> None:
-    if not task:
+    if task is None:
         return
-    try:
-        task.cancel()
-        with contextlib.suppress(Exception):
-            await task
-    except Exception:
-        pass
+    if task is asyncio.current_task():
+        raise ValueError("cancelTaskSafely requires a child task")
+    task.cancel()
+    # Child cancellation is an expected result, not a cancellation of the
+    # caller. gather consumes child failures/CancelledError but still propagates
+    # cancellation directed at the caller while it waits for child cleanup.
+    await asyncio.gather(task, return_exceptions=True)
 
 
 async def watchdogLoop(get_channels, start_recording_for_channel, stop_recording_for_channel,

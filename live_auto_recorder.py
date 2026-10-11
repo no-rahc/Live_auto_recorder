@@ -17,7 +17,7 @@ import string
 import shutil
 import secrets
 from datetime import datetime
-from typing import Optional, Any, List, Dict
+from typing import Optional, Any, List, Dict, Literal, TypedDict
 
 from module.recording_history import get_history, get_stats as get_recording_stats
 
@@ -365,30 +365,46 @@ async def autoRecording(app: FastAPI):
         logger.debug("자동 녹화 모드가 비활성화되어 있습니다.")
 
 
+class RecordingStartSuccess(TypedDict):
+    status: Literal["success"]
+    state: str
+    filename: str
+
+
+class RecordingStartError(TypedDict):
+    status: Literal["error"]
+    code: Literal["channel_not_found", "start_failed"]
+    message: str
+    status_code: int
+
+
 # 특정 채널의 녹화를 시작하는 함수
-async def startRecordingForChannel(app, channel_id: str, is_user_request: bool = False):
+async def startRecordingForChannel(
+    app, channel_id: str, is_user_request: bool = False,
+) -> RecordingStartSuccess | RecordingStartError:
     async with app.state.channels_lock:
         channels = list(app.state.channels)
     ch = next((c for c in channels if c.get("id") == channel_id), None)
     if not ch:
-        return {"status": "error", "message": "unknown channel"}
+        return {
+            "status": "error", "code": "channel_not_found",
+            "message": "unknown channel", "status_code": 404,
+        }
 
     from module.data_manager import RecorderManager
     rm = RecorderManager()
 
-    # 0) 이전 세션 잔재 선제 정리(이전 파일명/시간이 UI에 비치지 않도록)
-    rm.recording_remove_start_time(channel_id)
-    rm.recording_remove_filename(channel_id)
-    rm.clear_tasks_process(channel_id)
-    rm.set_status_recording(channel_id, False)
-
-    # 1) 사용자 시작 의사 표시 및 예약 표기
-    rm.set_is_user_stopped(channel_id, False)
-    if bool(ch.get("record_enabled", True)):
-        rm.set_status_reserved(channel_id, True)
-
-    # 2) FSM에 실제 시작 요청
     try:
+        # Preserve a live session so the FSM can recognize an idempotent start.
+        process = rm.get_tasks_process(channel_id)
+        active = rm.get_status_recording(channel_id) or (process and process.returncode is None)
+        if not active:
+            rm.recording_remove_start_time(channel_id)
+            rm.recording_remove_filename(channel_id)
+            rm.clear_tasks_process(channel_id)
+            rm.set_status_recording(channel_id, False)
+
+        # The FSM owns intent/reservation flags; a rejected start must not reserve.
         await app.state.fsm.userStart(channel_id, is_user_request=is_user_request)
 
         try:
@@ -403,7 +419,11 @@ async def startRecordingForChannel(app, channel_id: str, is_user_request: bool =
         state = "녹화 중" if rec and not rsv else ("예약녹화 중" if rsv else "대기 중")
         return {"status": "success", "state": state, "filename": file}
     except Exception as e:
-        return {"status": "error", "message": str(e)}
+        logger.exception("recording start request failed for %s", channel_id)
+        return {
+            "status": "error", "code": "start_failed",
+            "message": str(e) or "녹화 시작 요청에 실패했습니다.", "status_code": 500,
+        }
 
 
 

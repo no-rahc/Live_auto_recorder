@@ -26,7 +26,18 @@ def install_recording_routes(app: Any, core: Any) -> None:
         except Exception:
             is_user_request = False
 
-        await core.startRecordingForChannel(request.app, channel_id, is_user_request=is_user_request)
+        result = await core.startRecordingForChannel(
+            request.app, channel_id, is_user_request=is_user_request,
+        )
+        if result.get("status") == "error":
+            return JSONResponse(
+                status_code=result.get("status_code", 500),
+                content={
+                    "status": "error",
+                    "code": result.get("code", "start_failed"),
+                    "message": result.get("message") or "녹화 시작 요청에 실패했습니다.",
+                },
+            )
 
         for _ in range(20):
             recording = core.recorder_manager.get_status_recording(channel_id)
