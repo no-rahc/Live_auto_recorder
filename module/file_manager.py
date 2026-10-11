@@ -1,6 +1,7 @@
 from module.log_setup import get_logger
 logger = get_logger("file_manager")
 import os
+import errno
 import shutil 
 import time
 import subprocess
@@ -240,13 +241,48 @@ def streamCopyFile(src: str) -> str:
     return dst
 
 
+def validateBasename(name: str) -> str:
+    """Accept one literal name, never a path or a Windows drive/stream name."""
+    if (
+        not isinstance(name, str)
+        or not name.strip()
+        or name in {".", ".."}
+        or any(char in name for char in "/\\:")
+        or any(ord(char) < 32 for char in name)
+    ):
+        raise ValueError("new_name must be a single file or directory name")
+    if os.name == "nt":
+        # Windows strips trailing dots/spaces and resolves device names specially.
+        stem = name.split(".", 1)[0].rstrip(" ").upper()
+        reserved = {"CON", "PRN", "AUX", "NUL", "CONIN$", "CONOUT$"}
+        reserved.update(
+            f"{prefix}{suffix}"
+            for prefix in ("COM", "LPT")
+            for suffix in "123456789¹²³"
+        )
+        if (
+            name.endswith((".", " "))
+            or stem in reserved
+            or any(char in name for char in '<>"|?*')
+        ):
+            raise ValueError("new_name must be a valid file or directory name")
+    return name
+
+
 def renamePath(src: str, newName: str) -> str:
+    newName = validateBasename(newName)
     dst = os.path.join(os.path.dirname(src), newName)
-    os.replace(src, dst)
+    # No overwrite option is exposed by the file manager. Include dangling links
+    # in the collision check, while retaining same-name renames as a no-op.
+    same_name = os.path.normcase(os.path.abspath(src)) == os.path.normcase(os.path.abspath(dst))
+    if os.path.lexists(dst) and not same_name:
+        raise FileExistsError(errno.EEXIST, "Destination already exists", dst)
+    os.rename(src, dst)
     return dst
 
 
 def mkdirPath(parent: str, name: str) -> str:
+    name = validateBasename(name)
     p = os.path.join(parent, name)
     os.makedirs(p, exist_ok=True)
     return p
@@ -268,11 +304,13 @@ def busyFilePaths(recorderManager, channels: List[dict]) -> List[str]:
 def isLocked(path: str, busyPaths: List[str]) -> bool:
     rp = normPath(path)
     for bp in busyPaths:
-        if rp == bp:
-            return True
-        # 파일이 들어있는 폴더 자체를 옮기거나 지우는 것도 잠금
-        if rp.startswith(os.path.dirname(bp) + os.sep):
-            return True
+        # Lock the recording and its ancestors, not unrelated sibling files.
+        try:
+            if os.path.commonpath([rp, normPath(bp)]) == rp:
+                return True
+        except ValueError:
+            # Paths on different Windows drives cannot contain one another.
+            continue
     return False
 
 
