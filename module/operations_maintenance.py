@@ -227,6 +227,8 @@ class MaintenanceOpsMixin:
     # --------------------------- update -------------------------------
     def version_status(self, force: bool = False) -> dict[str, Any]:
         self._maintenance_init()
+        if os.getenv("LAR_DISABLE_UPDATE_CHECK", "").lower() in {"1", "true", "yes"}:
+            return {"status": "disabled", "update_available": False, "latest": "", "current": str(getattr(self.lar, "PROGRAM_VERSION", "unknown"))}
         now = time.time()
         if self._version_cache and not force and now - float(self._version_cache.get("checked_epoch", 0) or 0) < 3600:
             return self._version_cache
@@ -395,6 +397,8 @@ class MaintenanceOpsMixin:
                                 broadcast_id,
                                 delete_segments=bool(group_cfg.get("delete_segments_after_merge", False)),
                             )
+                            if "job_id" in result:
+                                continue  # Job acceptance is not merge completion.
                             await self._notify("recording.merged", f"방송 세그먼트 {result.get('segment_count')}개를 합쳤습니다.", result)
                             self.audit("broadcast_merged", f"broadcast={broadcast_id}; output={result.get('output_path')}")
                         except MergeInProgressError:

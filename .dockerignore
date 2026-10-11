@@ -27,3 +27,12 @@ htmlcov
 .DS_Store
 .idea
 .vscode
+
+# Build-only tooling and generated test reports
+node_modules
+**/node_modules
+.npm-cache
+.pw-browsers
+.test-deps
+frontend/test-results
+frontend/playwright-report

@@ -35,6 +35,8 @@ class ChannelFsm:
     def __init__(self):
         self.rm = RecorderManager()
         self.runtimes: Dict[str, ChannelRuntime] = {}
+        # Installed only by the opt-in v2 lifespan, before any watcher starts.
+        self.v2_policy = None
 
     def _runtime(self, cid: str) -> ChannelRuntime:
         runtime = self.runtimes.get(cid)
@@ -59,7 +61,11 @@ class ChannelFsm:
 
     # 실제 녹화 프로세스 생존 확인 유틸
     def _procAlive(self, cid: str) -> bool:
+        if self.v2_policy and self.v2_policy.capture_is_active(cid):
+            return True
         proc = self.rm.get_tasks_process(cid)
+        if proc is None and self.v2_policy:
+            proc = self.v2_policy.capture_process(cid)
         return bool(proc and proc.returncode is None)  # None이면 아직 종료되지 않음
 
     async def userStart(self, channelId: str, is_user_request: bool = False):
@@ -70,7 +76,9 @@ class ChannelFsm:
                 return
 
             # 자동/대량 시작은 record_enabled 필요, 수동은 1회 시작 허용
-            if (not ch.get("record_enabled", True)) and (not is_user_request):
+            permitted = (self.v2_policy.should_watch(channelId) if self.v2_policy
+                         else ch.get("record_enabled", True))
+            if not permitted and not is_user_request:
                 self._setStopped(channelId)
                 return
 
@@ -158,11 +166,22 @@ class ChannelFsm:
             await asyncio.gather(*tasks, return_exceptions=True)
 
     async def stopAll(self):
-        for ch in (self.rm.getChannels() or []):
-            await self.stop(ch.get("id"), reason="shutdown")
+        channel_ids = {ch.get("id") for ch in (self.rm.getChannels() or []) if ch.get("id")}
+        if self.v2_policy:
+            channel_ids.update(self.runtimes)
+        for cid in channel_ids:
+            await self.stop(cid, reason="shutdown")
+            if self.v2_policy:
+                self.v2_policy.capture_finished(cid)
 
     async def _killProcessTree(self, cid: str, timeout: float = 3.0):
         proc = self.rm.get_tasks_process(cid)
+        if proc is None and self.v2_policy:
+            proc = self.v2_policy.capture_process(cid)
+        if self.v2_policy and os.name == "posix":
+            await self.v2_policy.terminate_capture_groups(cid, process=proc, timeout=timeout)
+            self.rm.clear_tasks_process(cid)
+            return
         if not proc or proc.returncode is not None:
             return
 
@@ -262,10 +281,15 @@ class ChannelFsm:
 
     async def _stopAllWorkers(self, cid: str):
         runtime = self._runtime(cid)
+        # Some legacy recorder finalizers clear the manager handle when their
+        # coroutine is cancelled. Retain ownership until actual process exit.
+        process = (self.rm.get_tasks_process(cid) or self.v2_policy.capture_process(cid)) if self.v2_policy else None
         respawn_task, runtime.respawn_task = runtime.respawn_task, None
         watch_task, runtime.watch_task = runtime.watch_task, None
         await self._cancelTask(respawn_task)
         await self._cancelTask(watch_task)
+        if process is not None and process.returncode is None and not self.rm.get_tasks_process(cid):
+            self.rm.set_tasks_process(cid, process)
         await self._killProcessTree(cid)
 
     async def _cancelTask(self, task: Optional[asyncio.Task]):
@@ -290,7 +314,9 @@ class ChannelFsm:
             try:
                 await self._sleepWithJitter(base_seconds)
                 ch = self._findChannel(cid)
-                if ch and ch.get("record_enabled", True) and not runtime.stop_requested:
+                permitted = (self.v2_policy.should_watch(cid) if self.v2_policy
+                             else bool(ch and ch.get("record_enabled", True)))
+                if ch and permitted and not runtime.stop_requested:
                     self._spawnWatch(cid)
             finally:
                 if runtime.respawn_task is asyncio.current_task():
@@ -311,11 +337,17 @@ class ChannelFsm:
                 self._setStopped(cid)
                 return
 
+            if self.v2_policy and self._procAlive(cid):
+                self._setRecording(cid)
+                return
+
             if runtime.stop_requested:
                 self._setStopped(cid)
                 return
 
-            if (not ch.get("record_enabled", True)) and (not is_user_request):
+            permitted = (self.v2_policy.should_watch(cid) if self.v2_policy
+                         else ch.get("record_enabled", True))
+            if not permitted and not is_user_request:
                 self._setStopped(cid)
                 return
 
@@ -323,12 +355,15 @@ class ChannelFsm:
 
             try:
                 cfg = loadConfig() or {}
-                outcome = await startSession(
-                    ch,
-                    (ch.get("platform") or "").lower(),
-                    cfg,
-                    is_user_request=is_user_request,
-                )
+                policy = self.v2_policy
+                session_context = policy.session_context(cid) if policy else contextlib.nullcontext()
+                with session_context:
+                    outcome = await startSession(
+                        ch,
+                        (ch.get("platform") or "").lower(),
+                        cfg,
+                        is_user_request=(policy.session_is_manual(cid) if policy else is_user_request),
+                    )
                 runtime.last_outcome = outcome
                 if outcome == SessionOutcome.RETRYABLE_ERROR:
                     runtime.retry_attempts += 1
@@ -353,7 +388,14 @@ class ChannelFsm:
                     SessionOutcome.FATAL_ERROR,
                     SessionOutcome.UNSUPPORTED,
                 }
-                if terminal or not ch2 or not ch2.get("record_enabled", True) or runtime.stop_requested:
+                permitted = bool(ch2 and ch2.get("record_enabled", True))
+                if self.v2_policy:
+                    permitted = self.v2_policy.session_finished(cid, outcome)
+                    # Pausing keeps the current broadcast scope, including its
+                    # reconnects. The next metadata guard prevents a new one.
+                    if outcome == SessionOutcome.DISABLED and permitted:
+                        terminal = False
+                if terminal or not ch2 or not permitted or runtime.stop_requested:
                     self._setStopped(cid)
 
                 else:

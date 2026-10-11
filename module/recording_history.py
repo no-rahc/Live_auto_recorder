@@ -62,7 +62,7 @@ def _mirror_event(entry: dict) -> None:
     if entry.get("event") == "recording_stopped":
         try:
             from module.recording_verify import queue_validation
-            queue_validation(str(entry.get("channel_id") or ""), str(entry.get("filename") or ""))
+            queue_validation(str(entry.get("channel_id") or ""), str(entry.get("final_filename") or entry.get("filename") or ""))
         except Exception as exc:
             logger.warning(f"recording validation queue failed: {exc}")
 
@@ -106,6 +106,10 @@ def log_event(
         entry.update(trace)
     if extra:
         entry.update(extra)
+    # The v2 recording task binds the provider identity once at admission.
+    # Outside that context this is a no-op and legacy history stays unchanged.
+    from module.v2_channels import event_identity
+    entry.update(event_identity(channel_id))
     if filename and not entry.get("file_path"):
         entry["file_path"] = str(filename)
 

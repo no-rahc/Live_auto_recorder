@@ -119,6 +119,16 @@ async def lifespan(app: FastAPI):
     try:
         await initChannelStates(app)
 
+        # Load durable intent and suppression before any automatic watcher can
+        # reach a platform engine. Legacy mode does not initialize a v2 DB.
+        from module.v2_runtime import enabled as v2_enabled, get_repository
+        if v2_enabled():
+            from module.v2_channels import ChannelControlService
+            app.state.v2_channels = ChannelControlService(get_repository(), app.state.fsm)
+            await app.state.v2_channels.initialize(
+                app.state.channels, auto_start=bool(app.state.config.get("autoRecordingMode", False)),
+            )
+
         app.state.meta_fetcher = _makeMetaFetcher(app)
         app.state.save_debounced = DebouncedSaver(app, delay=1.2)
         mc_ensure(app)
@@ -131,7 +141,7 @@ async def lifespan(app: FastAPI):
         )
 
         # 부팅시 한 번만 자동 시작 (Auto ON일 때)
-        if app.state.config.get("autoRecordingMode", False):
+        if not v2_enabled() and app.state.config.get("autoRecordingMode", False):
             logger.debug("자동 녹화 모드: 부팅시 한 번만 WATCHING 진입")
             await app.state.fsm.startAllWatching()
 
@@ -186,9 +196,11 @@ async def lifespan(app: FastAPI):
             logger.warning(f"save_debounced.flush failed: {e}")
 
         # 녹화/감시 worker를 먼저 정상 정리해 orphan recorder process를 남기지 않는다.
+        app.state.v2_capture_shutdown_clean = False
         try:
             if hasattr(app.state, "fsm") and app.state.fsm:
                 await asyncio.wait_for(app.state.fsm.stopAll(), timeout=20)
+                app.state.v2_capture_shutdown_clean = True
         except asyncio.TimeoutError:
             logger.warning("FSM graceful shutdown timed out after 20s")
         except Exception as e:
@@ -405,7 +417,12 @@ async def startRecordingForChannel(
             rm.set_status_recording(channel_id, False)
 
         # The FSM owns intent/reservation flags; a rejected start must not reserve.
-        await app.state.fsm.userStart(channel_id, is_user_request=is_user_request)
+        controller = getattr(app.state, "v2_channels", None)
+        if controller is not None and is_user_request:
+            import uuid
+            await controller.command(channel_id, "start_once", "legacy-start:" + uuid.uuid4().hex)
+        else:
+            await app.state.fsm.userStart(channel_id, is_user_request=is_user_request)
 
         try:
             await asyncio.sleep(0.15)
@@ -432,12 +449,16 @@ async def stopRecordingForChannel(app: FastAPI, channel_id: str):
     try:
         last = recorder_manager.get_recording_filename(channel_id)
 
-        # 1) 사용자 중지 플래그
-        recorder_manager.set_is_user_stopped(channel_id, True)
-        recorder_manager.set_status_reserved(channel_id, False)
-
-        # 2) FSM 중지
-        await app.state.fsm.userStop(channel_id)
+        controller = getattr(app.state, "v2_channels", None)
+        if controller is not None:
+            # Suppression must commit before a stop flag can end the engine.
+            await controller.legacy_stop(channel_id)
+        else:
+            # 1) 사용자 중지 플래그
+            recorder_manager.set_is_user_stopped(channel_id, True)
+            recorder_manager.set_status_reserved(channel_id, False)
+            # 2) FSM 중지
+            await app.state.fsm.userStop(channel_id)
 
         # 3) ★즉시 UI 혼선 방지: 스테일 상태 정리
         recorder_manager.set_status_recording(channel_id, False)
@@ -456,6 +477,8 @@ async def stopRecordingForChannel(app: FastAPI, channel_id: str):
 
     except Exception as e:
         logger.warning(f"stopRecordingForChannel failed for {channel_id}: {e}")
+        if getattr(app.state, "v2_channels", None) is not None:
+            raise
         return None
 
 
@@ -463,6 +486,14 @@ async def stopRecordingForChannel(app: FastAPI, channel_id: str):
 async def startRecordingForAllChannels(app, is_user_request: bool=False):
     async with app.state.channels_lock:
         channels = [dict(c) for c in app.state.channels]
+
+    if getattr(app.state, "v2_channels", None) is not None:
+        results = {}
+        for channel in channels:
+            cid = channel.get("id")
+            if cid and channel.get("record_enabled", True):
+                results[cid] = await startRecordingForChannel(app, cid, is_user_request=is_user_request)
+        return results
 
     results = {}
     tasks = []
@@ -492,6 +523,11 @@ async def startRecordingForAllChannels(app, is_user_request: bool=False):
 
 # 모든 플랫폼 동시에 모두 녹화 중지하기 함수
 async def stopRecordingForAllChannels(app: FastAPI):
+    if getattr(app.state, "v2_channels", None) is not None:
+        for channel in list(app.state.channels):
+            if channel.get("id"):
+                await stopRecordingForChannel(app, channel["id"])
+        return
     # 1) 스냅샷
     pre_snap = {}
     async with app.state.channels_lock:
@@ -1329,13 +1365,13 @@ async def testTelegram(request: Request, login: Any = Depends(requireLogin)):
         if r.status_code == 200:
             return JSONResponse(content={'status': 'success', 'message': '테스트 메시지를 전송했습니다.'})
         else:
-            # 텔레그램에서 내려주는 에러 바디 그대로 전달
+            # Upstream response bodies and exception URLs can contain the bot token.
             return JSONResponse(
-                content={'status': 'error', 'message': f"전송 실패: {r.status_code} {r.text}"},
+                content={'status': 'error', 'message': f"전송 실패: {r.status_code}"},
                 status_code=400
             )
-    except Exception as e:
-        return JSONResponse(content={'status': 'error', 'message': str(e)}, status_code=500)
+    except Exception:
+        return JSONResponse(content={'status': 'error', 'message': '텔레그램 테스트 메시지를 전송하지 못했습니다.'}, status_code=500)
 
 
 # ── #3: 녹화 이력 API ────────────────────────────────────────
@@ -1379,13 +1415,16 @@ async def api_config_export(login: Any = Depends(requireLogin)):
             media_type="application/json",
             headers={"Content-Disposition": f'attachment; filename="{filename}"'}
         )
-    except Exception as e:
-        return JSONResponse(content={"status": "error", "message": str(e)}, status_code=500)
+    except Exception:
+        return JSONResponse(content={"status": "error", "message": "설정 백업 파일을 생성하지 못했습니다."}, status_code=500)
 
 
 @app.post("/api/config_import")
 async def api_config_import(request: Request, login: Any = Depends(requireLogin)):
     """JSON 백업 파일로 설정 복원."""
+    from module.v2_runtime import enabled as v2_enabled
+    if v2_enabled():
+        return JSONResponse(status_code=409, content={"status": "error", "code": "OFFLINE_RESTORE_REQUIRED", "message": "Stop the v2 service before restoring legacy configuration and channel files."})
     try:
         from urllib.parse import unquote
         from lar_app.backup_policy import preserve_existing_secrets
@@ -1424,15 +1463,18 @@ async def api_config_import(request: Request, login: Any = Depends(requireLogin)
             saveTelegram(preserve_existing_secrets(body["telegram"], loadTelegram()))
 
         return {"status": "success", "message": "설정이 복원되었습니다."}
-    except (ValueError, TypeError) as e:
-        return JSONResponse(content={"status": "error", "message": str(e)}, status_code=400)
-    except Exception as e:
-        return JSONResponse(content={"status": "error", "message": str(e)}, status_code=500)
+    except (ValueError, TypeError):
+        return JSONResponse(content={"status": "error", "message": "유효하지 않은 백업 파일입니다."}, status_code=400)
+    except Exception:
+        return JSONResponse(content={"status": "error", "message": "설정을 복원하지 못했습니다."}, status_code=500)
 
 
 # ── #5: 파일 정리 (Retention) API ────────────────────────────
 @app.post("/api/file_cleanup")
 async def api_file_cleanup(request: Request, login: Any = Depends(requireLogin)):
+    from module.v2_runtime import enabled as v2_enabled
+    if v2_enabled():
+        return JSONResponse(status_code=409, content={"status": "error", "code": "REFERENCE_AWARE_CLEANUP_REQUIRED", "message": "Legacy retention cleanup is disabled while v2 jobs may reference recordings."})
     """
     녹화 파일 정리.
     body: {

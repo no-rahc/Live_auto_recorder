@@ -1,0 +1,62 @@
+Live Auto Recorder 2.0 preview — local validation
+Date: 2026-10-11 UTC
+Baseline: 059f081c4f683b6ffa996b8fab5e7fe43ea6e731
+Environment: native Linux cloud workspace; no production recordings/accounts.
+Python commands used /tmp/recorder-safety-venv/bin/python (Python 3.12).
+Node dependencies pinned by frontend/package-lock.json.
+
+PASS: python scripts/test_regressions.py
+  243 tests passed, zero skipped. Original 109-test baseline passed before edits.
+  Includes five real owned-process capture-group regressions: stubborn child after
+  leader exit, natural-completion admission block, uncertain identity, both split
+  groups, and never signalling an inherited/application process group.
+
+PASS: python -m compileall -q app_entry.py lar_app module
+PASS: python scripts/release.py check
+  Existing release metadata remains v1.1.19; no production v2 version was declared.
+PASS: git diff --check
+
+PASS: python scripts/smoke_v2_media.py
+  Real FFmpeg/FFprobe: verify, recover, remux, merge and local archive succeeded.
+  Source SHA256 hashes unchanged. Post-publication database-failure/restart
+  reconciliation succeeded without re-executing the media job.
+  SQLite integrity_check=ok; no foreign_key_check violations.
+
+PASS: python scripts/smoke_v2_app.py
+  Two complete isolated startup/shutdown cycles reused persistent metadata.
+  Health/readiness, v2 channels/jobs/settings/status, new UI document, retained
+  legacy UI, and cross-origin mutation rejection passed.
+  Real SIGKILL/restart remained fail-closed with CAPTURE_RECONCILIATION_REQUIRED.
+  Offline smoke disables external update checking.
+
+PASS: cd frontend && npm run build
+  Strict TypeScript check and Vite production build passed.
+  JS: 314,542 bytes (95.80 KB gzip); CSS: 31,839 bytes (7.53 KB gzip).
+  No CDN or separate Node runtime server.
+PASS: cd frontend && npm test
+  31 unit/component tests passed (3 files).
+  Five screens/detail, stale and disconnected responses, filters, revision
+  conflicts, pending/blocked commands, merge confirmation, cancellation and
+  persistent storage warnings tested in jsdom.
+
+NOT RUN: 10 Playwright browser scenarios
+  Chromium could not launch because the execution sandbox denied required Unix
+  socket creation. The supported cloud browser could not reach the isolated
+  localhost server. Restrictions were not bypassed. No browser screenshot,
+  mobile visual, or real-browser interaction pass is claimed.
+
+NOT RUN: Docker build (no Docker runtime in this workspace).
+NOT RUN: real provider capture, actual ARM64 execution, live NAS disconnect/full
+  disk behavior and 24-hour representative NAS soak. Multiarch build definitions
+  are preserved but not evidence of those runtime tests.
+
+Independent review:
+  Prior cancellation, replay, active-source, alias, destructive legacy pipeline,
+  capture startup and process-group issues were reproduced and fixed. Final
+  reviewed scope reported no remaining blocker. This does not replace the
+  outstanding release tests above.
+
+Delivery boundary:
+  Local source/commit/review package only. No push, PR, merge, release, image
+  publication or deployment. See IMPLEMENTATION.md for delivered vs deferred
+  design slices and README.md for safe enable/rollback/reconciliation procedures.

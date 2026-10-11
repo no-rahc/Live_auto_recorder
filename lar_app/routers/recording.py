@@ -112,6 +112,14 @@ def install_recording_routes(app: Any, core: Any) -> None:
         login: Any = Depends(core.requireLogin),
     ):
         del login
+        controller = getattr(request.app.state, "v2_channels", None)
+        if controller is not None:
+            current = controller.get_channel(channel_id)
+            changed = await controller.patch_mode(
+                channel_id, "paused" if current["desired_mode"] == "auto" else "auto", current["revision"],
+            )
+            return {"status": "success", "channel_id": channel_id,
+                    "record_enabled": changed["desired_mode"] == "auto"}
         async with request.app.state.channels_lock:
             channels = request.app.state.channels
             channel = next((item for item in channels if item["id"] == channel_id), None)

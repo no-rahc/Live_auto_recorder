@@ -1,6 +1,7 @@
 """Assemble the legacy recorder core into the production ASGI application."""
 from __future__ import annotations
 
+import asyncio
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from pathlib import Path
@@ -23,6 +24,9 @@ from lar_app.routers.cookies import install_cookie_routes
 from lar_app.routers.config import install_config_routes
 from lar_app.routers.files import install_file_routes
 from lar_app.routers.recording import install_recording_routes
+from lar_app.routers.v2 import install_v2_routes
+from lar_app.web.v2_security import V2OriginMiddleware
+from module.v2_runtime import enabled as v2_enabled, get_repository
 from lar_app.security import configure_session_middleware, enforce_local_mode
 from lar_app.web.middleware import ConsoleAssetsMiddleware, SecurityMiddleware
 from module.config_tools_v1 import install_config_tools
@@ -48,15 +52,52 @@ def _install_operations_lifespan(app: Any, operations: Any, platform: Any, core:
 
     @asynccontextmanager
     async def application_lifespan(application):
-        async with core_lifespan(application):
-            enforce_local_mode(application, core)
-            await operations.start()
-            await platform.start()
+        worker = None
+        if v2_enabled():
+            from module.v2_storage import preflight_database_location
+            from module.v2_worker import V2Worker
+            repository = get_repository()
+            database = preflight_database_location(repository.db_path.parent)
+            if not database['ok']:
+                raise RuntimeError('V2 database preflight failed; use local persistent storage with sufficient free space')
+            worker = V2Worker(repository)
+            # Fence the whole app before legacy startup can spawn recorders.
+            worker.acquire_instance_lock()
+            from module.v2_runtime import begin_capture_guard
             try:
-                yield
-            finally:
-                await platform.stop()
-                await operations.stop()
+                begin_capture_guard(repository)
+            except BaseException:
+                worker.release_instance_lock()
+                raise
+            application.state.v2_worker = worker
+        try:
+            async with core_lifespan(application):
+                enforce_local_mode(application, core)
+                await operations.start()
+                try:
+                    await platform.start()
+                    try:
+                        if worker is not None:
+                            from module.v2_runtime import sync_catalog
+                            await asyncio.to_thread(sync_catalog)
+                            await worker.start()
+                            from module.v2_runtime import capture_storage_report
+                            application.state.v2_storage = await asyncio.to_thread(capture_storage_report)
+                            controller = getattr(application.state, 'v2_channels', None)
+                            if controller is not None:
+                                await controller.start_watching()
+                        yield
+                    finally:
+                        await platform.stop()
+                finally:
+                    await operations.stop()
+        finally:
+            # Keep accepting durable verification intents until engine shutdown
+            # has finished. Unclaimed intents remain in SQLite for next boot.
+            if worker is not None:
+                from module.v2_runtime import finish_capture_guard
+                finish_capture_guard(shutdown_confirmed=getattr(application.state, 'v2_capture_shutdown_clean', False))
+                await worker.stop()
 
     app.router.lifespan_context = application_lifespan
 
@@ -78,6 +119,11 @@ def _install_readiness_route(app: Any, release: ReleaseInfo, operations: Any, pl
     async def readyz():
         snapshot = readiness_snapshot(operations, platform)
         snapshot["version"] = release.version
+        if v2_enabled():
+            worker = getattr(app.state, "v2_worker", None)
+            snapshot["v2"] = worker.snapshot() if worker else {"running": False}
+            if not snapshot["v2"].get("ready", False) or not getattr(app.state, "v2_storage", {}).get("ok", False):
+                snapshot["ready"] = False
         return JSONResponse(status_code=200 if snapshot["ready"] else 503, content=snapshot)
 
     app.add_api_route("/readyz", readyz, methods=["GET"], include_in_schema=False)
@@ -116,6 +162,7 @@ def build_application(
     install_config_routes(app, core)
     install_file_routes(app, core)
     install_recording_routes(app, core)
+    install_v2_routes(app, core, root_dir=root_dir)
     configure_session_middleware(app)
     install_live_recorder_stderr_capture()
     _install_local_http_exception_handler(app)
@@ -130,6 +177,7 @@ def build_application(
     # Preserve the original middleware order: security wraps HTML injection.
     app.add_middleware(ConsoleAssetsMiddleware, release_version=release.version)
     app.add_middleware(SecurityMiddleware, operations=operations)
+    app.add_middleware(V2OriginMiddleware)
 
     runtime = ApplicationRuntime(
         app=app,

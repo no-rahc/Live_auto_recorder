@@ -411,6 +411,9 @@ class OperationsBase:
         }
 
     def run_cleanup(self, payload: dict[str, Any]) -> dict[str, Any]:
+        from module.v2_runtime import enabled as v2_enabled
+        if v2_enabled():
+            raise HTTPException(status_code=409, detail="Legacy retention cleanup is disabled while v2 artifacts/jobs may reference these files.")
         if not payload.get("confirm"):
             raise HTTPException(status_code=400, detail="confirm=true가 필요합니다.")
         preview = self.cleanup_candidates(payload)

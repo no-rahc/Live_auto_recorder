@@ -7,6 +7,7 @@ import requests
 from fastapi import APIRouter, Body, Depends, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
+from lar_app.backup_policy import preserve_existing_secrets, sanitize_secrets
 from lar_app.config_safety import resolve_secret
 from lar_app.config_validation import ConfigValidationError, normalize_config_update
 
@@ -28,14 +29,22 @@ def install_config_routes(app: Any, core: Any) -> None:
     @router.post("/api/save_config")
     async def save_config_api(request: Request, body: dict = Body(...), login: Any = Depends(requireLogin)):
         try:
+            current = loadConfig() or {}
             merged = normalize_config_update(
-                loadConfig() or {}, body, acknowledgement=body.get("danger_ack", ""),
+                current, preserve_existing_secrets(body, current),
+                acknowledgement=body.get("danger_ack", ""),
+            )
+            merged = saveConfig(merged)
+            request.app.state.config = merged
+            return JSONResponse(
+                {"status": "ok", "config": sanitize_secrets(merged)},
+                headers={"Cache-Control": "no-store"},
             )
         except ConfigValidationError as exc:
             return JSONResponse({"status": "error", "message": str(exc)}, status_code=400)
-        merged = saveConfig(merged)
-        request.app.state.config = merged
-        return {"status": "ok", "config": merged}
+        except Exception:
+            logger.error("설정 저장 중 오류 발생")
+            return JSONResponse({"status": "error", "message": "설정 저장 중 오류 발생"}, status_code=500)
 
 
     # 텔레그램 알림 API 테스트 함수
@@ -68,13 +77,13 @@ def install_config_routes(app: Any, core: Any) -> None:
             if r.status_code == 200:
                 return JSONResponse(content={'status': 'success', 'message': '테스트 메시지를 전송했습니다.'})
             else:
-                # 텔레그램에서 내려주는 에러 바디 그대로 전달
+                # Upstream bodies and request errors can contain credentials.
                 return JSONResponse(
-                    content={'status': 'error', 'message': f"전송 실패: {r.status_code} {r.text}"},
+                    content={'status': 'error', 'message': f"전송 실패: {r.status_code}"},
                     status_code=400
                 )
-        except Exception as e:
-            return JSONResponse(content={'status': 'error', 'message': str(e)}, status_code=500)
+        except Exception:
+            return JSONResponse(content={'status': 'error', 'message': '텔레그램 테스트 메시지를 전송하지 못했습니다.'}, status_code=500)
 
 
     # 설정 페이지 라우트
@@ -95,8 +104,11 @@ def install_config_routes(app: Any, core: Any) -> None:
 
 
     @router.get("/api/config")
-    async def get_config_api():
-        return loadConfig()
+    async def get_config_api(login: Any = Depends(requireLogin)):
+        try:
+            return JSONResponse(sanitize_secrets(loadConfig()), headers={"Cache-Control": "no-store"})
+        except Exception:
+            return JSONResponse({"status": "error", "message": "설정을 불러오지 못했습니다."}, status_code=500)
 
 
     @router.post("/config")
@@ -126,17 +138,20 @@ def install_config_routes(app: Any, core: Any) -> None:
             return RedirectResponse(url="/", status_code=303)
         except ConfigValidationError as exc:
             return JSONResponse({"status": "error", "message": str(exc)}, status_code=400)
-        except Exception as exc:
-            logger.error(f"설정 저장 중 오류 발생: {exc}")
+        except Exception:
+            logger.error("설정 저장 중 오류 발생")
             return JSONResponse({"status": "error", "message": "설정 저장 중 오류 발생"}, status_code=500)
 
 
     @router.get("/get_config")
-    async def get_config(request: Request):
+    async def get_config(request: Request, login: Any = Depends(requireLogin)):
         try:
-            return {"status": "success", "config": request.app.state.config}
-        except Exception as e:
-            return {"status": "error", "message": str(e)}
+            return JSONResponse(
+                {"status": "success", "config": sanitize_secrets(request.app.state.config)},
+                headers={"Cache-Control": "no-store"},
+            )
+        except Exception:
+            return JSONResponse({"status": "error", "message": "설정을 불러오지 못했습니다."}, status_code=500)
 
 
     # ── #2: Discord 테스트 API ───────────────────────────────────
@@ -168,7 +183,7 @@ def install_config_routes(app: Any, core: Any) -> None:
                     content={"status": "error", "message": f"Discord 응답: {resp.status_code}"},
                     status_code=400
                 )
-        except Exception as e:
-            return JSONResponse(content={"status": "error", "message": str(e)}, status_code=500)
+        except Exception:
+            return JSONResponse(content={"status": "error", "message": "Discord 테스트 메시지를 전송하지 못했습니다."}, status_code=500)
 
     app.include_router(router)

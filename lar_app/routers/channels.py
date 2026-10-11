@@ -89,6 +89,12 @@ def install_channel_routes(app: Any, core: Any) -> None:
         del login
         try:
             updated = await request.json()
+            controller = getattr(request.app.state, "v2_channels", None)
+            if controller is not None and "record_enabled" in updated:
+                current = controller.get_channel(channel_id)
+                await controller.patch_mode(
+                    channel_id, "auto" if core.toBool(updated["record_enabled"]) else "paused", current["revision"],
+                )
             async with request.app.state.channels_lock:
                 channels = request.app.state.channels
                 target = next((item for item in channels if item.get("id") == channel_id), None)

@@ -931,11 +931,15 @@ async def moveDirectory(file_path, destination_directory):
 
                 shutil.move(file_path, destination_path)
                 logger.info(f"파일 {file_path}가 {destination_path}로 이동되었습니다.")
+                return destination_path
             except Exception as e:
                 logger.info(f"파일 {file_path}를 {destination_directory}로 이동하는 중 오류 발생: {e}")
                 raise
 
-        await loop.run_in_executor(None, _do_move)
+        destination_path = await loop.run_in_executor(None, _do_move)
+        if destination_path:
+            from module.v2_channels import capture_moved
+            capture_moved(str(file_path), str(destination_path))
 
 
 def getBaseUrl():

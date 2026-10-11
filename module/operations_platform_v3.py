@@ -422,7 +422,8 @@ class PlatformRuntime:
             "archive.completed",
             {"recording_id": recording_id, "channel_name": recording.get("channel_name"), "detail": target},
         )
-        if cfg.get("delete_after"):
+        from module.v2_runtime import enabled as v2_enabled
+        if cfg.get("delete_after") and not v2_enabled():
             path.unlink()
         return {"status": "completed", "target": target}
 
@@ -576,7 +577,8 @@ def install_platform_features(app: Any, lar: Any, operations: Any) -> PlatformRu
         except Exception as exc:
             runtime.enqueue_notification("recording.merge_failed", {"broadcast_id": broadcast_id, "detail": str(exc)[:500]})
             raise HTTPException(status_code=409, detail=str(exc)[:500]) from exc
-        runtime.enqueue_notification("recording.merged", result)
+        if "job_id" not in result:
+            runtime.enqueue_notification("recording.merged", result)
         return result
 
     @router.post("/api/v3/recordings/{recording_id}/verify")
