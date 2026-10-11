@@ -17,9 +17,14 @@ python app_entry.py
 ## Checks
 
 ```bash
-python -m compileall -q app_entry.py lar_app module
+python -m compileall -q app_entry.py live_auto_recorder.py lar_app module
+# Install Node.js 22+ for JavaScript/UI regressions.
+python scripts/test_regressions.py
 python scripts/release.py check
 ```
+
+The regression workflow runs on every pull request and every push to `main`,
+without path filters. Missing Node.js or any skipped test fails the suite.
 
 ## Pull requests
 

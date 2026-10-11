@@ -85,48 +85,16 @@ def _validate_dangerous_config(
     account: dict[str, Any] | None = None,
     bind_address: str = "127.0.0.1",
 ) -> str | None:
-    """Require explicit confirmation for risky file-manager transitions."""
-
-    del account, bind_address  # Legacy parameters retained for compatibility.
-    current_risk = _file_manager_risk(current_config)
-    next_values = {
-        "fileManagerEnabled": _first(
-            pairs,
-            "fileManagerEnabled",
-            str(current_config.get("fileManagerEnabled", False)).lower(),
-        ),
-        "fileManagerMode": _first(
-            pairs,
-            "fileManagerMode",
-            str(current_config.get("fileManagerMode", "whitelist")),
-        ),
-        "fileManagerReadOnly": _first(
-            pairs,
-            "fileManagerReadOnly",
-            str(current_config.get("fileManagerReadOnly", True)).lower(),
-        ),
-        "trashEnabled": _first(
-            pairs,
-            "trashEnabled",
-            str(current_config.get("trashEnabled", True)).lower(),
-        ),
-    }
-    next_risk = _file_manager_risk(next_values)
-    risk_fields_changed = any(
-        str(next_values[name]).lower() != str(current_config.get(name, default)).lower()
-        for name, default in (
-            ("fileManagerEnabled", False),
-            ("fileManagerMode", "whitelist"),
-            ("fileManagerReadOnly", True),
-            ("trashEnabled", True),
-        )
-    )
-
-    if next_risk and (not current_risk or risk_fields_changed):
-        acknowledgement = _first(pairs, "danger_ack").strip()
-        if acknowledgement != "위험 설정 적용":
-            return "위험한 파일 관리자 설정을 적용하려면 확인 문구 ‘위험 설정 적용’을 입력하세요."
-
+    """Compatibility wrapper using the same validation as every save route."""
+    from lar_app.config_validation import ConfigValidationError, normalize_config_update
+    del account, bind_address
+    updates = dict(pairs)
+    if any(key == "fileManagerRoots" for key, _ in pairs):
+        updates["fileManagerRoots"] = [value for key, value in pairs if key == "fileManagerRoots"]
+    try:
+        normalize_config_update(current_config, updates, acknowledgement=_first(pairs, "danger_ack"))
+    except ConfigValidationError as exc:
+        return str(exc)
     return None
 
 

@@ -31,34 +31,12 @@ def validate_file_manager_transition(
     trash_enabled: bool,
     acknowledgement: str = "",
 ) -> str | None:
-    """Require explicit acknowledgement when enabling or changing risky file access."""
-
-    def risky(values: dict[str, Any]) -> bool:
-        return bool(
-            truthy(values.get("fileManagerEnabled"))
-            and (
-                str(values.get("fileManagerMode") or "whitelist") == "blacklist"
-                or not truthy(values.get("fileManagerReadOnly"))
-                or not truthy(values.get("trashEnabled"))
-            )
-        )
-
-    next_values = {
-        "fileManagerEnabled": enabled,
-        "fileManagerMode": mode,
-        "fileManagerReadOnly": read_only,
-        "trashEnabled": trash_enabled,
-    }
-    changed = any(
-        str(next_values[name]).lower() != str(current.get(name, default)).lower()
-        for name, default in (
-            ("fileManagerEnabled", False),
-            ("fileManagerMode", "whitelist"),
-            ("fileManagerReadOnly", True),
-            ("trashEnabled", True),
-        )
-    )
-    if risky(next_values) and (not risky(current) or changed):
-        if acknowledgement.strip() != "위험 설정 적용":
-            return "위험한 파일 관리자 설정을 적용하려면 확인 문구 ‘위험 설정 적용’을 입력하세요."
+    """Compatibility wrapper around the shared transition policy."""
+    from lar_app.config_validation import ConfigValidationError, validate_transition
+    candidate = dict(current, fileManagerEnabled=enabled, fileManagerMode=mode,
+                     fileManagerReadOnly=read_only, trashEnabled=trash_enabled)
+    try:
+        validate_transition(current, candidate, acknowledgement)
+    except ConfigValidationError as exc:
+        return str(exc)
     return None
