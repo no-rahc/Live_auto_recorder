@@ -7,12 +7,13 @@ import type { Channel, Job, Page, SystemStatus } from './types';
 export function Dashboard({ status }: { status?: SystemStatus }) {
   const channels = useChannelsQuery();
   const jobs = useApiQuery<Page<Job>>('/jobs?limit=50');
+  const jobsAvailable = status?.features?.durable_jobs !== false && jobs.data?.available !== false;
   const active = (channels.data?.items || []).filter(channel => ['recording','starting','reconnecting','stopping'].includes(channel.actual_state));
   const attention = (jobs.data?.items || []).filter(job => ['failed','blocked','interrupted','retry_wait'].includes(job.state));
   const stats = [
     { label: '녹화 중', value: status?.channels.recording, caption: '지금 보관하는 방송', icon: 'channels', className: 'recording-stat' },
     { label: '감시 중', value: status?.channels.watching, caption: '다음 방송을 기다리는 채널', icon: 'clock', className: '' },
-    { label: '조치 필요', value: status ? status.channels.attention + status.jobs.failed + status.jobs.blocked : undefined, caption: '확인이 필요한 채널과 작업', icon: 'warning', className: 'attention-stat' },
+    { label: '조치 필요', value: status ? status.channels.attention + (jobsAvailable ? status.jobs.failed + status.jobs.blocked : 0) : undefined, caption: jobsAvailable ? '확인이 필요한 채널과 작업' : '확인이 필요한 채널', icon: 'warning', className: 'attention-stat' },
   ];
   return <>
     <PageHeading eyebrow="OVERVIEW" title="녹화 현황" description="지금 녹화 중인 방송과 확인이 필요한 작업을 한눈에." action={<Link to="/v2/channels" className="button primary"><Icon name="channels"/>채널 관리</Link>}/>
@@ -28,9 +29,9 @@ export function Dashboard({ status }: { status?: SystemStatus }) {
       </article>)}</div> : <Empty icon="channels" title="지금 녹화 중인 방송이 없습니다" action={<Link to="/v2/channels" className="button secondary">채널 확인<Icon name="arrow" size={16}/></Link>}>자동 녹화가 켜진 채널은 방송이 시작되면 녹화를 준비합니다.</Empty>}
       <LastUpdated at={channels.data?.observed_at} fetching={channels.isFetching}/>
     </Panel></div>
-    <div className="dashboard-bottom"><Panel title="확인이 필요한 작업" subtitle="실패 원인을 확인하고 안전하게 다시 진행하세요." action={<Link to="/v2/jobs" className="text-link">모든 작업<Icon name="arrow" size={16}/></Link>}>
+    <div className="dashboard-bottom"><Panel title="확인이 필요한 작업" subtitle={jobsAvailable ? '실패 원인을 확인하고 안전하게 다시 진행하세요.' : '영속 작업 큐를 사용하지 않는 모드입니다.'} action={<Link to="/v2/jobs" className="text-link">모든 작업<Icon name="arrow" size={16}/></Link>}>
       <ErrorNotice error={jobs.error} stale={Boolean(jobs.data)} onRetry={() => void jobs.refetch()}/>
-      {jobs.isPending ? <Loading/> : attention.length ? <div className="attention-list">{attention.slice(0, 5).map(job => <Link key={job.id} to={`/v2/jobs?selected=${encodeURIComponent(job.id)}`} className="attention-row"><span className="attention-icon"><Icon name="warning"/></span><div><strong>{label(job.kind)}</strong><p>{job.error_message || job.error_code || '작업 상세에서 다음 단계를 확인하세요.'}</p></div><Badge value={job.state}/><Icon name="arrow" size={16}/></Link>)}</div> : <Empty icon="check" title="작업 목록에서 조치 대상을 찾지 못했습니다">전체 작업 상태와 이력은 작업 화면에서 확인할 수 있습니다.</Empty>}
+      {!jobsAvailable ? <Empty icon="jobs" title="파일 작업 기능이 꺼져 있습니다">방송과 파일 이력은 볼 수 있지만, 검증·합치기·복구 작업은 이 모드에서 요청할 수 없습니다.</Empty> : jobs.isPending ? <Loading/> : attention.length ? <div className="attention-list">{attention.slice(0, 5).map(job => <Link key={job.id} to={`/v2/jobs?selected=${encodeURIComponent(job.id)}`} className="attention-row"><span className="attention-icon"><Icon name="warning"/></span><div><strong>{label(job.kind)}</strong><p>{job.error_message || job.error_code || '작업 상세에서 다음 단계를 확인하세요.'}</p></div><Badge value={job.state}/><Icon name="arrow" size={16}/></Link>)}</div> : <Empty icon="check" title="작업 목록에서 조치 대상을 찾지 못했습니다">전체 작업 상태와 이력은 작업 화면에서 확인할 수 있습니다.</Empty>}
     </Panel><Panel title="보관함으로 이어보기" subtitle="방송 한 번의 모든 녹화 조각을 한곳에."><div className="library-callout"><div className="stack-visual" aria-hidden="true"><span/><span/><span><Icon name="library" size={34}/></span></div><h3>방송이 끝나도, 이어서.</h3><p>세션과 원본 파일, 검증 결과를 방송별로 확인할 수 있습니다.</p><Link to="/v2/broadcasts" className="button secondary">방송 보관함<Icon name="arrow" size={16}/></Link></div></Panel></div>
   </>;
 }

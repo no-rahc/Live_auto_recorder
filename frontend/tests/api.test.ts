@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { api, allChannels, ApiError, latestRevision, pollingInterval } from '../src/api';
+import { api, allChannels, ApiError, compatibilityRecording, latestRevision, pollingInterval } from '../src/api';
 import { bytes, date, duration, elapsed, safeLegacyLink, validation } from '../src/format';
 
 afterEach(() => vi.unstubAllGlobals());
@@ -71,4 +71,22 @@ it('loads every channel page for the shared dashboard and controls cache', async
   vi.stubGlobal('fetch',fetch);
   expect((await allChannels()).items.map(item=>item.id)).toEqual(['a','b']);
   expect(fetch.mock.calls[1][0]).toBe('/api/v2/channels?cursor=50');
+});
+
+
+describe('compatibility recording API', () => {
+  it('encodes the channel ID and uses only the existing same-origin recording routes', async () => {
+    const fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({status:'success',state:'녹화 중'})));
+    vi.stubGlobal('fetch',fetch);
+    await compatibilityRecording('id /?#', 'start');
+    expect(fetch).toHaveBeenCalledWith('/api/start_recording/id%20%2F%3F%23',expect.objectContaining({method:'POST',credentials:'same-origin',body:JSON.stringify({is_user_request:true})}));
+  });
+  it('does not accept a successful HTTP response containing a failed recording operation', async () => {
+    vi.stubGlobal('fetch',vi.fn().mockResolvedValue(new Response(JSON.stringify({status:'error',code:'start_failed',message:'Recording unavailable'}))));
+    await expect(compatibilityRecording('ch-1','start')).rejects.toMatchObject({code:'start_failed',message:'Recording unavailable'});
+  });
+  it('does not acknowledge an HTML login response or malformed receipt', async () => {
+    vi.stubGlobal('fetch',vi.fn().mockResolvedValue(new Response('<html>Sign in</html>')));
+    await expect(compatibilityRecording('ch-1','stop')).rejects.toMatchObject({code:'REQUEST_UNKNOWN'});
+  });
 });

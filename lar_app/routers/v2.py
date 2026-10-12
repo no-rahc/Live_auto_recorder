@@ -1,4 +1,4 @@
-"""Additive opt-in v2 API. The old API and media paths remain intact."""
+"""Default v2 UI with legacy observations and opt-in durable controls."""
 from __future__ import annotations
 import hashlib
 import json
@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.routing import APIRoute
 from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel, ConfigDict, Field
@@ -106,9 +106,11 @@ def _broadcast(item: dict) -> dict:
 
 def install_v2_routes(app: Any, core: Any, *, root_dir: Path | None = None) -> None:
     root = root_dir or Path(__file__).resolve().parents[2]
-    async def available():
-        if not enabled():
-            raise HTTPException(404, 'v2 is not enabled')
+    async def available(request: Request):
+        # The screen and observational API are always available. Only durable
+        # engine actions require opt-in; never initialize its repository here.
+        if not enabled() and request.method not in {'GET', 'HEAD'}:
+            raise HTTPException(409, 'Durable v2 controls are disabled; use existing recording controls')
     router = APIRouter(prefix='/api/v2', route_class=V2Route, dependencies=[Depends(available), Depends(core.requireLogin)])
 
     def service(request):
@@ -117,9 +119,29 @@ def install_v2_routes(app: Any, core: Any, *, root_dir: Path | None = None) -> N
             raise HTTPException(503, 'Channel controller is starting')
         return value
 
+    async def channel_values(request):
+        if enabled():
+            return service(request).list_channels()
+        async with request.app.state.channels_lock:
+            sources = [dict(item) for item in request.app.state.channels]
+        manager = core.recorder_manager
+        values = []
+        for item in sources:
+            cid = str(item['id'])
+            state = str(request.app.state.fsm.getState(cid)).lower()
+            recording = bool(manager.get_status_recording(cid))
+            watching = bool(manager.get_status_reserved(cid)) or state == 'watching'
+            values.append({'id': cid, 'name': str(item.get('name') or cid),
+                           'platform': str(item.get('platform') or ''),
+                           'desired_mode': 'auto' if core.toBool(item.get('record_enabled', True)) else 'paused',
+                           'actual_state': 'recording' if recording else 'watching' if watching else 'idle',
+                           'revision': _revision({'record_enabled': item.get('record_enabled', True)}),
+                           'observed_at': time.time(), 'controls_available': False})
+        return values
+
     @router.get('/channels')
     async def channels(request: Request, limit: int = Query(50, ge=1, le=200), cursor: int = Query(0, ge=0)):
-        items = sorted(service(request).list_channels(), key=lambda item: item['id'])
+        items = sorted(await channel_values(request), key=lambda item: item['id'])
         return {'items': items[cursor:cursor+limit], 'next_cursor': str(cursor+limit) if cursor+limit < len(items) else None, 'observed_at': time.time()}
 
     @router.patch('/channels/{channel_id}')
@@ -133,6 +155,8 @@ def install_v2_routes(app: Any, core: Any, *, root_dir: Path | None = None) -> N
 
     @router.get('/commands/{command_id}')
     async def get_command(command_id: str, request: Request):
+        if not enabled():
+            raise HTTPException(404, 'Durable command history is disabled')
         result = service(request).get_command(command_id)
         if result is None:
             raise HTTPException(404, 'Unknown command')
@@ -153,6 +177,25 @@ def install_v2_routes(app: Any, core: Any, *, root_dir: Path | None = None) -> N
         source = catalog.get_broadcast(broadcast_id)
         if source is None:
             raise HTTPException(404, 'Unknown broadcast')
+        if not enabled():
+            result = _broadcast(source)
+            result.pop('merge', None)  # Internal output paths/errors are not UI metadata.
+            # Project catalog records without registering storage, migrating data,
+            # probing media or creating the durable database. Never claim file
+            # existence/validation from a catalog entry alone.
+            result.update(jobs_available=False, sessions=[], jobs=[])
+            result['segments'] = [{'id': str(row['id']), 'revision': _revision(row),
+                                   'sequence': row.get('segment_index'),
+                                   'session_id': row.get('session_key'),
+                                   'captured_from': row.get('started_at'),
+                                   'captured_to': row.get('ended_at'), 'gap_before': None}
+                                  for row in source.get('segments', [])]
+            result['artifacts'] = [{'id': str(row['id']), 'revision': _revision(row),
+                                    'kind': 'original', 'relative_path': row.get('filename') or 'Unknown file',
+                                    'size': row.get('file_size'), 'exists': None,
+                                    'controls_available': False}
+                                   for row in source.get('segments', [])]
+            return result
         sync_catalog()
         normalized = get_repository().get_broadcast(broadcast_id)
         result = _broadcast(source)
@@ -168,6 +211,8 @@ def install_v2_routes(app: Any, core: Any, *, root_dir: Path | None = None) -> N
 
     @router.get('/jobs')
     async def jobs(limit: int = Query(50, ge=1, le=200), cursor: str | None = None, state: str | None = None, kind: str | None = None):
+        if not enabled():
+            return {'items': [], 'next_cursor': None, 'observed_at': time.time(), 'available': False}
         result = get_repository().list_jobs(states=[state] if state else None, kind=kind, limit=limit, cursor=cursor)
         result = result if isinstance(result, dict) else {'items': result, 'next_cursor': None, 'observed_at': time.time()}
         result['items'] = [_public_job(item) for item in result['items']]
@@ -175,6 +220,8 @@ def install_v2_routes(app: Any, core: Any, *, root_dir: Path | None = None) -> N
 
     @router.get('/jobs/{job_id}')
     async def job(job_id: str):
+        if not enabled():
+            raise HTTPException(404, 'Durable job history is disabled')
         result = get_repository().get_job(job_id)
         if result is None:
             raise HTTPException(404, 'Unknown job')
@@ -210,7 +257,14 @@ def install_v2_routes(app: Any, core: Any, *, root_dir: Path | None = None) -> N
 
     @router.get('/status')
     async def status(request: Request):
-        values = service(request).list_channels()
+        values = await channel_values(request)
+        if not enabled():
+            return {'enabled': True, 'observed_at': time.time(), 'version': getattr(core, 'VERSION', '2.0'),
+                    'features': {'durable_jobs': False, 'channel_controls': False},
+                    'channels': {'total': len(values), 'recording': sum(c['actual_state'] == 'recording' for c in values),
+                                 'watching': sum(c['actual_state'] == 'watching' for c in values), 'attention': 0},
+                    'jobs': {'queued': 0, 'running': 0, 'failed': 0, 'blocked': 0},
+                    'storage': {'status': 'unknown', 'message': 'Existing recording paths are unchanged; durable storage checks are disabled'}}
         result = get_repository().list_jobs(limit=200)
         items = result['items'] if isinstance(result, dict) else result
         worker = getattr(request.app.state, 'v2_worker', None)
@@ -222,15 +276,29 @@ def install_v2_routes(app: Any, core: Any, *, root_dir: Path | None = None) -> N
 
     @router.get('/settings')
     async def settings():
-        return {'enabled': True, 'version': getattr(core, 'VERSION', '2.0 preview'), 'storage': {'database': 'local persistent volume', 'recordings': 'existing paths preserved', 'originals_preserved': True}, 'features': {'durable_jobs': True, 'legacy_ui': True}, 'links': {'configuration': '/config', 'files': '/files', 'operations': '/operations'}}
+        return {'enabled': True, 'version': getattr(core, 'VERSION', '2.0 preview'), 'storage': {'database': 'local persistent volume' if enabled() else 'existing recording catalog (durable queue disabled)', 'recordings': 'existing paths preserved', 'originals_preserved': True}, 'features': {'durable_jobs': enabled(), 'legacy_ui': True}, 'links': {'configuration': '/config', 'files': '/files', 'operations': '/operations'}}
 
     app.include_router(router)
 
     async def ui(request: Request):
-        await available()
         index = root / 'templates/static/v2/index.html'
         if not index.is_file():
             raise HTTPException(503, 'Build the v2 frontend first')
         return FileResponse(index, headers={'Cache-Control': 'no-store'})
     app.add_api_route('/v2', ui, methods=['GET'], include_in_schema=False)
     app.add_api_route('/v2/{path:path}', ui, methods=['GET'], include_in_schema=False)
+
+    # Preserve the original dashboard and its endpoint behavior at /legacy.
+    # Register after removing / so FastAPI's first-match routing cannot leave
+    # the old screen as the default. All other legacy URLs remain unchanged.
+    for route in list(app.routes):
+        if getattr(route, 'path', None) == '/' and 'GET' in getattr(route, 'methods', set()):
+            app.routes.remove(route)
+            app.add_api_route('/legacy', route.endpoint, methods=['GET'], include_in_schema=False)
+            break
+
+    async def home():
+        # Source checkouts without a frontend build still have a usable console.
+        destination = '/v2' if (root / 'templates/static/v2/index.html').is_file() else '/legacy'
+        return RedirectResponse(destination, status_code=307, headers={'Cache-Control': 'no-store'})
+    app.add_api_route('/', home, methods=['GET'], include_in_schema=False)

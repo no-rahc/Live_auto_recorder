@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import { Badge, Empty, ErrorNotice, Icon, LastUpdated, Loading, Modal, PageHeading } from './components';
 import { date, label } from './format';
-import { useAction, useApiQuery, useCommand, useChannelsQuery } from './query';
-import type { Channel, Command, Page } from './types';
+import { useAction, useCommand, useChannelsQuery, useCompatibilityRecording } from './query';
+import type { Channel, Command } from './types';
 
 export function Channels() {
   const query = useChannelsQuery();
+  const compatibility = query.data?.items.some(channel => channel.controls_available === false);
   return <><PageHeading eyebrow="CHANNELS" title="채널" description="자동 녹화 설정과 실제 녹화 상태를 따로 확인하세요." action={<a href="/channels" className="button primary"><Icon name="plus"/>채널 추가 · 편집<Icon name="external" size={16}/></a>}/>
-    <div className="notice info"><Icon name="channels"/><div><strong>자동 녹화를 꺼도 현재 방송은 계속 녹화됩니다.</strong><p>이번 방송을 끝내려면 ‘이번 방송 중지’를 사용하세요. 한 번 녹화는 기존 자동 녹화 설정을 바꾸지 않습니다.</p></div></div>
+    {Boolean(query.data?.items.length) && <div className="notice info"><Icon name="channels"/><div>{compatibility ? <><strong>기존 녹화 엔진으로 녹화합니다.</strong><p>녹화 시작·중지는 이 화면에서 요청할 수 있습니다. 자동 녹화 설정은 <a href="/channels" className="text-link">채널 설정</a>에서 변경하세요. 자동 녹화를 끄면 감시나 녹화에 영향을 줄 수 있습니다.</p></> : <><strong>자동 녹화를 꺼도 현재 방송은 계속 녹화됩니다.</strong><p>이번 방송을 끝내려면 ‘이번 방송 중지’를 사용하세요. 한 번 녹화는 기존 자동 녹화 설정을 바꾸지 않습니다.</p></>}</div></div>}
     <ErrorNotice error={query.error} stale={Boolean(query.data)} onRetry={() => void query.refetch()}/>
     {query.isPending ? <Loading/> : query.data?.items.length ? <div className="channel-grid">{query.data.items.map(channel => <ChannelCard key={channel.id} channel={channel}/>)}</div> : <div className="panel"><Empty icon="channels" title="첫 번째 채널을 추가하세요" action={<a href="/channels" className="button primary"><Icon name="plus"/>채널 추가</a>}>기존 채널 설정 화면에서 CHZZK 또는 YouTube 채널을 등록할 수 있습니다.</Empty></div>}
     <LastUpdated at={query.data?.observed_at} fetching={query.isFetching}/>
@@ -32,6 +33,7 @@ function ChannelCard({ channel }: { channel: Channel }) {
     <div className="channel-states"><div><span>자동 녹화</span><strong className={channel.desired_mode === 'auto' ? 'green-text' : ''}>{channel.desired_mode === 'auto' ? '켜짐' : '꺼짐'}</strong></div><div><span>실제 상태</span><Badge value={channel.actual_state}/></div></div>
     {channel.reason_code && <p className="reason-code">상태 사유 · {channel.reason_code}</p>}
     <small className="muted">마지막 관측 {date(channel.observed_at, true)}</small>
+    {channel.controls_available === false ? <CompatibilityChannelControls channel={channel}/> : <>
     <ErrorNotice error={mode.error}/><ErrorNotice error={action.error}/><ErrorNotice error={commandError}/>
     {mode.result && !mode.pending && <p className="inline-success" role="status">자동 녹화 설정을 저장했습니다. 실제 상태는 관측 결과로 갱신됩니다.</p>}
     {receipt && <div className={`command-status ${state === 'failed' ? 'error-text' : ''}`} role="status"><Icon name={settled ? 'check' : 'clock'} size={16}/><span>{settled ? ['failed', 'rejected', 'blocked', 'interrupted'].includes(state) ? '명령 처리 실패 · 상태와 오류를 확인하세요.' : '명령 처리가 끝났습니다. 실제 상태를 확인하세요.' : '명령 접수 · 실제 처리 결과를 기다리는 중입니다.'}</span></div>}
@@ -41,5 +43,30 @@ function ChannelCard({ channel }: { channel: Channel }) {
         : <button type="button" className="button primary" disabled={pending || mode.pending} onClick={() => { action.clear(); setConfirm('start_once'); }}><Icon name="play" size={16}/>{pending ? '명령 처리 중…' : '지금 한 번 녹화'}</button>}
     </div>
     {confirm && <Modal title={confirm === 'stop_current' ? '이번 방송을 중지할까요?' : '지금 한 번 녹화할까요?'} close={() => { if (!action.pending) setConfirm(null); }}><p><strong>{channel.name}</strong></p><p>{confirm === 'stop_current' ? '진행 중인 녹화 프로세스의 종료를 요청합니다. 저장된 원본은 유지되며 같은 방송은 자동으로 다시 시작하지 않습니다.' : '이 채널에 한 번 녹화를 요청합니다. 방송 상태를 확인한 뒤 시작하며, 기존 자동 녹화 설정은 유지됩니다.'}</p>{confirm === 'stop_current' && <p className="path-box">대상 방송: {channel.broadcast_id}</p>}<ErrorNotice error={action.error}/><div className="modal-actions"><button type="button" className="button secondary" disabled={action.pending} onClick={() => setConfirm(null)}>돌아가기</button><button type="button" className={`button ${confirm === 'stop_current' ? 'danger' : 'primary'}`} disabled={action.pending} onClick={() => void issueCommand()}>{action.pending ? '명령 전송 중…' : confirm === 'stop_current' ? '중지 요청' : '한 번 녹화 요청'}</button></div></Modal>}
+    </>}
   </article>;
+}
+
+function CompatibilityChannelControls({ channel }: { channel: Channel }) {
+  const action = useCompatibilityRecording(channel.id);
+  const [confirm, setConfirm] = useState<'start' | 'stop' | null>(null);
+  const active = ['recording', 'starting', 'reconnecting', 'stopping'].includes(channel.actual_state);
+  const canStop = active || channel.actual_state === 'watching';
+  const ask = (kind: 'start' | 'stop') => { action.clear(); setConfirm(kind); };
+  const submit = async () => { if (confirm && await action.run(confirm)) setConfirm(null); };
+  return <>
+    {!confirm && <ErrorNotice error={action.error}/>}
+    {action.accepted && <p className="inline-success" role="status">{action.accepted === 'start' ? '녹화 시작' : '녹화 중지'} 요청을 접수했습니다. 실제 상태는 새 관측 결과로 확인하세요.</p>}
+    <div className="channel-actions">
+      {!active && <button type="button" className="button primary" disabled={action.pending} onClick={() => ask('start')}><Icon name="play" size={16}/>녹화 시작</button>}
+      {canStop && <button type="button" className="button danger-outline" disabled={action.pending || channel.actual_state === 'stopping'} onClick={() => ask('stop')}><Icon name="stop" size={16}/>{channel.actual_state === 'stopping' ? '중지 확인 중' : '녹화 중지'}</button>}
+      <a href="/channels" className="button secondary">자동 녹화 설정<Icon name="external" size={16}/></a>
+    </div>
+    {confirm && <Modal title={confirm === 'start' ? '녹화를 시작할까요?' : '녹화를 중지할까요?'} close={() => { if (!action.pending) setConfirm(null); }}>
+      <p><strong>{channel.name}</strong></p>
+      <p>{confirm === 'start' ? '기존 녹화 엔진에 시작을 요청합니다. 방송 상태에 따라 녹화하거나 방송 시작을 기다릴 수 있습니다.' : '기존 녹화 엔진에 이 채널의 녹화와 방송 감시 중지를 요청합니다. 실제 중지 여부는 채널 상태에서 확인하세요.'}</p>
+      <ErrorNotice error={action.error}/>
+      <div className="modal-actions"><button type="button" className="button secondary" disabled={action.pending} onClick={() => setConfirm(null)}>돌아가기</button><button type="button" className={`button ${confirm === 'stop' ? 'danger' : 'primary'}`} disabled={action.pending} onClick={() => void submit()}>{action.pending ? '요청 전송 중…' : confirm === 'start' ? '녹화 시작 요청' : '녹화 중지 요청'}</button></div>
+    </Modal>}
+  </>;
 }

@@ -109,3 +109,17 @@ logs/        로그
 [MIT License](LICENSE)
 
 저장소에 포함된 일부 폰트는 별도 라이선스를 따릅니다. 자세한 내용은 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)를 참고하세요.
+
+### Default v2 interface
+
+Opening `/` now opens the v2 interface; no environment flag is needed. `/legacy`
+keeps the previous dashboard, and existing channel/configuration/file URLs still
+work. A source checkout without built frontend assets falls back to `/legacy`;
+run `cd frontend && npm ci && npm run build` to build the UI.
+
+By default v2 reads the existing channel state and recording catalog, and its
+recording start/stop buttons use the existing engine. It does not migrate data,
+create storage markers, change recording paths or activate a new capture policy.
+Durable verification/recovery/merge jobs remain opt-in (`LAR_V2_ENABLED=true`)
+and require the documented local database and verified storage setup. The UI
+explicitly indicates when those operations are unavailable.

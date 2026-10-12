@@ -129,3 +129,112 @@ it('storage errors and last-good timestamp survive screen navigation',async()=>{
   fireEvent.click(within(screen.getByRole('navigation',{name:'주 메뉴'})).getByRole('link',{name:'방송 보관함'}));
   await screen.findByRole('heading',{name:'방송 보관함',level:1});expect(screen.getByText('NAS unavailable')).toBeTruthy();expect(screen.getByText(/마지막 정상 확인 2026/)).toBeTruthy();
 });
+
+function compatibilityMock(overrides?: (path: string, init?: RequestInit) => Promise<Response> | undefined) {
+  return mock((path, init) => {
+    const overridden = overrides?.(path, init);
+    if (overridden) return overridden;
+    if (path === '/status') return response({...systemStatus,features:{durable_jobs:false,channel_controls:false},worker:{ready:false},storage:{status:'unknown'}});
+    if (path === '/channels') return response({items:[{...channel,controls_available:false}],observed_at:now,next_cursor:null});
+    if (path.startsWith('/jobs?')) return response({items:[],observed_at:now,next_cursor:null,available:false});
+    if (path === '/broadcasts/broadcast-1') return response({...detail,jobs_available:false,jobs:[],artifacts:detail.artifacts.map(artifact=>({...artifact,controls_available:false,exists:undefined,exists_status:'unknown',validation:null}))});
+    if (path === '/settings') return response({enabled:true,features:{durable_jobs:false,legacy_ui:true}});
+  });
+}
+it('root is the active overview and compatibility status does not invent worker or storage health',async()=>{
+  compatibilityMock();mount('/');await screen.findByRole('heading',{name:'녹화 현황',level:1});
+  await screen.findByText('저장소 미확인');
+  expect(screen.queryByText('작업 실행기가 준비되지 않았습니다.')).toBeNull();
+  expect(screen.queryByText('작업 목록에서 조치 대상을 찾지 못했습니다')).toBeNull();
+  expect(screen.getByText('파일 작업 기능이 꺼져 있습니다')).toBeTruthy();
+  const nav=within(screen.getByRole('navigation',{name:'주 메뉴'}));
+  expect(nav.getByRole('link',{name:'현황'}).getAttribute('aria-current')).toBe('page');
+  expect(screen.getByRole('link',{name:'기존 화면으로 이동'}).getAttribute('href')).toBe('/legacy');
+  expect(document.title).toBe('현황 · Live Auto Recorder');
+});
+it('compatibility overview displays live observations and links to the catalog detail',async()=>{
+  compatibilityMock(path=>path==='/channels'?response({items:[{...channel,controls_available:false,actual_state:'recording',title:broadcast.title,broadcast_id:broadcast.id}],observed_at:now}):undefined);
+  mount('/v2');await screen.findByRole('heading',{name:broadcast.title});
+  expect(screen.getByRole('link',{name:'상세 보기'}).getAttribute('href')).toBe('/v2/broadcasts/broadcast-1');
+});
+it('compatibility controls use legacy semantics and cancelling a confirmation sends nothing',async()=>{
+  const fetch=compatibilityMock();mount('/v2/channels');await screen.findByRole('heading',{name:channel.name});
+  expect(screen.queryByRole('button',{name:'지금 한 번 녹화'})).toBeNull();
+  expect(screen.queryByRole('button',{name:'자동 녹화 끄기'})).toBeNull();
+  expect(screen.queryByText('자동 녹화를 꺼도 현재 방송은 계속 녹화됩니다.')).toBeNull();
+  expect(screen.getByRole('link',{name:'자동 녹화 설정'}).getAttribute('href')).toBe('/channels');
+  fireEvent.click(screen.getByRole('button',{name:'녹화 시작'}));
+  fireEvent.click(screen.getByRole('button',{name:'돌아가기'}));
+  expect(screen.queryByRole('dialog')).toBeNull();
+  expect(fetch.mock.calls.some(([,init])=>init?.method==='POST')).toBe(false);
+});
+it('compatibility start is sent once while pending and acknowledged without optimistic recording',async()=>{
+  let finish!:(value:Response)=>void;
+  const fetch=compatibilityMock(path=>path==='/api/start_recording/ch-1'?new Promise(resolve=>{finish=resolve;}):undefined);
+  mount('/v2/channels');await screen.findByRole('heading',{name:channel.name});
+  fireEvent.click(screen.getByRole('button',{name:'녹화 시작'}));
+  fireEvent.click(screen.getByRole('button',{name:'녹화 시작 요청'}));
+  fireEvent.click(screen.getByRole('button',{name:'요청 전송 중…'}));
+  fireEvent.click(screen.getByRole('button',{name:'닫기'}));
+  expect(screen.getByRole('dialog')).toBeTruthy();
+  expect(fetch.mock.calls.filter(([,init])=>init?.method==='POST')).toHaveLength(1);
+  const post=fetch.mock.calls.find(([,init])=>init?.method==='POST');
+  expect(post?.[0]).toBe('/api/start_recording/ch-1');
+  expect(JSON.parse(post?.[1]?.body as string)).toEqual({is_user_request:true});
+  expect((post?.[1]?.headers as Record<string,string>)['Idempotency-Key']).toBeUndefined();
+  finish(new Response(JSON.stringify({status:'success',state:'녹화 중'})));
+  await screen.findByText('녹화 시작 요청을 접수했습니다. 실제 상태는 새 관측 결과로 확인하세요.');
+  expect(screen.queryByRole('dialog')).toBeNull();
+  expect(screen.getByText('감시 중',{selector:'.channel-states .badge'})).toBeTruthy();
+  expect(screen.queryByText('녹화 중',{selector:'.channel-states .badge'})).toBeNull();
+  expect(fetch.mock.calls.filter(([url])=>url==='/api/v2/channels').length).toBeGreaterThan(1);
+  expect(fetch.mock.calls.filter(([url])=>url==='/api/v2/status').length).toBeGreaterThan(1);
+});
+it('compatibility stop works without a durable broadcast ID and keeps observed recording until refreshed',async()=>{
+  const fetch=compatibilityMock(path=>path==='/channels'?response({items:[{...channel,controls_available:false,actual_state:'recording',broadcast_id:null}],observed_at:now}):path==='/api/stop_recording/ch-1'?response({status:'success',state:'대기 중'}):undefined);
+  mount('/v2/channels');await screen.findByRole('button',{name:'녹화 중지'});
+  expect(screen.queryByRole('button',{name:'이번 방송 중지'})).toBeNull();
+  fireEvent.click(screen.getByRole('button',{name:'녹화 중지'}));
+  fireEvent.click(screen.getByRole('button',{name:'녹화 중지 요청'}));
+  await screen.findByText('녹화 중지 요청을 접수했습니다. 실제 상태는 새 관측 결과로 확인하세요.');
+  const post=fetch.mock.calls.find(([,init])=>init?.method==='POST');
+  expect(post?.[0]).toBe('/api/stop_recording/ch-1');expect(post?.[1]?.body).toBeUndefined();
+  expect(screen.getByText('녹화 중',{selector:'.channel-states .badge'})).toBeTruthy();
+});
+it('compatibility network failure is surfaced and refreshes observations without replaying a request',async()=>{
+  const fetch=compatibilityMock(path=>path==='/api/start_recording/ch-1'?Promise.reject(new TypeError('connection lost')):undefined);
+  mount('/v2/channels');await screen.findByRole('button',{name:'녹화 시작'});
+  fireEvent.click(screen.getByRole('button',{name:'녹화 시작'}));fireEvent.click(screen.getByRole('button',{name:'녹화 시작 요청'}));
+  await screen.findByText('CONNECTION_LOST');
+  await waitFor(()=>expect((screen.getByRole('button',{name:'녹화 시작 요청'}) as HTMLButtonElement).disabled).toBe(false));
+  expect(screen.queryByText(/요청을 접수했습니다/)).toBeNull();
+  expect(fetch.mock.calls.filter(([,init])=>init?.method==='POST')).toHaveLength(1);
+  expect(fetch.mock.calls.filter(([url])=>url==='/api/v2/channels').length).toBeGreaterThan(1);
+});
+it('compatibility file actions are disabled while unknown artifacts remain unverified',async()=>{
+  const fetch=compatibilityMock();mount('/v2/broadcasts/broadcast-1');await screen.findByRole('heading',{name:broadcast.title,level:1});
+  for(const button of screen.getAllByRole('button').filter(button=>['검증','복구본','조각 합치기'].includes(button.textContent || ''))) {
+    expect((button as HTMLButtonElement).disabled).toBe(true);fireEvent.click(button);
+  }
+  expect(screen.getAllByText(/파일 존재 여부 미확인/)).toHaveLength(detail.artifacts.length);
+  expect(screen.queryByRole('dialog')).toBeNull();
+  expect(fetch.mock.calls.some(([,init])=>init?.method==='POST')).toBe(false);
+  expect(screen.getByText('파일 작업 기능이 꺼져 있습니다.')).toBeTruthy();
+});
+it('artifact-level unavailable controls are honored even when broadcast jobs availability is absent',async()=>{
+  mock(path=>path==='/broadcasts/broadcast-1'?response({...detail,artifacts:detail.artifacts.map(artifact=>({...artifact,controls_available:false}))}):undefined);
+  mount('/v2/broadcasts/broadcast-1');await screen.findByRole('heading',{name:broadcast.title,level:1});
+  for(const name of ['검증','복구본','조각 합치기']) for(const button of screen.getAllByRole('button',{name})) expect((button as HTMLButtonElement).disabled).toBe(true);
+});
+it('disabled jobs mode is explicit and stale selected links never load unavailable job details',async()=>{
+  const fetch=compatibilityMock();mount('/v2/jobs?selected=old-job');await screen.findByText('파일 작업 기능이 꺼져 있습니다');
+  expect(screen.queryByText('조건에 맞는 작업이 없습니다')).toBeNull();
+  expect(screen.queryByRole('dialog')).toBeNull();
+  expect(fetch.mock.calls.some(([url])=>url.includes('/jobs/old-job'))).toBe(false);
+  expect(screen.getByRole('link',{name:'기존 파일 탐색'}).getAttribute('href')).toBe('/files');
+});
+it('settings distinguishes disabled durable features and links to the preserved legacy dashboard',async()=>{
+  compatibilityMock();mount('/v2/settings');await screen.findByText('사용 안 함');
+  expect(screen.getByRole('link',{name:'기존 녹화 화면으로 이동'}).getAttribute('href')).toBe('/legacy');
+  expect(screen.getByRole('link',{name:'채널 설정'}).getAttribute('href')).toBe('/channels');
+});

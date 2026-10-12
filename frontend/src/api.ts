@@ -11,9 +11,12 @@ export class ApiError extends Error {
   }
 }
 export async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
+  return request<T>(`/api/v2${path}`, options);
+}
+async function request<T>(url: string, options: RequestInit = {}): Promise<T> {
   let response: Response;
   try {
-    response = await fetch(`/api/v2${path}`, {
+    response = await fetch(url, {
       ...options, credentials: 'same-origin',
       headers: { Accept: 'application/json', ...(options.body ? { 'Content-Type': 'application/json' } : {}), ...options.headers },
     });
@@ -33,6 +36,17 @@ export async function api<T>(path: string, options: RequestInit = {}): Promise<T
     });
   }
   return data as T;
+}
+
+/** Compatibility actions use the running recorder, without durable-command semantics. */
+export async function compatibilityRecording(channelId: string, action: 'start' | 'stop'): Promise<void> {
+  const result = await request<{ status?: string; code?: string; message?: string } | null>(`/api/${action}_recording/${encodeURIComponent(channelId)}`, {
+    method: 'POST', ...(action === 'start' ? { body: JSON.stringify({ is_user_request: true }) } : {}),
+  });
+  if (result?.status !== 'success') throw new ApiError(0, {
+    code: result?.code || 'REQUEST_UNKNOWN',
+    message: result?.message || '요청 결과를 확인하지 못했습니다. 채널의 실제 상태를 확인하세요.',
+  });
 }
 export function commandKey(): string {
   if (typeof crypto.randomUUID === 'function') return crypto.randomUUID();

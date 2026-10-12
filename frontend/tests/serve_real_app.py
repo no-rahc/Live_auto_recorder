@@ -23,8 +23,10 @@ with tempfile.TemporaryDirectory(prefix='lar-v2-browser-') as folder:
     data.mkdir(); media.mkdir()
     (data / 'channels.json').write_text('[]')
     (data / 'config.json').write_text(json.dumps({'autoRecordingMode': False}))
-    (media / '.lar-storage-id').write_text('disposable-browser-test')
-    env = {**os.environ, 'LAR_V2_ENABLED': 'true', 'LAR_DISABLE_UPDATE_CHECK': 'true', 'LAR_DATA_DIR': str(data), 'RECORDINGS_ROOT': str(media), 'HOST': '127.0.0.1', 'PORT': os.getenv('UI_REAL_PORT', '4175'), 'PYTHONDONTWRITEBYTECODE': '1'}
+    durable_enabled = os.getenv('UI_REAL_V2_ENABLED', 'true')
+    if durable_enabled.lower() in {'1', 'true', 'yes', 'on'}:
+        (media / '.lar-storage-id').write_text('disposable-browser-test')
+    env = {**os.environ, 'LAR_V2_ENABLED': durable_enabled, 'LAR_DISABLE_UPDATE_CHECK': 'true', 'LAR_DATA_DIR': str(data), 'RECORDINGS_ROOT': str(media), 'HOST': '127.0.0.1', 'PORT': os.getenv('UI_REAL_PORT', '4175'), 'PYTHONDONTWRITEBYTECODE': '1'}
     ffmpeg = shutil.which('ffmpeg')
     if ffmpeg:
         subprocess.run([ffmpeg, '-hide_banner', '-loglevel', 'error', '-f', 'lavfi', '-i', 'testsrc=size=128x72:rate=10', '-t', '1', '-c:v', 'mpeg2video', '-f', 'mpegts', '-n', str(media/'sample-1.ts')], check=True)

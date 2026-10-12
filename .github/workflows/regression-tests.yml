@@ -34,6 +34,16 @@ jobs:
       - name: Install Chromium for UI regressions
         working-directory: frontend
         run: npx playwright install --with-deps chromium
+      - name: Render fixture-only default v2 previews
+        working-directory: frontend
+        run: npm run test:browser -- --grep "compatibility preview"
+      - name: Save default v2 preview screenshots
+        uses: actions/upload-artifact@v7
+        with:
+          name: v2-default-ui-preview
+          path: frontend/test-results/v2-default-*-sample.png
+          if-no-files-found: error
+          retention-days: 7
       - name: Test desktop, mobile, and interrupted UI flows
         working-directory: frontend
         run: npm run test:browser

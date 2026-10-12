@@ -194,7 +194,7 @@
       svgIcon("chevron") +
       "</span>";
 
-    const isActive = targetPath === activePath;
+    const isActive = targetPath === (activePath === "/legacy" ? "/" : activePath);
     link.classList.toggle("lar-active", isActive);
     if (isActive) link.setAttribute("aria-current", "page");
     else link.removeAttribute("aria-current");
@@ -1039,7 +1039,7 @@
 
   function currentPath() {
     const value = location.pathname.replace(/\/$/, "");
-    return value || "/";
+    return value === "/legacy" ? "/" : value || "/";
   }
 
   function forceLightTheme() {
@@ -3692,7 +3692,7 @@
   }
 
   function showStorageBanner(storage) {
-    if (!storage || storage.status === "ok" || !["/", "/recording"].includes(path)) return;
+    if (!storage || storage.status === "ok" || !["/", "/legacy", "/recording"].includes(path)) return;
     let banner = document.querySelector(".ops-storage-banner");
     if (!banner) {
       banner = document.createElement("a");

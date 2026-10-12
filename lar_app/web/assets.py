@@ -8,6 +8,7 @@ from html import escape
 
 HTML_ROUTES = frozenset({
     "/",
+    "/legacy",
     "/recording",
     "/config",
     "/channels",

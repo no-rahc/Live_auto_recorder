@@ -111,3 +111,69 @@ test('storage errors persist across screens with last successful check and keybo
   await page.goBack();await expect(page.getByRole('heading',{name:'방송 보관함',exact:true})).toBeVisible();
   await page.goForward();await expect(page.getByRole('heading',{name:broadcast.title})).toBeVisible();
 });
+
+test('compatibility preview uses the actual UI with clearly labeled sample observations',async({page})=>{
+  await page.setViewportSize({width:1440,height:1050});
+  const sampleChannels=[
+    {...channel,name:'샘플 채널 · 초록 스튜디오',controls_available:false,actual_state:'recording',broadcast_id:broadcast.id,title:'샘플 방송 · 가을 저녁의 작업실',started_at:Date.now()/1000-3682,last_write_at:Date.now()/1000-2,write_rate_bps:2180000},
+    {...channel,id:'sample-youtube',name:'샘플 채널 · 느린 오후',platform:'youtube',controls_available:false,actual_state:'watching'},
+    {...channel,id:'sample-paused',name:'샘플 채널 · 작은 서재',desired_mode:'paused',controls_available:false,actual_state:'idle'},
+  ];
+  await page.route('**/api/v2/status',route=>route.fulfill({contentType:'application/json',body:JSON.stringify({...systemStatus,version:'2.0 · 샘플 데이터',observed_at:Date.now()/1000,channels:{recording:1,watching:1,attention:0,total:3},features:{durable_jobs:false,channel_controls:false},worker:{ready:false},storage:{status:'unknown'}})}));
+  await page.route('**/api/v2/channels',route=>route.fulfill({contentType:'application/json',body:JSON.stringify({items:sampleChannels,next_cursor:null,observed_at:Date.now()/1000})}));
+  await page.route('**/api/v2/jobs?*',route=>route.fulfill({contentType:'application/json',body:JSON.stringify({items:[],available:false,observed_at:Date.now()/1000})}));
+  await page.goto('/v2');await expect(page.getByRole('heading',{name:'녹화 현황'})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'샘플 방송 · 가을 저녁의 작업실'})).toBeVisible();
+  await expect(page.getByText('저장소 미확인')).toBeVisible();
+  await page.screenshot({path:'test-results/v2-default-dashboard-sample.png',fullPage:true});
+  await page.goto('/v2/channels');await expect(page.getByRole('heading',{name:'샘플 채널 · 초록 스튜디오'})).toBeVisible();
+  await expect(page.getByRole('button',{name:'녹화 중지',exact:true}).first()).toBeVisible();
+  await page.screenshot({path:'test-results/v2-default-channels-sample.png',fullPage:true});
+});
+
+test('default compatibility recording controls call existing APIs and keep observed state authoritative',async({page})=>{
+  let observed='watching', starts=0, stops=0, startBody:unknown;
+  await page.route('**/api/v2/status',route=>route.fulfill({contentType:'application/json',body:JSON.stringify({...systemStatus,features:{durable_jobs:false,channel_controls:false},worker:{ready:false},storage:{status:'unknown'}})}));
+  await page.route('**/api/v2/channels',route=>route.fulfill({contentType:'application/json',body:JSON.stringify({items:[{...channel,controls_available:false,actual_state:observed,broadcast_id:null}],observed_at:Date.now()/1000})}));
+  await page.route('**/api/start_recording/ch-1',async route=>{
+    starts++;startBody=route.request().postDataJSON();
+    await new Promise(resolve=>setTimeout(resolve,200));
+    await route.fulfill({contentType:'application/json',body:JSON.stringify({status:'success',state:'녹화 중'})});
+  });
+  await page.route('**/api/stop_recording/ch-1',route=>{
+    stops++;return route.fulfill({contentType:'application/json',body:JSON.stringify({status:'success',state:'대기 중'})});
+  });
+  await page.goto('/v2/channels');
+  await expect(page.getByRole('button',{name:'지금 한 번 녹화',exact:true})).toHaveCount(0);
+  await expect(page.getByText('작업 실행기가 준비되지 않았습니다.')).toHaveCount(0);
+  await page.getByRole('button',{name:'녹화 시작',exact:true}).click();
+  await page.getByRole('button',{name:'돌아가기',exact:true}).click();expect(starts).toBe(0);
+  await page.getByRole('button',{name:'녹화 시작',exact:true}).click();
+  await page.getByRole('button',{name:'녹화 시작 요청',exact:true}).click();
+  await expect(page.getByRole('button',{name:'요청 전송 중…'})).toBeDisabled();
+  await expect(page.getByText('녹화 시작 요청을 접수했습니다. 실제 상태는 새 관측 결과로 확인하세요.')).toBeVisible();
+  expect(starts).toBe(1);expect(startBody).toEqual({is_user_request:true});
+  await expect(page.locator('.channel-states').getByText('감시 중')).toBeVisible();
+  observed='recording';await page.getByRole('button',{name:'모든 상태 새로고침'}).click();
+  await expect(page.locator('.channel-states').getByText('녹화 중')).toBeVisible();
+  await page.getByRole('button',{name:'녹화 중지',exact:true}).click();
+  await page.getByRole('button',{name:'녹화 중지 요청',exact:true}).click();
+  await expect(page.getByText('녹화 중지 요청을 접수했습니다. 실제 상태는 새 관측 결과로 확인하세요.')).toBeVisible();
+  expect(stops).toBe(1);await expect(page.locator('.channel-states').getByText('녹화 중')).toBeVisible();
+});
+
+test('compatibility failures stay visible and are never replayed automatically',async({page})=>{
+  let attempts=0;
+  await page.route('**/api/v2/channels',route=>route.fulfill({contentType:'application/json',body:JSON.stringify({items:[{...channel,controls_available:false}],observed_at:now})}));
+  await page.route('**/api/start_recording/ch-1',route=>{
+    attempts++;return route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({status:'error',code:'start_failed',message:'테스트 녹화 엔진에 연결할 수 없습니다.'})});
+  });
+  await page.goto('/v2/channels');await page.getByRole('button',{name:'녹화 시작',exact:true}).click();
+  await page.getByRole('button',{name:'녹화 시작 요청',exact:true}).click();
+  await expect(page.getByText('테스트 녹화 엔진에 연결할 수 없습니다.')).toBeVisible();
+  await expect(page.getByRole('button',{name:'녹화 시작 요청',exact:true})).toBeEnabled();
+  await expect(page.getByText(/녹화 시작 요청을 접수했습니다/)).toHaveCount(0);
+  await page.getByRole('button',{name:'돌아가기',exact:true}).click();
+  await page.getByRole('button',{name:'모든 상태 새로고침'}).click();
+  await expect(page.getByText('테스트 녹화 엔진에 연결할 수 없습니다.')).toBeVisible();expect(attempts).toBe(1);
+});

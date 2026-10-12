@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
-import { api, allChannels, ApiError, commandKey, latestRevision, pollingInterval } from './api';
+import { api, allChannels, ApiError, commandKey, compatibilityRecording, latestRevision, pollingInterval } from './api';
 import type { Channel, Command, Page } from './types';
 
 export function useApiQuery<T>(path: string, enabled = true, loader?: (signal: AbortSignal) => Promise<T>) {
@@ -57,3 +57,29 @@ export function useCommand(receipt: Command | null) {
 }
 
 export function useChannelsQuery() { return useApiQuery<Page<Channel>>('/channels', true, allChannels); }
+
+/** Legacy requests cannot be retried automatically or treated as completed observations. */
+export function useCompatibilityRecording(channelId: string) {
+  const queryClient = useQueryClient();
+  const inflight = useRef(false);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<ApiError | null>(null);
+  const [accepted, setAccepted] = useState<'start' | 'stop' | null>(null);
+  const run = async (kind: 'start' | 'stop') => {
+    if (inflight.current) return false;
+    inflight.current = true; setPending(true); setError(null); setAccepted(null);
+    let success = false;
+    try {
+      await compatibilityRecording(channelId, kind);
+      setAccepted(kind); success = true;
+    } catch (cause) {
+      setError(cause instanceof ApiError ? cause : new ApiError(0, { code: 'REQUEST_UNKNOWN', message: '요청 결과를 확인하지 못했습니다. 채널의 실제 상태를 확인하세요.' }));
+    } finally {
+      // A transport failure may still have changed the recorder. Refresh observations, never replay.
+      await Promise.all(['/channels', '/status'].map(path => queryClient.invalidateQueries({ queryKey: ['v2', path] })));
+      inflight.current = false; setPending(false);
+    }
+    return success;
+  };
+  return { run, pending, error, accepted, clear: () => { setError(null); setAccepted(null); } };
+}

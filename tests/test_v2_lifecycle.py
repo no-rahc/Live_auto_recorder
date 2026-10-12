@@ -46,3 +46,14 @@ class V2LifecycleTests(unittest.IsolatedAsyncioTestCase):
             with self.assertRaises(RuntimeError):
                 async with app.router.lifespan_context(app): pass
         self.assertEqual(events,['lock','release'])
+
+    async def test_default_lifespan_does_not_activate_durable_capture_or_storage(self):
+        app = FastAPI()
+        operations = SimpleNamespace(start=AsyncMock(), stop=AsyncMock())
+        platform = SimpleNamespace(start=AsyncMock(), stop=AsyncMock())
+        with patch.dict(os.environ, {'LAR_V2_ENABLED': '0'}), patch('lar_app.bootstrap.get_repository', side_effect=AssertionError('must not open durable DB')), patch('module.v2_runtime.begin_capture_guard', side_effect=AssertionError('must not change capture policy')), patch('lar_app.bootstrap.enforce_local_mode'):
+            _install_operations_lifespan(app, operations, platform, Mock())
+            async with app.router.lifespan_context(app):
+                self.assertFalse(hasattr(app.state, 'v2_worker'))
+            operations.start.assert_awaited_once()
+            operations.stop.assert_awaited_once()
