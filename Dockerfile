@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.7
-FROM --platform=$BUILDPLATFORM golang:1.24-bookworm AS ytarchive-builder
+FROM --platform=$BUILDPLATFORM golang:1.27-bookworm AS ytarchive-builder
 
 ARG TARGETOS=linux
 ARG TARGETARCH=amd64
@@ -16,14 +16,14 @@ RUN mkdir -p /out \
     && CGO_ENABLED=0 GOOS="${TARGETOS}" GOARCH="${TARGETARCH}" \
         go build -trimpath -ldflags="-s -w" -o /out/ytarchive .
 
-FROM --platform=$BUILDPLATFORM node:22-bookworm-slim AS frontend-builder
+FROM --platform=$BUILDPLATFORM node:26-bookworm-slim AS frontend-builder
 WORKDIR /src/frontend
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci --no-audit --no-fund
 COPY frontend ./
 RUN npm run build
 
-FROM python:3.12-slim-bookworm
+FROM python:3.14-slim-bookworm
 
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONDONTWRITEBYTECODE=1 \
