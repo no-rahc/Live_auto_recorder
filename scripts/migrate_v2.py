@@ -24,7 +24,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from module.v2_repository import V2Repository, FutureSchema, SCHEMA_VERSION, DEFAULT_DB_NAME
 from module.v2_storage import StorageRoot, preflight_database_location, preflight_storage
 
-def sanitize_secrets(value):
+def redact_secrets(value):
     # Keep the offline migration command standard-library-only. Match the live
     # backup policy recursively without importing the FastAPI application.
     if isinstance(value, dict):
@@ -35,10 +35,10 @@ def sanitize_secrets(value):
                       or any(part in normalized for part in ('password', 'passwd', 'secret', 'token', 'api_key', 'apikey', 'private_key', 'webhook_url'))
                       or normalized.endswith('_cookie'))
             if not secret:
-                result[key] = sanitize_secrets(item)
+                result[key] = redact_secrets(item)
         return result
     if isinstance(value, list):
-        return [sanitize_secrets(item) for item in value]
+        return [redact_secrets(item) for item in value]
     return value
 
 JSON_FILES = ('config.json', 'channels.json', 'operations_v2.json', 'operations_jobs.json')
@@ -233,7 +233,7 @@ def migrate(source_dir, *, data_dir=None, recording_root=None, apply=False,
             path = source_dir / filename
             if path.exists():
                 value = json.loads(path.read_text(encoding='utf-8'))
-                _write_json(directory / filename, sanitize_secrets(value))
+                _write_json(directory / filename, redact_secrets(value))
                 manifest['files'].append({'name': filename, 'sha256': _digest(directory / filename), 'sanitized': True})
         for filename in HISTORY_FILES:
             path = source_dir / filename
@@ -251,7 +251,7 @@ def migrate(source_dir, *, data_dir=None, recording_root=None, apply=False,
                         continue
                     if not isinstance(row, dict):
                         continue
-                    out.write(json.dumps(sanitize_secrets(row), ensure_ascii=False) + '\n')
+                    out.write(json.dumps(redact_secrets(row), ensure_ascii=False) + '\n')
                 out.flush()
                 os.fsync(out.fileno())
             manifest['files'].append({'name': filename, 'sha256': _digest(snapshot), 'sanitized': True})
@@ -271,12 +271,12 @@ def migrate(source_dir, *, data_dir=None, recording_root=None, apply=False,
                 enabled = row.get('record_enabled', False)
                 if isinstance(enabled, str):
                     enabled = enabled.lower() in ('true', '1', 'yes', 'on')
-                repo.upsert_channel(str(row['id']), platform=str(row.get('platform') or ''), name=str(row.get('name') or ''), desired_mode='auto' if enabled else 'paused', metadata=sanitize_secrets(row))
+                repo.upsert_channel(str(row['id']), platform=str(row.get('platform') or ''), name=str(row.get('name') or ''), desired_mode='auto' if enabled else 'paused', metadata=redact_secrets(row))
         imports['catalog'] = repo.sync_legacy_catalog(source_dir / 'recordings.sqlite3', recording_root)
         jobs = source_dir / 'operations_jobs.json'
         if jobs.exists():
             rows = json.loads(jobs.read_text(encoding='utf-8'))
-            records = [(str(row.get('id') or _hash_row(row)), sanitize_secrets(row)) for row in rows if isinstance(row, dict)]
+            records = [(str(row.get('id') or _hash_row(row)), redact_secrets(row)) for row in rows if isinstance(row, dict)]
             imports['jobs'] = repo.import_legacy_records('json:' + str(jobs.resolve()), records, kind='job')
         for filename in HISTORY_FILES:
             path = source_dir / filename
@@ -293,7 +293,7 @@ def migrate(source_dir, *, data_dir=None, recording_root=None, apply=False,
                 # Original ID where present, otherwise content+line identity is
                 # stable across reruns and unaffected by appended history.
                 key = str(row.get('id') or f'{line_number}:{hashlib.sha256(line.encode()).hexdigest()}')
-                records.append((key, sanitize_secrets(row)))
+                records.append((key, redact_secrets(row)))
             imports[filename] = repo.import_legacy_records('jsonl:' + str(path.resolve()), records)
         catalog = source_dir / 'recordings.sqlite3'
         if catalog.exists():

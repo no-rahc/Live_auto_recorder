@@ -45,3 +45,12 @@ integration issues. The release document lists the remaining real-hardware gates
   cover CLI rejection, direct-call rejection, no-write behavior and sanitized
   migration. No remote alert was manually dismissed or suppressed; the new
   CodeQL scan determines whether the finding is resolved.
+
+- Follow-up alert 79 marked the already-redacted JSONL write as a secret source:
+  CodeQL's sensitive-function-name heuristic treats `sanitize_secrets` as a
+  function returning secrets. Renamed this helper to `redact_secrets` to state
+  its actual output contract (the upstream heuristic recognizes `redact`).
+  Added an end-to-end regression proving nested password, API key, cookie,
+  credential and webhook fields are absent from JSON and both JSONL backups,
+  while non-secret data and every original file remain intact. No query,
+  suppression, alert dismissal or security workflow was changed.

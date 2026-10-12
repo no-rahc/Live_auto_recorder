@@ -393,6 +393,30 @@ class MigrationTests(unittest.TestCase):
         self.assertNotIn('secret-value', output.getvalue())
         self.assertEqual(before, self.snapshots())
 
+    def test_nested_credentials_are_absent_from_json_and_history_snapshots(self):
+        protected = {'password': 'fixture-pw', 'apiKey': 'fixture-key',
+                     'nested': [{'cookies': 'fixture-cookie', 'keep': 7,
+                                 'accessToken': 'fixture-access',
+                                 'telegram_bot_token': 'fixture-telegram',
+                                 'telegram_chat_id': 'fixture-chat'}],
+                     'credentials': {'login': 'fixture-login'},
+                     'webhook-url': 'fixture-hook', 'enabled': True}
+        (self.data / 'config.json').write_text(json.dumps(protected))
+        for name in ('recording_history.jsonl', 'operations_audit.jsonl'):
+            (self.data / name).write_text(json.dumps({'id': name, **protected}) + '\n')
+        before = self.snapshots()
+        report = migrate(self.data, apply=True, stopped=True, image_id='sha256:old')
+        self.assertTrue(report['ok'], report)
+        directory = Path(report['manifest']).parent
+        expected = {'nested': [{'keep': 7}], 'enabled': True}
+        self.assertEqual(json.loads((directory / 'config.json').read_text()), expected)
+        for name in ('recording_history.jsonl', 'operations_audit.jsonl'):
+            self.assertEqual(json.loads((directory / name).read_text()), {'id': name, **expected})
+        for path in directory.iterdir():
+            self.assertNotIn(b'fixture-', path.read_bytes())
+        for name, content in before.items():
+            self.assertEqual(content, (self.root / name).read_bytes())
+
     def test_additive_import_rerun_and_sanitized_backup(self):
         before = self.snapshots()
         report = migrate(self.data, recording_root=self.media, apply=True, stopped=True, image_id='sha256:old')
