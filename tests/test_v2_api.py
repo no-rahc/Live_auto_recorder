@@ -1,8 +1,7 @@
 """v2 compatibility, API contracts, and request-origin boundaries."""
+import asyncio
 import os
-import tempfile
 import unittest
-from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock, patch
 
@@ -24,9 +23,38 @@ class V2ApiTests(unittest.IsolatedAsyncioTestCase):
         self.client = httpx.AsyncClient(transport=httpx.ASGITransport(app=self.app), base_url='http://localhost')
         self.addAsyncCleanup(self.client.aclose)
 
-    async def test_opt_out_is_404(self):
-        with patch.dict(os.environ, {'LAR_V2_ENABLED':'0'}):
-            self.assertEqual((await self.client.get('/api/v2/channels')).status_code, 404)
+    async def test_disabled_reads_legacy_without_durable_repository(self):
+        self.app.state.channels_lock = asyncio.Lock()
+        self.app.state.channels = [{'id': 'one', 'name': 'One', 'platform': 'chzzk', 'record_enabled': True, 'token': 'secret'}]
+        self.app.state.fsm = SimpleNamespace(getState=lambda cid: 'WATCHING')
+        self.core.recorder_manager = SimpleNamespace(get_status_recording=lambda cid: False, get_status_reserved=lambda cid: True)
+        self.core.toBool = bool
+        with patch.dict(os.environ, {'LAR_V2_ENABLED': '0'}), patch('lar_app.routers.v2.get_repository', side_effect=AssertionError('must not open durable DB')), patch('lar_app.routers.v2.sync_catalog', side_effect=AssertionError('must not migrate')):
+            response = await self.client.get('/api/v2/channels')
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.json()['items'][0]['actual_state'], 'watching')
+            self.assertFalse(response.json()['items'][0]['controls_available'])
+            self.assertNotIn('secret', response.text)
+            status = (await self.client.get('/api/v2/status')).json()
+            self.assertEqual(status['channels']['watching'], 1)
+            self.assertFalse(status['features']['durable_jobs'])
+            self.assertEqual(status['storage']['status'], 'unknown')
+            self.assertNotIn('worker', status)
+            self.assertFalse((await self.client.get('/api/v2/jobs')).json()['available'])
+            self.assertFalse((await self.client.get('/api/v2/settings')).json()['features']['durable_jobs'])
+            self.assertEqual((await self.client.get('/api/v2/jobs/old')).status_code, 404)
+            self.assertEqual((await self.client.get('/api/v2/commands/old')).status_code, 404)
+            response = await self.client.post('/api/v2/channels/one/commands', json={'kind': 'start_once'}, headers={'Idempotency-Key': 'key'})
+            self.assertEqual(response.status_code, 409)
+            self.service.command.assert_not_awaited()
+            source = {'broadcast_id': 'b', 'title': 'Broadcast', 'merge': {'output_path': '/private'}, 'segments': [{'id': 1, 'filename': 'recording.ts', 'file_path': '/private/path', 'file_size': 42}]}
+            with patch('lar_app.routers.v2.catalog.get_broadcast', return_value=source):
+                detail = await self.client.get('/api/v2/broadcasts/b')
+            self.assertEqual(detail.status_code, 200)
+            self.assertNotIn('/private', detail.text)
+            self.assertFalse(detail.json()['jobs_available'])
+            self.assertEqual(detail.json()['artifacts'][0]['size'], 42)
+            self.assertIsNone(detail.json()['artifacts'][0]['exists'])
 
     async def test_channels_separate_intent_actual_and_have_envelope(self):
         result = (await self.client.get('/api/v2/channels')).json()
@@ -112,14 +140,3 @@ class V2ApiTests(unittest.IsolatedAsyncioTestCase):
         result=(await self.client.get('/api/v2/settings')).json()
         self.assertTrue(result['storage']['originals_preserved'])
         self.assertNotIn('cookies',str(result))
-
-    async def test_ui_returns_only_v2_assets(self):
-        with tempfile.TemporaryDirectory() as root:
-            target=Path(root)/'templates/static/v2';target.mkdir(parents=True)
-            (target/'index.html').write_text('<html><script src="/static/v2/app.js"></script></html>')
-            app=FastAPI();install_v2_routes(app,self.core,root_dir=Path(root))
-            async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app),base_url='http://localhost') as client:
-                response=await client.get('/v2/broadcasts/test')
-            self.assertEqual(response.status_code,200)
-            self.assertNotIn('console.js',response.text)
-            self.assertEqual(response.headers['cache-control'],'no-store')

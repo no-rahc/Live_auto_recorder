@@ -12,11 +12,16 @@ export function Jobs() {
   const query = useApiQuery<Page<Job>>(`/jobs?${params}`);
   const selected = search.get('selected');
   const select = (id: string | null) => { const next = new URLSearchParams(search); if (id) next.set('selected', id); else next.delete('selected'); navigate(`${path}${next.size ? '?' + next : ''}`); };
-  return <><PageHeading eyebrow="JOB QUEUE" title="작업" description="접수부터 실제 완료까지, 작업의 모든 시도를 확인합니다."/>
+  if (query.data?.available === false) return <>
+    <PageHeading eyebrow="JOB QUEUE" title="작업 상태" description="영속 작업 큐를 사용하지 않는 모드입니다."/>
+    <ErrorNotice error={query.error} stale onRetry={() => void query.refetch()}/>
+    <div className="panel"><Empty icon="jobs" title="파일 작업 기능이 꺼져 있습니다" action={<a href="/files" className="button secondary">파일 탐색<Icon name="external" size={16}/></a>}>방송과 파일 이력은 볼 수 있지만, 검증·합치기·복구 작업은 이 모드에서 요청할 수 없습니다.</Empty><LastUpdated at={query.data.observed_at} fetching={query.isFetching}/></div>
+  </>;
+  return <><PageHeading eyebrow="JOB QUEUE" title="작업 상태" description="접수부터 실제 완료까지, 작업의 모든 시도를 확인합니다."/>
     <div className="jobs-toolbar"><div className="filter-tabs" aria-label="작업 상태 필터">{[['','전체'],['queued','대기'],['running','실행 중'],['blocked','보류'],['failed','실패'],['retry_wait','재시도 대기'],['cancel_requested','취소 요청 중']].map(([value, title]) => <button type="button" key={value} className={(search.get('state') || '') === value ? 'active' : ''} onClick={() => update('state', value)} aria-pressed={(search.get('state') || '') === value}>{title}</button>)}</div><label className="filter-field"><span>작업 종류</span><select value={search.get('kind') || ''} onChange={e => update('kind', e.target.value)}><option value="">모든 작업</option><option value="verify">파일 검증</option><option value="merge">합치기</option><option value="recover">복구</option><option value="archive">보관</option></select></label></div>
     <ErrorNotice error={query.error} stale={Boolean(query.data)} onRetry={() => void query.refetch()}/>
     <div className="panel"><div className="list-caption"><strong>작업 목록</strong><span>접수된 작업은 서버에 보관됩니다</span></div>{query.isPending ? <Loading/> : query.data?.items.length ? <div className="jobs-list">{query.data.items.map(job => <button type="button" key={job.id} className="job-row" onClick={() => select(job.id)}><span className={`job-kind ${job.state === 'failed' ? 'bad' : ''}`}><Icon name={job.kind === 'verify' ? 'check' : job.kind === 'merge' ? 'library' : 'jobs'} size={22}/></span><div className="job-main"><strong>{label(job.kind)}</strong><span className="job-target">{job.target_id}</span><small>{job.error_code ? `${job.error_code} · ` : ''}{job.error_message || `접수 ${date(job.created_at, true)}`}</small></div><div className="job-progress"><Progress job={job}/><span>{job.attempts ?? 0} / {job.max_attempts ?? '—'}회 시도</span></div><div className="job-state"><Badge value={job.state}/>{job.next_run_at && <small>다음 시도 {date(job.next_run_at, true)}</small>}</div><Icon name="arrow" size={16}/></button>)}</div> : <Empty icon="jobs" title="조건에 맞는 작업이 없습니다">방송 상세에서 검증·합치기·복구 작업을 요청할 수 있습니다.</Empty>}<LastUpdated at={query.data?.observed_at} fetching={query.isFetching}/></div><Pagination nextCursor={query.data?.next_cursor}/>
-    {selected && <JobDetailPanel id={selected} close={() => select(null)}/>}
+    {selected && query.data && <JobDetailPanel id={selected} close={() => select(null)}/>}
   </>;
 }
 export function Progress({ job }: { job: Job }) {

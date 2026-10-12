@@ -24,8 +24,10 @@ with tempfile.TemporaryDirectory(prefix='lar-v2-browser-') as folder:
     (data / 'channels.json').write_text('[]')
     (data / 'config.json').write_text(json.dumps({'autoRecordingMode': False}))
     (media / '.lar-storage-id').write_text('disposable-browser-test')
-    env = {**os.environ, 'LAR_V2_ENABLED': 'true', 'LAR_DISABLE_UPDATE_CHECK': 'true', 'LAR_DATA_DIR': str(data), 'RECORDINGS_ROOT': str(media), 'HOST': '127.0.0.1', 'PORT': os.getenv('UI_REAL_PORT', '4175'), 'PYTHONDONTWRITEBYTECODE': '1'}
+    env = {**os.environ, 'LAR_V2_ENABLED': os.getenv('UI_DURABLE_JOBS', 'false'), 'LAR_DISABLE_UPDATE_CHECK': 'true', 'LAR_DATA_DIR': str(data), 'RECORDINGS_ROOT': str(media), 'HOST': '127.0.0.1', 'PORT': os.getenv('UI_REAL_PORT', '4175'), 'PYTHONDONTWRITEBYTECODE': '1'}
     ffmpeg = shutil.which('ffmpeg')
+    if not ffmpeg:
+        raise SystemExit('FFmpeg is required to create disposable browser integration media')
     if ffmpeg:
         subprocess.run([ffmpeg, '-hide_banner', '-loglevel', 'error', '-f', 'lavfi', '-i', 'testsrc=size=128x72:rate=10', '-t', '1', '-c:v', 'mpeg2video', '-f', 'mpegts', '-n', str(media/'sample-1.ts')], check=True)
         shutil.copyfile(media/'sample-1.ts', media/'sample-2.ts')
@@ -45,7 +47,7 @@ with sqlite3.connect(catalog.DB_PATH) as db:
     def stop(_signum, _frame):
         if process.poll() is None: process.terminate()
     signal.signal(signal.SIGTERM, stop); signal.signal(signal.SIGINT, stop)
-    print(f'Disposable app: http://127.0.0.1:{env["PORT"]}/v2', flush=True)
+    print(f'Disposable app: http://127.0.0.1:{env["PORT"]}/broadcasts', flush=True)
     try:
         process.wait()
         if process.returncode: raise SystemExit(process.returncode)

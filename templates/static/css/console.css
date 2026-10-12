@@ -3950,3 +3950,18 @@ body.page-operations .ops-token-once {
   border-color: #c9e2ff !important;
   background: #f8fbff !important;
 }
+
+/* Keep the existing v1 dashboard cards inside narrow screens. The history
+   table retains its own scrolling area; do not hide page-level overflow. */
+@media (max-width: 700px) {
+  body.page-index .dash-two {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+  body.page-index .dash-two > .index-section {
+    min-width: 0 !important;
+  }
+  body.page-index .dash-two .table-wrap {
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+}
