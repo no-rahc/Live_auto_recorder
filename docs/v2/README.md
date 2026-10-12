@@ -21,19 +21,23 @@ unchanged until the release gates below have been met.
   `LAR_ALLOWED_HOSTS`; v2 mode rejects foreign Host/Origin browser requests.
   This is not an internet-facing multi-user authentication system.
 
-## Try the new UI
+## Integrated v1 interface
+
+The existing v1 dashboard, sidebar, recording controls and advanced settings stay
+at their original routes. Broadcast library and job status are embedded features
+at `/broadcasts` and `/jobs` using the same console. The separate v2 application
+shell has been removed. Old `/v2` links redirect to the matching console route.
 
 Build `frontend` with `npm ci && npm run build`, then start the normal Python
-entrypoint with `LAR_V2_ENABLED=true`. Open `/v2`. Container builds compile the
-frontend in a build stage and serve static files through FastAPI; there is no
-Node runtime server in the final image. The legacy `/` UI remains available.
-Disabling the UI feature flag does not reverse any database migration or erase
-new outputs, job history, or channel intent.
+entrypoint. The built files are `/static/library/library.js` and `library.css`;
+Docker compiles these in its build stage without a Node runtime server.
 
-The dashboard, broadcast library, broadcast detail, channel controls, and job
-queue share one React/TanStack Query data flow. New pages do not load legacy DOM
-patching scripts. Advanced channel editing and existing settings/backup tools
-remain clearly linked legacy screens during the transition.
+Reading existing broadcasts does not require `LAR_V2_ENABLED`. With the default
+`false`, file existence and validation remain unknown unless actually observed,
+and durable jobs are explicitly unavailable. The existing recorder, advanced
+settings, file browser, and legacy operations remain the normal control surfaces.
+Enabling the durable engine is a separate opt-in with the storage/rollback
+requirements below. Opening the library does not enable it or run a migration.
 
 ## Persistence and restart
 
@@ -66,7 +70,7 @@ and counts. Do not overwrite the only backup.
 Before new writes, restore the previous image plus pre-migration data after
 stopping the application. After v2 has produced new media or state, preserve the
 v2 database and inventory all new files before any rollback. Restore previous
-metadata from backup and re-index new media explicitly. Merely disabling the UI
+metadata from backup and re-index new media explicitly. Merely disabling the engine
 flag is not a downgrade or a configuration rollback. No automatic reverse
 schema conversion is provided.
 

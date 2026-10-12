@@ -57,4 +57,4 @@ export function Pagination({ nextCursor }: { nextCursor?: string | null }) {
   if (!nextCursor && !search.has('cursor')) return null;
   return <div className="pagination">{search.has('cursor') && <button type="button" className="button secondary" onClick={() => move(null)}>처음으로</button>}{nextCursor && <button type="button" className="button secondary" onClick={() => move(nextCursor)}>다음 방송 / 작업<Icon name="arrow"/></button>}</div>;
 }
-export function DetailLink({ id, children = '상세 보기' }: { id: string; children?: ReactNode }) { return <Link to={`/v2/broadcasts/${encodeURIComponent(id)}`} className="text-link">{children}<Icon name="arrow" size={16}/></Link>; }
+export function DetailLink({ id, children = '상세 보기' }: { id: string; children?: ReactNode }) { return <Link to={`/broadcasts/${encodeURIComponent(id)}`} className="text-link">{children}<Icon name="arrow" size={16}/></Link>; }
