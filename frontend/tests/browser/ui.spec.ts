@@ -37,7 +37,8 @@ test('integrated screens and detail fit 360px with usable controls and no JS err
     await page.goto(path);await expect(page.locator('#root h1')).toBeVisible();
     await expect(page.locator('#root .loading')).toHaveCount(0);
     expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),path).toBe(true);
-    expect(await page.locator('#root button:visible, #root input:visible, #root select:visible').evaluateAll(elements=>elements.every(element=>element.getBoundingClientRect().height>=43.9)),path).toBe(true);
+    const undersized=await page.locator('#root button:visible, #root input:visible, #root select:visible').evaluateAll(elements=>elements.filter(element=>element.getBoundingClientRect().height<43.9).map(element=>({tag:element.tagName,label:element.getAttribute('aria-label')||element.textContent?.trim(),className:element.className,height:element.getBoundingClientRect().height})));
+    expect(undersized,`${path}: controls smaller than the 44px mobile target`).toEqual([]);
     if(path.includes('selected=')) {
       const rect=await page.getByRole('dialog').boundingBox();
       expect(rect).toBeTruthy();expect(rect!.x).toBeGreaterThanOrEqual(0);expect(rect!.x+rect!.width).toBeLessThanOrEqual(360);

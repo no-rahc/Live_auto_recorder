@@ -24,7 +24,13 @@ export async function mockApi(page: Page) {
 }
 
 /** Only data are synthetic; serve_ui.py renders the production v1 templates/assets. */
-export const metrics = {cpu_name:'Synthetic preview CPU',cpu_percent:18.4,mem_percent:38.5,mem_used:6614249635,mem_total:17179869184,net_up_bps:524288,net_down_bps:8388608,net_bytes_sent:104857600,net_bytes_recv:1073741824,disks:[{mountpoint:'/synthetic/recordings',fstype:'cifs',used:500000000000,total:1000000000000,free:500000000000,percent:50}]};
+export const socketMetrics = {cpu_name:'Synthetic preview CPU',cpu_percent:18.4,mem_percent:38.5,mem_used:6614249635,mem_total:17179869184,net_up_bps:524288,net_down_bps:8388608,net_bytes_sent:104857600,net_bytes_recv:1073741824,disks:[{mountpoint:'/synthetic/recordings',fstype:'cifs',used:500000000000,total:1000000000000,free:500000000000,percent:50}]};
+export const metrics = {
+  cpu:{name:socketMetrics.cpu_name,percent:socketMetrics.cpu_percent},
+  memory:{percent:socketMetrics.mem_percent,used:socketMetrics.mem_used,total:socketMetrics.mem_total},
+  network:{up_bps:socketMetrics.net_up_bps,down_bps:socketMetrics.net_down_bps,bytes_sent:socketMetrics.net_bytes_sent,bytes_recv:socketMetrics.net_bytes_recv},
+  disks:socketMetrics.disks,
+};
 export async function mockLegacyApi(page: Page) {
   const fulfill = (data: unknown) => ({contentType:'application/json',body:JSON.stringify(data)});
   await page.route('**/api/**', async route => {
@@ -43,7 +49,7 @@ export async function mockLegacyApi(page: Page) {
   });
   await page.route('**/user_info',route=>route.fulfill(fulfill({logged_in:false,username:'Synthetic preview',config:{loginMode:false}})));
   await page.route('**/status',route=>route.fulfill(fulfill({'ch-1':{recording:false,reserved:false}})));
-  await page.routeWebSocket('**/ws/sys_metrics',socket=>socket.send(JSON.stringify(metrics)));
+  await page.routeWebSocket('**/ws/sys_metrics',socket=>socket.send(JSON.stringify(socketMetrics)));
 }
 export async function mockConsoleApi(page: Page) {
   await mockApi(page);

@@ -15,6 +15,8 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
@@ -37,6 +39,8 @@ jobs:
           sudo apt-get install -y fonts-noto-cjk
       - name: Capture actual dashboard, library, jobs and detail at desktop and mobile sizes
         working-directory: frontend
+        env:
+          UI_BASELINE_REF: ${{ github.event.pull_request.base.sha || github.event.before }}
         run: npm run test:browser -- --grep @preview
       - name: Upload labeled synthetic previews immediately
         if: always()

@@ -213,6 +213,8 @@ body.page-library #content { max-width: 1440px !important; }
 @media (prefers-reduced-motion: reduce) { #root.library-workspace .spinner { animation: none !important; } }
 @keyframes library-spin { to { transform: rotate(360deg); } }
 @media (max-width:700px) {
+  #root.library-workspace .library-tools button,
+  #root.library-workspace .filter-tabs button,
   #root.library-workspace button,
   #root.library-workspace .button,
   #root.library-workspace input,
