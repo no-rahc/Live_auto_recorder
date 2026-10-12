@@ -200,6 +200,10 @@ def migrate(source_dir, *, data_dir=None, recording_root=None, apply=False,
     source_dir = Path(source_dir).absolute()
     data_dir = Path(data_dir or source_dir).absolute()
     report = preflight(source_dir, data_dir, recording_root)
+    if include_secrets:
+        report['errors'].append('--include-secrets is disabled: only sanitized backups are supported; original settings are preserved')
+        report['ok'] = False
+        return report
     if not apply:
         return report
     if not stopped:
@@ -217,7 +221,7 @@ def migrate(source_dir, *, data_dir=None, recording_root=None, apply=False,
         return {**report, 'ok': False, 'dry_run': False, 'phase': 'failed', 'errors': [*report['errors'], 'Cannot create private backup directory: ' + str(exc)]}
     manifest = {'format': 1, 'phase': 'backup_started', 'created_at': time.time(), 'image_id': image_id,
                 'source_dir': str(source_dir), 'v2_path': str(data_dir / DEFAULT_DB_NAME),
-                'include_secrets': bool(include_secrets), 'files': [], 'invalid_rows': report['invalid_rows'],
+                'include_secrets': False, 'files': [], 'invalid_rows': report['invalid_rows'],
                 'rollback': 'Before v2 writes, keep the previous image and original files. After v2 writes, stop the service, preserve v2 data/new videos, restore backups and reindex new files; never simply downgrade the image.'}
     manifest_path = directory / 'manifest.json'
     _write_json(manifest_path, manifest)
@@ -229,8 +233,8 @@ def migrate(source_dir, *, data_dir=None, recording_root=None, apply=False,
             path = source_dir / filename
             if path.exists():
                 value = json.loads(path.read_text(encoding='utf-8'))
-                _write_json(directory / filename, value if include_secrets else sanitize_secrets(value))
-                manifest['files'].append({'name': filename, 'sha256': _digest(directory / filename), 'sanitized': not include_secrets})
+                _write_json(directory / filename, sanitize_secrets(value))
+                manifest['files'].append({'name': filename, 'sha256': _digest(directory / filename), 'sanitized': True})
         for filename in HISTORY_FILES:
             path = source_dir / filename
             if not path.exists():
@@ -247,24 +251,10 @@ def migrate(source_dir, *, data_dir=None, recording_root=None, apply=False,
                         continue
                     if not isinstance(row, dict):
                         continue
-                    out.write(json.dumps(row if include_secrets else sanitize_secrets(row), ensure_ascii=False) + '\n')
+                    out.write(json.dumps(sanitize_secrets(row), ensure_ascii=False) + '\n')
                 out.flush()
                 os.fsync(out.fileno())
-            manifest['files'].append({'name': filename, 'sha256': _digest(snapshot), 'sanitized': not include_secrets})
-        if include_secrets:
-            for filename in SECRET_FILES:
-                path = source_dir / filename
-                if path.exists():
-                    if path.is_symlink():
-                        raise ValueError('Secret backup symbolic links are not accepted')
-                    with (directory / filename).open('xb') as out:
-                        os.chmod(directory / filename, 0o600)
-                        with path.open('rb') as source:
-                            for chunk in iter(lambda: source.read(1024 * 1024), b''):
-                                out.write(chunk)
-                        out.flush()
-                        os.fsync(out.fileno())
-                    manifest['files'].append({'name': filename, 'sha256': _digest(directory / filename), 'secret': True})
+            manifest['files'].append({'name': filename, 'sha256': _digest(snapshot), 'sanitized': True})
         manifest['phase'] = 'backup_complete'
         _write_json(manifest_path, manifest)
         repo = V2Repository(data_dir / DEFAULT_DB_NAME)
@@ -348,7 +338,7 @@ def main(argv=None):
     parser.add_argument('--stopped', action='store_true', help='Confirm the app and media jobs are stopped')
     parser.add_argument('--image-id', default='', help='Previous image digest or exact source commit')
     parser.add_argument('--backup-dir')
-    parser.add_argument('--include-secrets', action='store_true', help='Explicit disaster-recovery secret backup in a private directory')
+    parser.add_argument('--include-secrets', action='store_true', help='Disabled: secret backups are not supported; originals remain unchanged')
     arguments = vars(parser.parse_args(argv))
     arguments.pop('dry_run', None)
     result = migrate(**arguments)

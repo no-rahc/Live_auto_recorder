@@ -367,14 +367,31 @@ class MigrationTests(unittest.TestCase):
             self.assertEqual(content, (self.root / name).read_bytes())
         self.assertEqual(json.loads(Path(report['manifest']).read_text())['phase'], 'failed')
 
-    def test_explicit_secret_backup_is_private_and_opt_in(self):
-        report = migrate(self.data, recording_root=self.media, apply=True, stopped=True, image_id='sha256:old', include_secrets=True)
-        self.assertTrue(report['ok'], report)
-        directory = Path(report['manifest']).parent
-        self.assertEqual((directory.stat().st_mode & 0o777), 0o700)
-        self.assertEqual(((directory / 'cookie.json').stat().st_mode & 0o777), 0o600)
-        self.assertEqual((directory / 'cookie.json').read_bytes(), (self.data / 'cookie.json').read_bytes())
-        self.assertEqual(json.loads((directory / 'config.json').read_text())['password'], 'secret-value')
+    def test_explicit_secret_backup_is_rejected_without_writes(self):
+        before = self.snapshots()
+        for apply in (False, True):
+            with self.subTest(apply=apply):
+                report = migrate(self.data, recording_root=self.media, apply=apply,
+                                 stopped=True, image_id='sha256:old', include_secrets=True)
+                self.assertFalse(report['ok'], report)
+                self.assertIn('--include-secrets is disabled', report['errors'][-1])
+                self.assertEqual(before, self.snapshots())
+                self.assertFalse((self.data / 'backups').exists())
+                self.assertFalse((self.data / 'recorder_v2.sqlite3').exists())
+
+    def test_cli_secret_backup_is_rejected_without_writes(self):
+        import contextlib
+        import io
+        from scripts.migrate_v2 import main
+        before = self.snapshots()
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            code = main(['--source-dir', str(self.data), '--apply', '--stopped',
+                         '--image-id', 'sha256:old', '--include-secrets'])
+        self.assertEqual(code, 2)
+        self.assertFalse(json.loads(output.getvalue())['ok'])
+        self.assertNotIn('secret-value', output.getvalue())
+        self.assertEqual(before, self.snapshots())
 
     def test_additive_import_rerun_and_sanitized_backup(self):
         before = self.snapshots()
@@ -385,6 +402,9 @@ class MigrationTests(unittest.TestCase):
             self.assertEqual(content, (self.root / name).read_bytes())
         directory = Path(report['manifest']).parent
         self.assertFalse((directory / 'cookie.json').exists())
+        manifest = json.loads(Path(report['manifest']).read_text())
+        self.assertIs(manifest['include_secrets'], False)
+        self.assertTrue(all(entry.get('sanitized', True) for entry in manifest['files']))
         config = json.loads((directory / 'config.json').read_text())
         self.assertEqual(config, {'unknownSetting': {'keep': 7}})
         repo = V2Repository(self.data / 'recorder_v2.sqlite3')

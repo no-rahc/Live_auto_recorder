@@ -36,10 +36,12 @@ integration issues. The release document lists the remaining real-hardware gates
   worker exceptions and storage diagnostics could contain private paths or
   credentials. Public status and readiness now allowlist health counters and uses fixed
   failure messages; an API regression injects a credential-bearing traceback.
-- Alert 78 / discussion 4243775540: intentional explicit disaster-recovery export.
-  `--include-secrets` is off by default; ordinary migration backups recursively
-  redact secret fields. The opt-in full backup retains original credential data
-  inside a newly created owner-only 0700 directory. This backup is sensitive,
-  unencrypted local data and must not be shared or uploaded. The existing test
-  verifies default redaction and explicit private full-backup behavior. No remote
-  CodeQL alert or review thread was dismissed or resolved.
+- Alert 78 / discussion 4243775540: plaintext credential backup was a genuine
+  exposure even inside an owner-only directory. The preview now rejects
+  `--include-secrets` for both dry-run and apply, before any backup or import
+  writes. Direct Python calls enforce the same restriction. The credential-file
+  copy path has been removed, and JSON/JSONL snapshots always sanitize secrets.
+  Original settings and credential files remain untouched. Regression tests
+  cover CLI rejection, direct-call rejection, no-write behavior and sanitized
+  migration. No remote alert was manually dismissed or suppressed; the new
+  CodeQL scan determines whether the finding is resolved.
