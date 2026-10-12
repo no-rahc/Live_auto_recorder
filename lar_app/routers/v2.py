@@ -76,7 +76,17 @@ def _storage_status(request):
     report = capture_storage_report()
     request.app.state.v2_storage = report
     checks = report.get('checks', {})
-    return {'status': 'ok' if report['ok'] else 'blocked', 'message': '; '.join(report.get('errors', [])) or 'Storage identity verified; originals are preserved', 'free_bytes': checks.get('free_bytes'), 'total_bytes': checks.get('total_bytes'), 'observed_at': time.time()}
+    return {'status': 'ok' if report['ok'] else 'blocked', 'message': 'Storage identity verified; originals are preserved' if report['ok'] else 'Storage is unavailable; check the configured volume and local diagnostics', 'free_bytes': checks.get('free_bytes'), 'total_bytes': checks.get('total_bytes'), 'observed_at': time.time()}
+
+
+def public_worker_health(worker):
+    """Expose health counters, never internal exception or filesystem diagnostics."""
+    if worker is None:
+        return {'running': False, 'ready': False}
+    snapshot = worker.snapshot()
+    return {'ready': bool(snapshot.get('ready')), 'running': int(snapshot.get('running', 0)),
+            'reconciled': bool(snapshot.get('reconciled')),
+            'error': 'Worker needs attention; check local diagnostics' if snapshot.get('error') else ''}
 
 
 def _revision(item: dict) -> int:
@@ -207,7 +217,7 @@ def install_v2_routes(app: Any, core: Any, *, root_dir: Path | None = None) -> N
         return {'enabled': True, 'observed_at': time.time(), 'version': getattr(core, 'VERSION', '2.0 preview'),
                 'channels': {'total': len(values), 'recording': sum(c['actual_state'] == 'recording' for c in values), 'watching': sum(c['actual_state'] == 'watching' for c in values), 'attention': sum(c['actual_state'] in {'blocked', 'error'} for c in values)},
                 'jobs': get_repository().job_counts(),
-                'worker': worker.snapshot() if worker else {'running': False},
+                'worker': public_worker_health(worker),
                 'storage': _storage_status(request)}
 
     @router.get('/settings')

@@ -41,13 +41,31 @@ it.each([['/v2','녹화 현황'],['/v2/broadcasts','방송 보관함'],['/v2/cha
   await waitFor(()=>expect(screen.getByText('서버 연결됨')).toBeTruthy());
   expect(screen.queryByText('화면을 표시하지 못했습니다.')).toBeNull();
 });
-it('persists search and UTC date filters in URL and API requests',async()=>{
+it('keeps select labels separate from their option text',async()=>{
+  mock();mount('/v2/broadcasts');await screen.findByRole('option',{name:channel.name});
+  for (const name of ['플랫폼','채널','방송 상태']) {
+    const select=screen.getByRole('combobox',{name}) as HTMLSelectElement;
+    expect(select.labels).toHaveLength(1);
+    // Playwright's exact getByLabel reads the full native label text.
+    expect(select.labels?.[0].textContent).toBe(name);
+    expect(screen.getByLabelText(name,{exact:true})).toBe(select);
+  }
+});
+it('persists search, select and UTC date filters in URL and API requests',async()=>{
   const fetch=mock();mount('/v2/broadcasts');await screen.findByRole('heading',{name:'방송 보관함',level:1});
   fireEvent.change(screen.getByRole('searchbox',{name:'방송 제목 검색'}),{target:{value:'가을'}});
+  fireEvent.change(screen.getByLabelText('플랫폼',{exact:true}),{target:{value:'chzzk'}});
+  await screen.findByRole('option',{name:channel.name});
+  fireEvent.change(screen.getByLabelText('채널',{exact:true}),{target:{value:channel.id}});
+  fireEvent.change(screen.getByLabelText('방송 상태',{exact:true}),{target:{value:'completed'}});
   fireEvent.change(screen.getByLabelText('시작일 (UTC)'),{target:{value:'2026-10-01'}});
   fireEvent.change(screen.getByLabelText('종료일 (UTC)'),{target:{value:'2026-10-11'}});
-  expect(new URLSearchParams(location.search).get('query')).toBe('가을');
-  await waitFor(()=>expect(fetch.mock.calls.some(([url])=>url.includes('date_from=2026-10-01')&&url.includes('date_to=2026-10-11'))).toBe(true));
+  const filters={query:'가을',platform:'chzzk',channel_id:channel.id,status:'completed',date_from:'2026-10-01',date_to:'2026-10-11'};
+  expect(Object.fromEntries(new URLSearchParams(location.search))).toEqual(filters);
+  await waitFor(()=>expect(fetch.mock.calls.some(([url])=>{
+    const params=new URL(url,location.origin).searchParams;
+    return Object.entries(filters).every(([key,value])=>params.get(key)===value);
+  })).toBe(true));
 });
 it('closes a command confirmation without sending a command',async()=>{
   const fetch=mock();mount('/v2/channels');await screen.findByRole('heading',{name:channel.name});

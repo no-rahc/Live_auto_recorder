@@ -89,6 +89,25 @@ class V2ApiTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(response.status_code,422)
             repo.create_job.assert_not_called()
 
+    async def test_status_does_not_expose_internal_exception_or_storage_details(self):
+        secret = 'Traceback: OSError /private/cookies/token=private-secret'
+        self.app.state.v2_worker = SimpleNamespace(snapshot=lambda: {
+            'ready': False, 'running': 1, 'reconciled': True,
+            'error': secret, 'storages': {'recordings': {'errors': [secret]}}})
+        repo = Mock()
+        repo.list_jobs.return_value = {'items': []}
+        repo.job_counts.return_value = {'blocked': 1}
+        report = {'ok': False, 'errors': [secret], 'checks': {'free_bytes': 42}}
+        with patch('lar_app.routers.v2.get_repository', return_value=repo), patch('module.v2_runtime.capture_storage_report', return_value=report):
+            response = await self.client.get('/api/v2/status')
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn('private', response.text)
+        self.assertNotIn('Traceback', response.text)
+        self.assertNotIn('storages', response.json()['worker'])
+        self.assertEqual(response.json()['worker']['running'], 1)
+        self.assertEqual(response.json()['storage']['status'], 'blocked')
+        self.assertEqual(response.json()['storage']['free_bytes'], 42)
+
     async def test_settings_have_no_secret_values(self):
         result=(await self.client.get('/api/v2/settings')).json()
         self.assertTrue(result['storage']['originals_preserved'])

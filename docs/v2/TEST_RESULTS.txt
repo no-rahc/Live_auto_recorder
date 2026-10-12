@@ -60,3 +60,15 @@ Delivery boundary:
   Local source/commit/review package only. No push, PR, merge, release, image
   publication or deployment. See IMPLEMENTATION.md for delivered vs deferred
   design slices and README.md for safe enable/rollback/reconciliation procedures.
+
+PR82 CI follow-up (2026-10-12 UTC):
+  Initial published tree matched the tested local tree exactly.
+  Initial CI: Docker multi-platform, security and release conventions passed;
+  browser regressions ran in Chromium and reported 9 passed, 1 failed because
+  a select's wrapped options polluted its accessible label. Explicit labels fix
+  this contract; final CI status must be checked on the PR's current head.
+  Status diagnostics now expose only public health fields, with an injected
+  secret/traceback regression. Updated local aggregate: 244 passed, zero skipped.
+  compileall, release metadata consistency and git diff --check passed again.
+  Updated frontend: npm test 32 passed; npm run build (TypeScript + Vite) passed.
+  Browser test also covers all select filters and URL persistence on reload.

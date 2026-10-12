@@ -28,11 +28,19 @@ test('library filters live in URL and send server-side query/date parameters', a
   await page.goto('/v2/broadcasts');
   await page.getByRole('searchbox',{name:'방송 제목 검색'}).fill('가을');
   await page.getByLabel('플랫폼',{exact:true}).selectOption('chzzk');
+  await page.getByLabel('채널',{exact:true}).selectOption(channel.id);
+  await page.getByLabel('방송 상태',{exact:true}).selectOption('completed');
   await page.getByLabel('시작일 (UTC)',{exact:true}).fill('2026-10-01');
   await page.getByLabel('종료일 (UTC)',{exact:true}).fill('2026-10-11');
   await expect(page).toHaveURL(/date_to=2026-10-11/);
-  await expect.poll(()=>requests.some(url=>new URL(url).searchParams.get('query')==='가을' && url.includes('date_from=2026-10-01') && url.includes('date_to=2026-10-11'))).toBe(true);
+  const filters={query:'가을',platform:'chzzk',channel_id:channel.id,status:'completed',date_from:'2026-10-01',date_to:'2026-10-11'};
+  await expect.poll(()=>requests.some(url=>Object.entries(filters).every(([key,value])=>new URL(url).searchParams.get(key)===value))).toBe(true);
   await page.reload(); await expect(page.getByRole('searchbox',{name:'방송 제목 검색'})).toHaveValue('가을');
+  await expect(page.getByLabel('플랫폼',{exact:true})).toHaveValue('chzzk');
+  await expect(page.getByLabel('채널',{exact:true})).toHaveValue(channel.id);
+  await expect(page.getByLabel('방송 상태',{exact:true})).toHaveValue('completed');
+  await expect(page.getByLabel('시작일 (UTC)',{exact:true})).toHaveValue('2026-10-01');
+  await expect(page.getByLabel('종료일 (UTC)',{exact:true})).toHaveValue('2026-10-11');
 });
 test('a delayed command is sent once and never paints an optimistic recording state', async ({page}) => {
   let posts=0;

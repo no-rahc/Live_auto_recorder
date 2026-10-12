@@ -24,7 +24,7 @@ from lar_app.routers.cookies import install_cookie_routes
 from lar_app.routers.config import install_config_routes
 from lar_app.routers.files import install_file_routes
 from lar_app.routers.recording import install_recording_routes
-from lar_app.routers.v2 import install_v2_routes
+from lar_app.routers.v2 import install_v2_routes, public_worker_health
 from lar_app.web.v2_security import V2OriginMiddleware
 from module.v2_runtime import enabled as v2_enabled, get_repository
 from lar_app.security import configure_session_middleware, enforce_local_mode
@@ -121,7 +121,7 @@ def _install_readiness_route(app: Any, release: ReleaseInfo, operations: Any, pl
         snapshot["version"] = release.version
         if v2_enabled():
             worker = getattr(app.state, "v2_worker", None)
-            snapshot["v2"] = worker.snapshot() if worker else {"running": False}
+            snapshot["v2"] = public_worker_health(worker)
             if not snapshot["v2"].get("ready", False) or not getattr(app.state, "v2_storage", {}).get("ok", False):
                 snapshot["ready"] = False
         return JSONResponse(status_code=200 if snapshot["ready"] else 503, content=snapshot)

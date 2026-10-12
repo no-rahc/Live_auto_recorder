@@ -29,3 +29,17 @@ Additional issues addressed during the same pass:
 Repository and media-worker review additionally found and fixed cancellation,
 idempotency replay, active-input, revision, publication and capture-admission
 integration issues. The release document lists the remaining real-hardware gates.
+
+## PR82 initial CodeQL review
+
+- Alert 77 / discussion 4243775547: genuine status-response exposure. Internal
+  worker exceptions and storage diagnostics could contain private paths or
+  credentials. Public status and readiness now allowlist health counters and uses fixed
+  failure messages; an API regression injects a credential-bearing traceback.
+- Alert 78 / discussion 4243775540: intentional explicit disaster-recovery export.
+  `--include-secrets` is off by default; ordinary migration backups recursively
+  redact secret fields. The opt-in full backup retains original credential data
+  inside a newly created owner-only 0700 directory. This backup is sensitive,
+  unencrypted local data and must not be shared or uploaded. The existing test
+  verifies default redaction and explicit private full-backup behavior. No remote
+  CodeQL alert or review thread was dismissed or resolved.
