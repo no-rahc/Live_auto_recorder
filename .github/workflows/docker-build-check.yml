@@ -91,15 +91,25 @@ jobs:
             exit 1
           fi
 
-          status="$(curl -sS -o /tmp/dashboard.html -w '%{http_code}' "http://127.0.0.1:${port}/")"
-          if [[ "$status" != "200" ]]; then
-            echo "Dashboard returned HTTP ${status}"
-            cat /tmp/dashboard.html || true
+          # A stock image opens v2 without enabling the durable engine.
+          redirect="$(curl -sS -o /dev/null -w '%{http_code} %{redirect_url}' "http://127.0.0.1:${port}/")"
+          test "$redirect" = "307 http://127.0.0.1:${port}/v2"
+          curl -fsSL "http://127.0.0.1:${port}/" -o /tmp/dashboard.html
+          grep -q '/static/v2/assets/' /tmp/dashboard.html
+          if grep -q 'console.js' /tmp/dashboard.html; then
+            echo "v2 unexpectedly contains legacy console assets"
             exit 1
           fi
-          grep -qiE '<!doctype html|<html' /tmp/dashboard.html
-          grep -q '녹화 관제 보드' /tmp/dashboard.html
-          if grep -q '<h2>로그인</h2>' /tmp/dashboard.html; then
+          for route in channels status settings jobs; do
+            curl -fsS "http://127.0.0.1:${port}/api/v2/${route}" -o "/tmp/v2-${route}.json"
+          done
+          grep -q '"durable_jobs":false' /tmp/v2-status.json
+          grep -q '"available":false' /tmp/v2-jobs.json
+          # Check the backwards-compatible dashboard independently.
+          curl -fsS "http://127.0.0.1:${port}/legacy" -o /tmp/legacy.html
+          grep -q '녹화 관제 보드' /tmp/legacy.html
+          grep -q 'console.js' /tmp/legacy.html
+          if grep -q '<h2>로그인</h2>' /tmp/legacy.html; then
             echo "Dashboard unexpectedly rendered the legacy login form"
             exit 1
           fi
