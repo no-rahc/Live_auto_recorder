@@ -525,6 +525,9 @@ class HealthJobsMixin:
         return wrapper
 
     async def _delete_short_recording(self, channel_id: str, source: str) -> None:
+        from module.v2_runtime import enabled as v2_enabled
+        if v2_enabled():
+            return  # v2 original cleanup requires an explicit separate operation.
         rule = self.settings.get("rules", {}).get(channel_id, {})
         minimum = int(rule.get("minimum_duration_minutes", 0) or 0)
         if minimum <= 0 or not source:

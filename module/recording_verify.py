@@ -120,6 +120,10 @@ def _repair(path: Path) -> tuple[bool, str]:
 
 
 def verify_recording(recording_id: int, *, attempt_repair: bool = True) -> dict[str, Any]:
+    from module.v2_runtime import enabled, enqueue_legacy_job
+    if enabled():
+        # Legacy repair replaced its input. All v2 callers use safe durable work.
+        return enqueue_legacy_job('verify', str(recording_id))
     from module.recording_catalog import get_recording
 
     recording = get_recording(recording_id)
@@ -191,6 +195,11 @@ def _ensure_validation_workers() -> None:
 
 def queue_validation(channel_id: str, filename: str = "") -> bool:
     """Queue validation on a bounded worker pool without blocking the recorder loop."""
+    from module.v2_runtime import enabled, queue_verification
+    if enabled():
+        # Never fall back to the legacy in-memory repair queue after an error:
+        # v2 validation is durable and cannot replace the original recording.
+        return queue_verification(channel_id, filename)
     _ensure_validation_workers()
     item = (str(channel_id or ""), str(filename or ""))
     dedupe = bool(item[1])

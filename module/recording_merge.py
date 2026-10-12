@@ -57,6 +57,9 @@ _ACTIVE_MERGES: set[str] = set()
 
 def merge_broadcast(broadcast_id: str, *, delete_segments: bool = False) -> dict[str, Any]:
     """Admit one merge per broadcast across API and maintenance worker threads."""
+    from module.v2_runtime import enabled, enqueue_legacy_job
+    if enabled():
+        return enqueue_legacy_job('merge', str(broadcast_id))
     broadcast_id = str(broadcast_id)
     with _MERGE_LOCK:
         if broadcast_id in _ACTIVE_MERGES:

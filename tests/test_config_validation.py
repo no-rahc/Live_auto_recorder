@@ -59,6 +59,15 @@ class ConfigValidationTest(unittest.TestCase):
             result = normalize_config_update(SAFE, {'fileManagerRoots': [directory]}, acknowledgement=DANGER_ACK)
             self.assertEqual(result['fileManagerRoots'], [directory])
 
+    def test_protected_roots_are_rejected_before_existence_probe(self):
+        # Checking a user-selected directory exists is intentional. Protected
+        # paths must never reach that probe, even after traversal normalization.
+        for root in ['/etc/ssl', '/tmp/../etc', 'C:\\Windows\\System32']:
+            with self.subTest(root=root), patch('lar_app.config_validation.os.path.isdir') as probe:
+                with self.assertRaises(ConfigValidationError):
+                    normalize_config_update(SAFE, {'fileManagerRoots': [root]}, acknowledgement=DANGER_ACK)
+                probe.assert_not_called()
+
     def test_windows_junction_resolves_before_protected_root_check(self):
         with patch('lar_app.config_validation.os.name', 'nt'), patch(
             'lar_app.config_validation.os.path.realpath', return_value='C:\\Windows'
@@ -93,8 +102,10 @@ class ConfigRoutesTest(unittest.IsolatedAsyncioTestCase):
         self.telegram_saved = Mock()
         async def login():
             return True
-        core = SimpleNamespace(loadConfig=lambda: deepcopy(self.current), saveConfig=self.saved,
-            loadAccount=lambda: {}, loadTelegram=lambda: {}, saveTelegram=self.telegram_saved,
+        self.loaded = Mock(side_effect=lambda: deepcopy(self.current))
+        self.telegram = Mock(return_value={})
+        core = SimpleNamespace(loadConfig=self.loaded, saveConfig=self.saved,
+            loadAccount=lambda: {}, loadTelegram=self.telegram, saveTelegram=self.telegram_saved,
             toBool=bool, _normalizeAllowedRoots=lambda roots: roots, templates=Mock(),
             PROGRAM_VERSION='test', requireLogin=login, logger=Mock())
         self.app = FastAPI()
@@ -127,10 +138,97 @@ class ConfigRoutesTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.status_code, 400)
         self.saved.assert_not_called()
 
+    async def test_config_json_responses_remove_secrets_without_mutating_settings(self):
+        self.current.update(discord_webhook_url='private-webhook', extension={
+            'apiKey': 'private-api-key', 'label': 'visible',
+            'children': [{'password': 'private-password', 'name': 'visible-child'}],
+        })
+        self.app.state.config = deepcopy(self.current)
+        before = deepcopy(self.current)
+        for path in ['/api/config', '/get_config']:
+            response = await self.client.get(path)
+            self.assertEqual(response.status_code, 200, response.text)
+            value = response.json()
+            value = value['config'] if path == '/get_config' else value
+            self.assertNotIn('discord_webhook_url', value)
+            self.assertEqual(value['extension'], {'label': 'visible', 'children': [{'name': 'visible-child'}]})
+            self.assertNotIn('private-', response.text)
+            self.assertEqual(response.headers['cache-control'], 'no-store')
+        self.assertEqual(self.current, before)
+        self.assertEqual(self.app.state.config, before)
+
+    async def test_json_save_redacts_response_and_preserves_omitted_nested_credentials(self):
+        self.current.update(discord_webhook_url='private-webhook',
+                            extension={'apiKey': 'private-api-key', 'label': 'old'})
+        response = await self.client.post('/api/save_config', json={
+            'recheckInterval': 120, 'extension': {'label': 'new'}})
+        self.assertEqual(response.status_code, 200, response.text)
+        value = response.json()['config']
+        self.assertEqual(value['recheckInterval'], 120)
+        self.assertEqual(value['extension'], {'label': 'new'})
+        self.assertNotIn('discord_webhook_url', value)
+        self.assertNotIn('private-', response.text)
+        self.assertEqual(response.headers['cache-control'], 'no-store')
+        saved = self.saved.call_args.args[0]
+        self.assertEqual(saved['discord_webhook_url'], 'private-webhook')
+        self.assertEqual(saved['extension']['apiKey'], 'private-api-key')
+        self.assertEqual(self.app.state.config, saved)
+
+    async def test_json_save_still_allows_explicit_secret_replacement_and_clear(self):
+        self.current['discord_webhook_url'] = 'old-webhook'
+        for secret in ['new-webhook', '']:
+            response = await self.client.post('/api/save_config', json={'discord_webhook_url': secret})
+            self.assertEqual(response.status_code, 200, response.text)
+            self.assertEqual(self.saved.call_args.args[0]['discord_webhook_url'], secret)
+            self.assertNotIn('discord_webhook_url', response.json()['config'])
+
+    async def test_validation_errors_are_fixed_messages_not_rejected_values(self):
+        for path, kwargs in [('/api/save_config', {'json': {'recheckInterval': 'private-input'}}),
+                             ('/config', {'data': {'recheckInterval': 'private-input'}})]:
+            response = await self.client.post(path, **kwargs)
+            self.assertEqual(response.status_code, 400, response.text)
+            self.assertIn('recheckInterval', response.json()['message'])
+            self.assertNotIn('private-input', response.text)
+        self.saved.assert_not_called()
+
+    async def test_settings_failures_do_not_echo_exception_details(self):
+        self.loaded.side_effect = OSError('private-token /private/config.json')
+        for method, path in [('GET', '/api/config'), ('POST', '/api/save_config'), ('POST', '/config')]:
+            response = await self.client.request(method, path, json={} if path == '/api/save_config' else None)
+            self.assertEqual(response.status_code, 500, response.text)
+            self.assertNotIn('private-', response.text)
+            self.assertNotIn('/private/', response.text)
+        self.saved.assert_not_called()
+        self.loaded.side_effect = lambda: deepcopy(self.current)
+        self.saved.side_effect = OSError('private-token /private/config.json')
+        response = await self.client.post('/api/save_config', json={})
+        self.assertEqual(response.status_code, 500, response.text)
+        self.assertNotIn('private-', response.text)
+        response = await self.client.get('/get_config')
+        self.assertEqual(response.status_code, 500, response.text)
+        self.assertNotIn('has no attribute', response.text)
+
+    async def test_notification_errors_never_echo_request_urls_or_upstream_bodies(self):
+        self.current['telegram_enabled'] = True
+        self.telegram.return_value = {'telegram_bot_token': 'private-telegram-token', 'telegram_chat_id': 'private-chat'}
+        with patch('lar_app.routers.config.requests.get', side_effect=RuntimeError('https://telegram/private-token')):
+            response = await self.client.get('/api/test_telegram')
+        self.assertEqual(response.status_code, 500, response.text)
+        self.assertNotIn('private-', response.text)
+        with patch('lar_app.routers.config.requests.get', return_value=Mock(status_code=400, text='private-upstream-body')):
+            response = await self.client.get('/api/test_telegram')
+        self.assertEqual(response.status_code, 400, response.text)
+        self.assertIn('400', response.json()['message'])
+        self.assertNotIn('private-', response.text)
+        with patch('lar_app.routers.config.requests.post', side_effect=RuntimeError('https://discord/private-token')):
+            response = await self.client.post('/api/discord_test', json={'webhook_url': 'https://discord.example/private-token'})
+        self.assertEqual(response.status_code, 500, response.text)
+        self.assertNotIn('private-', response.text)
+
 
 class LegacyConfigImportTest(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
-        # Compile only the two handlers to avoid legacy module startup side effects.
+        # Compile only the selected handlers to avoid legacy startup side effects.
         import ast
         from datetime import datetime
         from pathlib import Path
@@ -144,19 +242,23 @@ class LegacyConfigImportTest(unittest.IsolatedAsyncioTestCase):
         self.telegram_saved = Mock()
         self.current = dict(SAFE, discord_webhook_url='stored-webhook')
         self.telegram = {'telegram_bot_token': 'stored-token', 'telegram_chat_id': 'stored-chat'}
+        self.telegram_requests = SimpleNamespace(get=Mock())
         namespace = dict(Request=Request, Any=object, Depends=Depends, requireLogin=requireLogin,
-            JSONResponse=JSONResponse, json=json, datetime=datetime,
+            JSONResponse=JSONResponse, json=json, datetime=datetime, toBool=bool,
+            requests=self.telegram_requests,
             loadConfig=lambda: deepcopy(self.current), saveConfig=self.saved,
             loadChannels=lambda: [], saveChannels=self.channels_saved,
             loadTelegram=lambda: dict(self.telegram), saveTelegram=self.telegram_saved)
+        self.namespace = namespace
         tree = ast.parse((Path(__file__).resolve().parents[1] / 'live_auto_recorder.py').read_text())
         handlers = [node for node in tree.body if isinstance(node, ast.AsyncFunctionDef)
-                    and node.name in {'api_config_import', 'api_config_export'}]
+                    and node.name in {'api_config_import', 'api_config_export', 'testTelegram'}]
         for node in handlers:
             node.decorator_list = []
         exec(compile(ast.Module(body=handlers, type_ignores=[]), '<legacy-config>', 'exec'), namespace)
         self.app.post('/api/config_import')(namespace['api_config_import'])
         self.app.get('/api/config_export')(namespace['api_config_export'])
+        self.app.get('/api/test_telegram')(namespace['testTelegram'])
         self.client = httpx.AsyncClient(transport=httpx.ASGITransport(app=self.app), base_url='http://test')
         self.addAsyncCleanup(self.client.aclose)
 
@@ -182,6 +284,38 @@ class LegacyConfigImportTest(unittest.IsolatedAsyncioTestCase):
         self.saved.assert_not_called()
         self.channels_saved.assert_not_called()
         self.telegram_saved.assert_not_called()
+
+    async def test_legacy_telegram_handler_does_not_echo_credentials(self):
+        # This legacy route is currently registered before the extracted router.
+        self.current['telegram_enabled'] = True
+        self.telegram_requests.get.side_effect = RuntimeError('https://telegram/private-token')
+        response = await self.client.get('/api/test_telegram')
+        self.assertEqual(response.status_code, 500, response.text)
+        self.assertNotIn('private-', response.text)
+        self.telegram_requests.get.side_effect = None
+        self.telegram_requests.get.return_value = Mock(status_code=400, text='private-upstream-body')
+        response = await self.client.get('/api/test_telegram')
+        self.assertEqual(response.status_code, 400, response.text)
+        self.assertNotIn('private-', response.text)
+
+    async def test_import_and_export_failures_never_return_raw_exception_details(self):
+        self.saved.side_effect = OSError('private-token /private/config.json')
+        response = await self.client.post('/api/config_import', json={'config': {}})
+        self.assertEqual(response.status_code, 500, response.text)
+        self.assertNotIn('private-', response.text)
+        self.assertNotIn('/private/', response.text)
+        self.saved.side_effect = ValueError('private-invalid-value')
+        response = await self.client.post('/api/config_import', json={'config': {}})
+        self.assertEqual(response.status_code, 400, response.text)
+        self.assertNotIn('private-', response.text)
+        response = await self.client.post('/api/config_import', content='{"private-token":')
+        self.assertEqual(response.status_code, 400, response.text)
+        self.assertNotIn('private-', response.text)
+        self.namespace['loadConfig'] = Mock(side_effect=OSError('private-token /private/config.json'))
+        response = await self.client.get('/api/config_export')
+        self.assertEqual(response.status_code, 500, response.text)
+        self.assertNotIn('private-', response.text)
+        self.assertNotIn('/private/', response.text)
 
     async def test_legacy_export_is_sanitized_even_when_query_requests_secrets(self):
         response = await self.client.get('/api/config_export?include_secrets=true')

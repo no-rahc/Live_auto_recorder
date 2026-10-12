@@ -314,9 +314,11 @@ def record_event(entry: dict[str, Any]) -> None:
                     except Exception:
                         pass
                 conn.execute(
-                    "UPDATE recordings SET ended_at=?,ended_epoch=?,duration=?,status=?,error=?,failure_code=?,failure_detail=?,failure_remedy=?,filename=CASE WHEN ?<>'' THEN ? ELSE filename END,stop_reason=CASE WHEN ?<>'' THEN ? ELSE stop_reason END,updated_epoch=? WHERE id=?",
+                    "UPDATE recordings SET ended_at=?,ended_epoch=?,duration=?,status=?,error=?,failure_code=?,failure_detail=?,failure_remedy=?,filename=CASE WHEN ?<>'' THEN ? ELSE filename END,file_path=CASE WHEN ?<>'' THEN ? ELSE file_path END,stop_reason=CASE WHEN ?<>'' THEN ? ELSE stop_reason END,updated_epoch=? WHERE id=?",
                     (str(entry.get("ts") or ""), epoch, str(entry.get("duration") or ""), status,
-                     str(entry.get("error") or "")[:1000], failure_code, failure_detail, failure_remedy, filename, filename,
+                     str(entry.get("error") or "")[:1000], failure_code, failure_detail, failure_remedy,
+                     str(extra.get("final_filename") or filename), str(extra.get("final_filename") or filename),
+                     str(extra.get("final_file_path") or ""), str(extra.get("final_file_path") or ""),
                      stop_reason, stop_reason, epoch, row["id"]),
                 )
         elif event in {"postprocess_done", "postprocess_failed"}:
@@ -412,7 +414,7 @@ def list_recordings(*, limit: int = 100, offset: int = 0, channel_id: str = "", 
     return {"total": total, "items": [dict(row) for row in rows], "limit": limit, "offset": offset}
 
 
-def list_broadcasts(*, limit: int = 100, offset: int = 0, channel_id: str = "", query: str = "") -> dict[str, Any]:
+def list_broadcasts(*, limit: int = 100, offset: int = 0, channel_id: str = "", query: str = "", platform: str = "", status: str = "", started_from: float | None = None, started_to: float | None = None) -> dict[str, Any]:
     """Return recording rows grouped into one logical live broadcast."""
     init_catalog()
     limit = max(1, min(int(limit), 500))
@@ -426,6 +428,21 @@ def list_broadcasts(*, limit: int = 100, offset: int = 0, channel_id: str = "", 
         where.append("(r.channel_name LIKE ? OR r.title LIKE ? OR r.filename LIKE ? OR r.error LIKE ?)")
         needle = f"%{query}%"
         args.extend([needle] * 4)
+    if platform:
+        where.append("r.platform=?")
+        args.append(platform)
+    if started_from is not None:
+        where.append("r.broadcast_id IN (SELECT broadcast_id FROM recordings GROUP BY broadcast_id HAVING MIN(started_epoch)>=?)")
+        args.append(started_from)
+    if started_to is not None:
+        where.append("r.broadcast_id IN (SELECT broadcast_id FROM recordings GROUP BY broadcast_id HAVING MIN(started_epoch)<?)")
+        args.append(started_to)
+    if status == "recording":
+        where.append("EXISTS (SELECT 1 FROM recordings active WHERE active.broadcast_id=r.broadcast_id AND active.status='recording')")
+    elif status == "completed":
+        where.append("NOT EXISTS (SELECT 1 FROM recordings active WHERE active.broadcast_id=r.broadcast_id AND active.status='recording') AND EXISTS (SELECT 1 FROM recordings good WHERE good.broadcast_id=r.broadcast_id AND good.status<>'failed')")
+    elif status == "failed":
+        where.append("NOT EXISTS (SELECT 1 FROM recordings good WHERE good.broadcast_id=r.broadcast_id AND good.status<>'failed')")
     clause = (" WHERE " + " AND ".join(where)) if where else ""
     base = " FROM recordings r" + clause
     with _LOCK, _connect() as conn:
@@ -449,7 +466,7 @@ def list_broadcasts(*, limit: int = 100, offset: int = 0, channel_id: str = "", 
                  FROM recordings r
             LEFT JOIN broadcast_merges m ON m.broadcast_id=r.broadcast_id"""
             + clause
-            + " GROUP BY r.broadcast_id ORDER BY MIN(r.started_epoch) DESC LIMIT ? OFFSET ?",
+            + " GROUP BY r.broadcast_id ORDER BY MIN(r.started_epoch) DESC,r.broadcast_id DESC LIMIT ? OFFSET ?",
             [*args, limit, offset],
         ).fetchall()
     items: list[dict[str, Any]] = []

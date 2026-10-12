@@ -149,6 +149,9 @@ class BackupStatsMixin:
         return path
 
     def restore_backup(self, name: str, *, acknowledgement: str = "") -> dict[str, Any]:
+        from module.v2_runtime import enabled as v2_enabled
+        if v2_enabled():
+            raise HTTPException(status_code=409, detail="Stop the v2 service and follow the offline restore procedure; live legacy restore cannot reconcile v2 channel intent and jobs.")
         with _BACKUP_LOCK:
             path = self.backup_path(name)
             _PROTECTED_BACKUPS.add(path)

@@ -16,6 +16,13 @@ RUN mkdir -p /out \
     && CGO_ENABLED=0 GOOS="${TARGETOS}" GOARCH="${TARGETARCH}" \
         go build -trimpath -ldflags="-s -w" -o /out/ytarchive .
 
+FROM --platform=$BUILDPLATFORM node:22-bookworm-slim AS frontend-builder
+WORKDIR /src/frontend
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci --no-audit --no-fund
+COPY frontend ./
+RUN npm run build
+
 FROM python:3.12-slim-bookworm
 
 ENV DEBIAN_FRONTEND=noninteractive \
@@ -57,8 +64,11 @@ COPY app_entry.py live_auto_recorder.py VERSION ./
 COPY lar_app ./lar_app
 COPY module ./module
 COPY templates ./templates
+COPY --from=frontend-builder /src/templates/static/v2 ./templates/static/v2
 COPY dependent ./dependent
 COPY LICENSE THIRD_PARTY_NOTICES.md ./
+COPY --from=frontend-builder /src/frontend/node_modules/react/LICENSE ./third-party/react-LICENSE.txt
+COPY --from=frontend-builder /src/frontend/node_modules/@tanstack/query-core/LICENSE ./third-party/tanstack-query-LICENSE.txt
 
 RUN mkdir -p /app/chzzk /app/json /app/logs /app/tmp/ytarchive \
     && python -m compileall -q app_entry.py lar_app module

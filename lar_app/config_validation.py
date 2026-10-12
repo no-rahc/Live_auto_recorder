@@ -12,7 +12,11 @@ from typing import Any
 
 
 class ConfigValidationError(ValueError):
-    pass
+    """An application-authored, client-safe validation message.
+
+    Use fixed text and known setting names only. Never wrap filesystem, request,
+    or parsing exceptions here: their messages may contain private data.
+    """
 
 
 BOOL_FIELDS = frozenset('''telegram_enabled discord_enabled autoRecordingMode
@@ -76,6 +80,9 @@ def normalize_roots(value: Any, *, require_existing: bool = False, enforce_polic
             )
         if forbidden and enforce_policy:
             raise ConfigValidationError('fileManagerRoots: 시스템 경로는 허용되지 않습니다.')
+        # This is an intentional local administrator-selected root, not a file
+        # name appended to a trusted directory. Only check existence after the
+        # canonical path has passed the protected-root policy above.
         if require_existing and not os.path.isdir(normalized):
             raise ConfigValidationError('fileManagerRoots: 존재하는 폴더 경로가 필요합니다.')
         if normalized not in result:

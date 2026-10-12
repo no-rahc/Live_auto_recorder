@@ -713,6 +713,10 @@ def probeVcodec(ffprobe_path: str, path: str) -> str:
 
 # 후처리 작업 함수
 async def handlePostProcessing(input_path: str, channel_id: str, channel_name: str, post_cfg: dict | None):
+    from module.v2_runtime import enabled as v2_enabled
+    if v2_enabled():
+        recorder_manager.recording_remove_postproc(channel_id)
+        return  # Original-preserving durable jobs are requested through v2.
     try:
         logger.info(f"start   {channel_name} src={os.path.basename(input_path)}")
         cfg = post_cfg or {}
@@ -1302,6 +1306,9 @@ def listNumericSegments(session_dir: str, base_noext: str, ext: str = ".mp4") ->
 
 # 분할녹화용 후처리 함수
 async def batchEncodeSegments(session_dir: str, base_noext: str, overlap_sec: int, post_cfg: dict, input_ext: str = ".ts"):
+    from module.v2_runtime import enabled as v2_enabled
+    if v2_enabled():
+        return  # Never run the legacy delete/replace pipeline under v2.
     mode = "new" if toBool(post_cfg.get("postNewWindow", False)) else "inherit"
     ff = getFFmpeg()
     ffprobe = resolveFFprobe(ff)
@@ -1507,6 +1514,10 @@ async def runSegLoop(updated_channel: dict, channel_id: str, channel_name: str, 
             env=env
         )
 
+        from module.v2_channels import capture_policy_active
+        if capture_policy_active():
+            from module.v2_channels import capture_process_launched
+            capture_process_launched(channel_id, streamlink)
         ffmpeg = await asyncio.create_subprocess_exec(
             *ff_cmd,
             stdin=asyncio.subprocess.PIPE,
@@ -1518,6 +1529,8 @@ async def runSegLoop(updated_channel: dict, channel_id: str, channel_name: str, 
         # 프로세스 등록
         recorder_manager.set_tasks_process(channel_id, ffmpeg)
         recorder_manager.recording_set_filename(channel_id, segmentPattern)
+        from module.v2_channels import capture_started
+        capture_started(channel_id, segmentPattern, ffmpeg)
 
         # 하트비트
         hb_task = spawnHeartbeat(
@@ -1631,6 +1644,9 @@ async def runSegLoop(updated_channel: dict, channel_id: str, channel_name: str, 
         # 최신 설정 재평가
         prefs = resolveRecordingPrefs()
         auto_pp = bool(prefs.get("splitPostProcessing", prefs.get("autoPostProcessing", True)))
+        from module.v2_channels import capture_policy_active
+        if capture_policy_active():
+            auto_pp = False
         ov = int(prefs.get("splitOverlapSec") or 0)
         ov = max(0, min(30, ov))
 
@@ -1698,6 +1714,8 @@ async def runSegLoop(updated_channel: dict, channel_id: str, channel_name: str, 
                         break
 
         # 배치 진입 전 세그먼트 개수 로그
+        from module.v2_channels import capture_finished
+        capture_finished(channel_id)
         probe_cnt = len(listNumericSegments(out_dir, base_noext, seg_ext))
         logger.info(f"found {probe_cnt} segment(s) before encode")
 
@@ -1797,6 +1815,9 @@ async def runSegLoop(updated_channel: dict, channel_id: str, channel_name: str, 
 
 
 async def queueBatchPattern(channel_id: str, pattern_path: str) -> bool:
+    from module.v2_runtime import enabled as v2_enabled
+    if v2_enabled():
+        return False  # Explicit durable merge/recovery replaces detached batch work.
     try:
         # 분할 플래그/오토스탑 확인
         split_on, auto_stop, overlap = splitGate()
@@ -1836,6 +1857,9 @@ async def queueBatchPattern(channel_id: str, pattern_path: str) -> bool:
 
 # 분할녹화 외부 폴백 트리거
 async def queueBatchLast(channel_id: str) -> bool:
+    from module.v2_runtime import enabled as v2_enabled
+    if v2_enabled():
+        return False
     try:
         # 분할/오토스탑/분할자동후처리 모두 만족할 때만 시도
         split_on, auto_stop, _ = splitGate()
@@ -1972,6 +1996,10 @@ async def chzzkStartRecording(channel, cookies, recheckInterval, autoStopInterva
                 autoPostProcessing = bool(prefs.get("splitPostProcessing", prefs.get("autoPostProcessing", True)))
             else:
                 autoPostProcessing = bool(prefs.get("autoPostProcessing", False))
+            from module.v2_channels import capture_policy_active
+            if capture_policy_active():
+                # V2 output transformations must run through durable Jobs.
+                autoPostProcessing = False
 
             post_cfg = {
                 "deleteAfterPostProcessing": prefs["deleteAfterPostProcessing"],
@@ -2051,6 +2079,12 @@ async def chzzkStartRecording(channel, cookies, recheckInterval, autoStopInterva
                         logger.warning(f"{channel_name} HLS probe 타임아웃 → CLOSED 유지")
                     else:
                         logger.debug(f"{channel_name} HLS probe 실패 → CLOSED 유지")             
+
+            # The v2 policy uses the provider metadata actually used by this
+            # attempt. A pre-fetch in the web layer would race with a new live.
+            from module.v2_channels import allow_capture
+            if not allow_capture(updated_channel, metadata, is_live=is_open):
+                return RecorderAttemptOutcome.OFFLINE if single_attempt else None
 
             # 예약+OPEN인데 실제 녹화 프로세스가 없고, 워치독 비트가 오래 멈췄으면 시작 가드 해제
             if is_open_meta and not tail_guard_active and recorder_manager.get_status_reserved(channel_id):
@@ -2313,6 +2347,8 @@ async def chzzkStartRecording(channel, cookies, recheckInterval, autoStopInterva
 
             recorder_manager.recording_set_filename(channel_id, output_path)
             recorder_manager.set_tasks_process(channel_id, proc)
+            from module.v2_channels import capture_started
+            capture_started(channel_id, output_path, proc)
 
             # 7-10) 프로세스 핸들/파일명 세팅 완료 후 상태 승격
             recorder_manager.set_status_recording(channel_id, True)

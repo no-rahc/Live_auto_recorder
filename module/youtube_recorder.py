@@ -205,6 +205,7 @@ async def getYoutubeMetadata(channel, ycookie_path=None):
             }
         # 보강 필드
         d.setdefault("is_live_now", False)
+        d["metadata_available"] = False
         return d
 
     try:
@@ -345,6 +346,7 @@ async def getYoutubeMetadata(channel, ycookie_path=None):
         return {
             "platform": platform,
             "id": cid,
+            "metadata_available": isinstance(player, dict),
             "is_live": bool(is_live),
             "is_live_now": bool(is_live_now),
             "live_title": live_title or "정보 없음",
@@ -930,6 +932,10 @@ async def ytStartRecording(channel, recheckInterval: int, filenamePattern: str, 
             is_live = bool(metadata.get("is_live"))
             last_video_id = metadata.get("video_id")
 
+            from module.v2_channels import allow_capture
+            if not allow_capture(curr, metadata, is_live=is_live):
+                return RecorderAttemptOutcome.OFFLINE if single_attempt else None
+
             # 7) 녹화 전 표시: 라이브가 아니면 토글에 따라 예약/대기
             if not is_live:
 
@@ -1054,6 +1060,8 @@ async def ytStartRecording(channel, recheckInterval: int, filenamePattern: str, 
             )
             recorder_manager.set_tasks_process(channel_id, proc)
             recorder_manager.recording_set_filename(channel_id, output_path)
+            from module.v2_channels import capture_started
+            capture_started(channel_id, output_path, proc)
 
             # 진행 표시 파일 루프 시작
             progress_path = prefix_path + ".recording"

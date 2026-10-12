@@ -25,3 +25,15 @@ jobs:
         run: python -m pip install -r requirements.txt
       - name: Run all Python and JavaScript regressions (no skips)
         run: python scripts/test_regressions.py
+      - name: Install v2 frontend dependencies
+        working-directory: frontend
+        run: npm ci --no-audit --no-fund
+      - name: Typecheck, unit test, and build v2 UI
+        working-directory: frontend
+        run: npm test && npm run build
+      - name: Install Chromium for UI regressions
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+      - name: Test desktop, mobile, and interrupted UI flows
+        working-directory: frontend
+        run: npm run test:browser
