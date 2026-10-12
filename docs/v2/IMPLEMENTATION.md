@@ -34,15 +34,20 @@ acceptance gate in the design or a production 2.0 release has been completed.
 
 ## Revert boundaries
 
-The changes are additive behind `LAR_V2_ENABLED`. Turning it off restores the
-legacy UI/engine policy but does not delete or downgrade sidecar data. Preserve
+The durable engine changes are additive behind `LAR_V2_ENABLED`. Turning it off
+restores the legacy engine policy but does not delete or downgrade sidecar data.
+The v1 console and observational library remain available regardless of this flag. Preserve
 new media and v2 metadata before a code downgrade. Do not use feature-flag
 rollback to ignore an unresolved capture-process marker. Follow the stopped-app
 procedure in README for data restoration and process reconciliation.
 
 ## Verification record
 
-The final review package contains exact commands and results in
-`TEST_RESULTS.txt`. Focused intermediate passes are not substituted for the final
-mandatory suite. Browser suite launch failure and real-hardware tests are marked
-not run rather than passed.
+`TEST_RESULTS.txt` preserves the original engine-preview validation record; its
+old standalone UI notes are historical. Current integrated-UI verification is in
+[PR #85](https://github.com/no-rahc/Live_auto_recorder/pull/85) and its exact-head
+CI checks/artifacts. CI renders actual v1 templates with labeled synthetic data,
+checks desktop/mobile interactions, runs the disposable full app with durable
+jobs both off and on, and checks the Docker root/legacy routes. A partial or
+failed browser run is not a pass. Real-provider/NAS/ARM64 runtime gates remain
+separate from fixture screenshots and multiarch image builds.

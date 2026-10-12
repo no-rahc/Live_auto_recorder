@@ -11,6 +11,5 @@ export default defineConfig({
       assetFileNames: asset => asset.names?.some(name => name.endsWith('.css')) ? 'library.css' : 'assets/[name]-[hash][extname]',
     } },
   },
-  server: { proxy: { '/api': 'http://127.0.0.1:5000' } },
   test: { environment: 'jsdom', include: ['tests/**/*.test.ts', 'tests/**/*.test.tsx'], clearMocks: true },
 });
