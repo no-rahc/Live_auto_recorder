@@ -14,9 +14,9 @@ acceptance gate in the design or a production 2.0 release has been completed.
 | C2 media jobs | Original-preserving recover/remux/merge, private attempt output, validated hardlink publication, postlink crash reconciliation | Arbitrary bitrate transcoding/legacy detached conversion disabled under v2 |
 | C3 archive/notification | Local/NAS durable archive copy with hash verification; existing notification queue bridge; legacy queue history preserved | Remote rclone remains its own legacy queue; no claim of exactly-once external delivery |
 | D1 state/API | Desired/actual separation, expected revision, idempotent commands/jobs, same-broadcast suppression, explicit once/stop, legacy start/stop adapters | Unknown provider identity is conservatively suppressed; interrupted once commands need a new request. Request schemas are Pydantic/OpenAPI; frontend response types remain manually maintained pending generated response contracts |
-| D2 dashboard | React/TypeScript/Vite/Query, isolated DOM owner, flag-gated `/v2`, legacy `/` retained, connection/stale/pending handling | Browser visual/mobile execution blocked in current sandbox |
+| D2 interface | Original v1 dashboard/sidebar retained; React library/job islands at `/broadcasts` and `/jobs`; old `/v2` routes redirect | Integrated browser fixtures and final CI must be verified before merge |
 | D3 library/jobs | Broadcast filters/detail, session/segment/artifact relations, merge preview, job attempts/cancel/retry, responsive layout implementation | Full visual/interaction parity not claimed without supported browser testing |
-| E1 settings/channels | Shared channel intent controls, secret-safe existing settings API, explicit legacy advanced links, offline restore guard | Advanced add/edit/settings forms remain legacy; live legacy restore disabled in v2 |
+| E1 settings/channels | Original recording/channel/settings pages remain the single control surface; secret-safe existing API and offline restore guard | Live legacy restore remains disabled with the opt-in durable engine |
 | E2 release validation | Mandatory regression suite, real synthetic FFmpeg media flow, DB/FK integrity, full isolated app clean/crash-restart smoke, frontend build/unit/DOM checks | Docker build locally unavailable; actual amd64/arm64 provider recordings, NAS fault/24-hour soak and visual browser checks remain release gates |
 
 ## Changed invariants
@@ -34,15 +34,20 @@ acceptance gate in the design or a production 2.0 release has been completed.
 
 ## Revert boundaries
 
-The changes are additive behind `LAR_V2_ENABLED`. Turning it off restores the
-legacy UI/engine policy but does not delete or downgrade sidecar data. Preserve
+The durable engine changes are additive behind `LAR_V2_ENABLED`. Turning it off
+restores the legacy engine policy but does not delete or downgrade sidecar data.
+The v1 console and observational library remain available regardless of this flag. Preserve
 new media and v2 metadata before a code downgrade. Do not use feature-flag
 rollback to ignore an unresolved capture-process marker. Follow the stopped-app
 procedure in README for data restoration and process reconciliation.
 
 ## Verification record
 
-The final review package contains exact commands and results in
-`TEST_RESULTS.txt`. Focused intermediate passes are not substituted for the final
-mandatory suite. Browser suite launch failure and real-hardware tests are marked
-not run rather than passed.
+`TEST_RESULTS.txt` preserves the original engine-preview validation record; its
+old standalone UI notes are historical. Current integrated-UI verification is in
+[PR #85](https://github.com/no-rahc/Live_auto_recorder/pull/85) and its exact-head
+CI checks/artifacts. CI renders actual v1 templates with labeled synthetic data,
+checks desktop/mobile interactions, runs the disposable full app with durable
+jobs both off and on, and checks the Docker root/legacy routes. A partial or
+failed browser run is not a pass. Real-provider/NAS/ARM64 runtime gates remain
+separate from fixture screenshots and multiarch image builds.

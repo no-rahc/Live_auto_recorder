@@ -46,11 +46,12 @@ def main():
                         except (URLError,TimeoutError):
                             if time.monotonic()>deadline:raise RuntimeError('Startup timed out: '+log.read_text()[-6000:])
                             time.sleep(.1)
-                    for path in ('/readyz','/api/v2/channels','/api/v2/jobs','/api/v2/settings','/api/v2/status','/v2','/'):
+                    for path in ('/readyz','/api/v2/channels','/api/v2/jobs','/api/v2/settings','/api/v2/status','/broadcasts','/jobs','/v2','/'):
                         with urlopen(base+path,timeout=5) as response:
                             payload=response.read().decode()
                             assert response.status==200,(path,response.status)
-                            if path=='/v2':assert '/static/v2/' in payload and 'console.js' not in payload
+                            if path in {'/broadcasts','/jobs'}:assert '/static/library/' in payload and 'console.js' in payload
+                            if path in {'/v2','/'}:assert 'page-index' in payload and '/static/v2/' not in payload
                             if path=='/api/v2/channels':assert json.loads(payload)['items']==[]
                     try:
                         urlopen(Request(base+'/api/v2/jobs',data=b'{}',headers={'Content-Type':'application/json','Origin':'https://foreign.example'}),timeout=5)

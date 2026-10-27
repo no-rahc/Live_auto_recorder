@@ -14,7 +14,20 @@ HTML_ROUTES = frozenset({
     "/cookies",
     "/files",
     "/operations",
+    "/broadcasts",
+    "/jobs",
 })
+
+
+def is_html_route(path: str) -> bool:
+    """Match the shared shell, including individual library broadcasts."""
+    if path in HTML_ROUTES:
+        return True
+    if path.startswith('/broadcasts/'):
+        broadcast_id = path.removeprefix('/broadcasts/')
+        return bool(broadcast_id) and '/' not in broadcast_id
+    return False
+
 
 INJECTION_MARKER = "data-lar-console"
 _VERSION_IN_TITLE = re.compile(
