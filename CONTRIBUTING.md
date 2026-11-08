@@ -14,6 +14,14 @@ python -m pip install -r requirements.txt
 python app_entry.py
 ```
 
+## Embedded library development
+
+The broadcast library and job status use the existing Python-served v1 console.
+Run `npm ci` in `frontend`, then `npm run dev` to rebuild embedded assets on
+changes while `python app_entry.py` serves `/broadcasts` and `/jobs`. There is no
+separate frontend dashboard or Vite app server. Reading the library does not
+require enabling the opt-in durable engine.
+
 ## Checks
 
 ```bash
