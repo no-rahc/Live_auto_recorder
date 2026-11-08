@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#f2f4f6">
+  <title>{{ page_title }} · Live Auto Recorder</title>
+  <link rel="stylesheet" href="{{ url_for('static', path='css/app.css') }}?v={{ program_version|default('') }}">
+  <link rel="stylesheet" href="/static/library/library.css?v={{ program_version|default('') }}">
+  <script type="module" src="/static/library/library.js?v={{ program_version|default('') }}"></script>
+</head>
+<body class="page-library">
+  <span class="dash-ver" hidden>v{{ program_version|default('') }}</span>
+  <div class="navbar-container"><div class="navbar">
+    <button class="menu-icon" type="button" aria-controls="mySidenav" aria-expanded="false" aria-label="메뉴 열기">&#9776;</button>
+    <div class="brand"><span class="rec-dot" aria-hidden="true"></span><div class="brand-text"><h2>Live Auto Recorder</h2><span class="brand-sub">Control Console</span></div></div>
+  </div></div>
+  <div id="mySidenav" class="sidenav">
+    <a href="javascript:void(0)" class="closebtn">&times;</a>
+    <a href="/">대시보드</a><a href="/recording">녹화 현황</a>
+    <a href="/broadcasts">방송 보관함</a><a href="/jobs">작업 상태</a>
+    <a href="/config">설정 관리</a><a href="/channels">채널 관리</a>
+    <a href="/cookies">쿠키 관리</a><a href="/files">파일 관리</a>
+    <a href="/operations" class="restricted-menu">운영 관리</a>
+    <div id="user-info"><p id="username-display">{{ request.session.get('username', '사용자') }}</p><a href="/logout" id="logout-btn" class="logout-btn">로그아웃</a></div>
+  </div>
+  <main id="content"><div id="root" class="library-workspace"><p role="status">최근 상태를 불러오고 있습니다</p></div><noscript>이 화면을 사용하려면 자바스크립트를 켜 주세요. <a href="/files">파일 관리</a>로 이동할 수 있습니다.</noscript></main>
+</body>
+</html>

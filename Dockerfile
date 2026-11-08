@@ -64,7 +64,7 @@ COPY app_entry.py live_auto_recorder.py VERSION ./
 COPY lar_app ./lar_app
 COPY module ./module
 COPY templates ./templates
-COPY --from=frontend-builder /src/templates/static/v2 ./templates/static/v2
+COPY --from=frontend-builder /src/templates/static/library ./templates/static/library
 COPY dependent ./dependent
 COPY LICENSE THIRD_PARTY_NOTICES.md ./
 COPY --from=frontend-builder /src/frontend/node_modules/react/LICENSE ./third-party/react-LICENSE.txt

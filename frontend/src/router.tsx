@@ -14,7 +14,7 @@ export function RouterProvider({ children }: { children: ReactNode }) {
 export function useRouter() { const value = useContext(Router); if (!value) throw new Error('Missing router'); return value; }
 export function Link({ to, children, className = '', ...props }: { to: string; children: ReactNode; className?: string; 'aria-label'?: string; 'aria-current'?: 'page' | undefined }) {
   const { navigate } = useRouter();
-  const click = (event: MouseEvent<HTMLAnchorElement>) => { if (event.button === 0 && !event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey) { event.preventDefault(); navigate(to); } };
+  const click = (event: MouseEvent<HTMLAnchorElement>) => { if ((to === '/jobs' || to === '/broadcasts' || to.startsWith('/jobs?') || to.startsWith('/broadcasts/')) && event.button === 0 && !event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey) { event.preventDefault(); navigate(to); } };
   return <a href={to} onClick={click} className={className} {...props}>{children}</a>;
 }
 export function useFilters() {
