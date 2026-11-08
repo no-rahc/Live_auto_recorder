@@ -16,6 +16,8 @@
       hint: "세션 제어",
       icon: "activity",
     },
+    "/broadcasts": { label: "방송 보관함", hint: "방송별 녹화 이력", icon: "folder" },
+    "/jobs": { label: "작업 상태", hint: "검증·합치기·복구", icon: "operations" },
     "/config": {
       label: "설정 관리",
       hint: "자동화 구성",
@@ -85,7 +87,8 @@
   }
 
   function currentPath() {
-    return normalizedPath(location.href) || "/";
+    const path = normalizedPath(location.href) || "/";
+    return path.startsWith("/broadcasts/") ? "/broadcasts" : path;
   }
 
   function detectVersion() {
@@ -286,6 +289,16 @@
     const userInfo = Array.from(nav.children).find(function (child) {
       return child.id === "user-info";
     });
+    // Extend the existing console only where recording navigation is visible.
+    const recordingLink = nav.querySelector('a[href="/recording"]');
+    if (recordingLink) {
+      let after = recordingLink;
+      [["/broadcasts", "방송 보관함"], ["/jobs", "작업 상태"]].forEach(function (item) {
+        let link = nav.querySelector('a[href="' + item[0] + '"]');
+        if (!link) { link = document.createElement("a"); link.href = item[0]; link.textContent = item[1]; after.insertAdjacentElement("afterend", link); }
+        after = link;
+      });
+    }
     const primaryLinks = Array.from(nav.children).filter(function (child) {
       return child.matches?.("a[href]:not(.closebtn)");
     });
@@ -1162,8 +1175,9 @@
       const request = input instanceof Request ? input : null;
       const method = String(init?.method || request?.method || "GET").toUpperCase();
       const url = String(request?.url || input || "");
-      // The recording-start UI handles its structured result and error message.
-      const silent = /\/api\/sys_metrics|\/ws\/sys_metrics|recording_history|\/api\/start_recording\//i.test(url);
+      // Recording-start and the library island own structured status, including
+      // accepted jobs and intentionally aborted query refreshes.
+      const silent = /\/api\/v2\/|\/api\/sys_metrics|\/ws\/sys_metrics|recording_history|\/api\/start_recording\//i.test(url);
 
       return nativeFetch(input, init).then(function (response) {
         if (!silent && method !== "GET") {

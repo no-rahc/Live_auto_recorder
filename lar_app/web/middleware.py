@@ -9,7 +9,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse, RedirectResponse, Response
 
-from lar_app.web.assets import HTML_ROUTES, inject_console_assets
+from lar_app.web.assets import inject_console_assets, is_html_route
 
 
 NO_STORE_ROUTES = frozenset({"/config", "/cookies", "/operations"})
@@ -193,7 +193,7 @@ class ConsoleAssetsMiddleware(BaseHTTPMiddleware):
         self.release_version = release_version
 
     async def dispatch(self, request: Request, call_next):
-        if request.method != "GET" or request.url.path not in HTML_ROUTES:
+        if request.method != "GET" or not is_html_route(request.url.path):
             return await call_next(request)
 
         response = await call_next(request)

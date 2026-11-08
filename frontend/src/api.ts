@@ -11,9 +11,12 @@ export class ApiError extends Error {
   }
 }
 export async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
+  return request<T>(`/api/v2${path}`, options);
+}
+async function request<T>(url: string, options: RequestInit = {}): Promise<T> {
   let response: Response;
   try {
-    response = await fetch(`/api/v2${path}`, {
+    response = await fetch(url, {
       ...options, credentials: 'same-origin',
       headers: { Accept: 'application/json', ...(options.body ? { 'Content-Type': 'application/json' } : {}), ...options.headers },
     });
@@ -34,6 +37,7 @@ export async function api<T>(path: string, options: RequestInit = {}): Promise<T
   }
   return data as T;
 }
+
 export function commandKey(): string {
   if (typeof crypto.randomUUID === 'function') return crypto.randomUUID();
   const random = crypto.getRandomValues(new Uint8Array(16));

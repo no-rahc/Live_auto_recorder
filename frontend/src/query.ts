@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { api, allChannels, ApiError, commandKey, latestRevision, pollingInterval } from './api';
-import type { Channel, Command, Page } from './types';
+import type { Channel, Page } from './types';
 
 export function useApiQuery<T>(path: string, enabled = true, loader?: (signal: AbortSignal) => Promise<T>) {
   return useQuery<T, ApiError>({ queryKey: ['v2', path], queryFn: ({ signal }) => loader ? loader(signal) : api<T>(path, { signal }), enabled,
@@ -37,23 +37,4 @@ export function useAction<T = unknown>() {
   };
   return { run, pending, error, result, clear: () => { setError(null); setResult(null); } };
 }
-const commandTerminal = new Set(['succeeded', 'completed', 'failed', 'rejected', 'cancelled', 'blocked', 'interrupted']);
-export function useCommand(receipt: Command | null) {
-  const id = receipt?.command_id || receipt?.id;
-  const query = useQuery<Command, ApiError>({
-    queryKey: ['v2', `/commands/${encodeURIComponent(id || '')}`],
-    queryFn: ({ signal }) => api<Command>(`/commands/${encodeURIComponent(id || '')}`, { signal }),
-    enabled: Boolean(id), retry: 1, staleTime: 1000,
-    refetchInterval: current => commandTerminal.has(current.state.data?.state || current.state.data?.status || '') ? false : pollingInterval(),
-    refetchIntervalInBackground: true,
-    structuralSharing: (old, next) => latestRevision(old as Command | undefined, next as Command),
-  });
-  const command = query.data || receipt;
-  const state = command?.state || command?.status || 'pending';
-  const settled = commandTerminal.has(state);
-  const queryClient = useQueryClient();
-  useEffect(() => { if (settled) void queryClient.invalidateQueries({ queryKey: ['v2'] }); }, [settled, queryClient]);
-  return { command, state, settled, error: id ? query.error : null };
-}
-
 export function useChannelsQuery() { return useApiQuery<Page<Channel>>('/channels', true, allChannels); }

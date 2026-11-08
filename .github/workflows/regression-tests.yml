@@ -9,9 +9,65 @@ permissions:
   contents: read
 
 jobs:
-  regressions:
+  rendered-preview:
+    name: Render v1-integrated preview first
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install isolated preview dependencies
+        run: |
+          python -m pip install Jinja2==3.1.6
+          npm --prefix frontend ci --no-audit --no-fund
+      - name: Build the embedded library bundle
+        working-directory: frontend
+        run: npm run build
+      - name: Install Chromium and Korean fonts
+        working-directory: frontend
+        run: |
+          npx playwright install --with-deps chromium
+          sudo apt-get install -y fonts-noto-cjk
+      - name: Capture actual dashboard, library, jobs and detail at desktop and mobile sizes
+        working-directory: frontend
+        env:
+          UI_BASELINE_REF: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: npm run test:browser -- --grep @preview
+      - name: Upload labeled synthetic previews immediately
+        if: always()
+        id: preview
+        uses: actions/upload-artifact@v4
+        with:
+          name: v1-integrated-synthetic-preview
+          path: |
+            frontend/test-results/fixture/
+            frontend/playwright-report/fixture/
+          retention-days: 14
+          if-no-files-found: error
+      - name: Link preview for review before merge
+        if: always()
+        env:
+          PREVIEW_URL: ${{ steps.preview.outputs.artifact-url }}
+        run: |
+          {
+            echo '### v1-integrated UI preview'
+            echo 'Original Jinja dashboard/console plus embedded Broadcasts and Jobs; no replacement shell.'
+            echo 'Screenshots visibly label synthetic sample data. This is a CI rendering, not a deployment or live installation.'
+            echo "[Download rendered screenshots and browser report](${PREVIEW_URL})"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  regressions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
@@ -21,19 +77,77 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
       - name: Install runtime dependencies
         run: python -m pip install -r requirements.txt
       - name: Run all Python and JavaScript regressions (no skips)
         run: python scripts/test_regressions.py
-      - name: Install v2 frontend dependencies
+      - name: Install embedded frontend dependencies
         working-directory: frontend
         run: npm ci --no-audit --no-fund
-      - name: Typecheck, unit test, and build v2 UI
+      - name: Unit test, typecheck and build the integrated library
         working-directory: frontend
         run: npm test && npm run build
       - name: Install Chromium for UI regressions
         working-directory: frontend
         run: npx playwright install --with-deps chromium
-      - name: Test desktop, mobile, and interrupted UI flows
+      - name: Test integrated desktop, mobile and interrupted flows
         working-directory: frontend
+        run: npm run test:browser -- --grep-invert @preview
+      - name: Upload interaction failure evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integrated-ui-interactions
+          path: |
+            frontend/test-results/fixture/
+            frontend/playwright-report/fixture/
+          retention-days: 14
+          if-no-files-found: warn
+
+  full-app-browser:
+    name: Real app browser (durable jobs ${{ matrix.durable }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        durable: ['false', 'true']
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+          cache: pip
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install app, media and browser dependencies
+        run: |
+          python -m pip install -r requirements.txt
+          npm --prefix frontend ci --no-audit --no-fund
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+          cd frontend && npx playwright install --with-deps chromium
+      - name: Build embedded assets
+        working-directory: frontend
+        run: npm run build
+      - name: Check actual app with disposable synthetic recordings
+        working-directory: frontend
+        env:
+          UI_REAL_APP: '1'
+          UI_DURABLE_JOBS: ${{ matrix.durable }}
         run: npm run test:browser
+      - name: Upload real-app browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: real-app-browser-durable-${{ matrix.durable }}
+          path: |
+            frontend/test-results/real-app/
+            frontend/playwright-report/real-app/
+          retention-days: 14
+          if-no-files-found: warn

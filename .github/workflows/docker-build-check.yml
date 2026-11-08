@@ -99,6 +99,40 @@ jobs:
           fi
           grep -qiE '<!doctype html|<html' /tmp/dashboard.html
           grep -q '녹화 관제 보드' /tmp/dashboard.html
+          grep -q '/static/js/console.js' /tmp/dashboard.html
+          if grep -qE 'id="root"|/static/library/|/static/v2/' /tmp/dashboard.html; then
+            echo "Root dashboard was replaced or received island-only assets"
+            exit 1
+          fi
+
+          # Default durable-jobs-off image still exposes library reads in v1 chrome.
+          for page in broadcasts jobs; do
+            curl -fsS "http://127.0.0.1:${port}/${page}" -o "/tmp/${page}.html"
+            grep -q 'id="root" class="library-workspace"' "/tmp/${page}.html"
+            grep -q '/static/library/library.js' "/tmp/${page}.html"
+            grep -q '/static/library/library.css' "/tmp/${page}.html"
+            grep -q '/static/js/console.js' "/tmp/${page}.html"
+            grep -q '/static/css/console.css' "/tmp/${page}.html"
+          done
+          curl -fsS "http://127.0.0.1:${port}/static/library/library.js" >/dev/null
+          curl -fsS "http://127.0.0.1:${port}/static/library/library.css" >/dev/null
+          curl -fsS "http://127.0.0.1:${port}/api/v2/broadcasts?limit=1" >/dev/null
+          curl -fsS "http://127.0.0.1:${port}/api/v2/jobs" -o /tmp/jobs.json
+          python -c 'import json; result=json.load(open("/tmp/jobs.json")); assert result["available"] is False and result["items"] == []'
+          blocked_status="$(curl -sS -o /tmp/jobs-disabled.json -w '%{http_code}' \
+            -X POST -H 'Content-Type: application/json' -H 'Idempotency-Key: docker-disabled-smoke' \
+            --data '{"kind":"verify","target_id":"synthetic","input_revision":1,"options":{}}' \
+            "http://127.0.0.1:${port}/api/v2/jobs")"
+          test "$blocked_status" = "409"
+          curl -sS -D /tmp/legacy-library.headers -o /dev/null "http://127.0.0.1:${port}/v2/broadcasts?query=sample"
+          grep -qiE '^location: /broadcasts\?query=sample' /tmp/legacy-library.headers
+          for page in channels config recording files; do
+            curl -fsS "http://127.0.0.1:${port}/${page}" -o "/tmp/legacy-${page}.html"
+            if grep -qE 'id="root"|/static/library/' "/tmp/legacy-${page}.html"; then
+              echo "Legacy ${page} page unexpectedly replaced"
+              exit 1
+            fi
+          done
           if grep -q '<h2>로그인</h2>' /tmp/dashboard.html; then
             echo "Dashboard unexpectedly rendered the legacy login form"
             exit 1
