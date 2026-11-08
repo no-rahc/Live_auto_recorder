@@ -43,6 +43,8 @@ RUN apt-get update \
         ca-certificates \
         curl \
         ffmpeg \
+        libxml2 \
+        libxslt1.1 \
         rclone \
         tini \
         tzdata \
@@ -50,9 +52,13 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt ./
-RUN python -m pip install --no-cache-dir --upgrade pip \
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends build-essential libxml2-dev libxslt1-dev \
+    && python -m pip install --no-cache-dir --upgrade pip \
     && python -m pip install --no-cache-dir -r requirements.txt \
-    && python -m pip check
+    && python -m pip check \
+    && apt-get purge -y --auto-remove build-essential libxml2-dev libxslt1-dev \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY --from=ytarchive-builder /out/ytarchive /usr/local/bin/ytarchive
 RUN chmod 0755 /usr/local/bin/ytarchive \
@@ -64,7 +70,7 @@ COPY app_entry.py live_auto_recorder.py VERSION ./
 COPY lar_app ./lar_app
 COPY module ./module
 COPY templates ./templates
-COPY --from=frontend-builder /src/templates/static/v2 ./templates/static/v2
+COPY --from=frontend-builder /src/templates/static/library ./templates/static/library
 COPY dependent ./dependent
 COPY LICENSE THIRD_PARTY_NOTICES.md ./
 COPY --from=frontend-builder /src/frontend/node_modules/react/LICENSE ./third-party/react-LICENSE.txt

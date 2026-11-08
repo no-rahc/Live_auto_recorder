@@ -3,19 +3,16 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { App } from '../src/App';
 import { RouterProvider } from '../src/router';
-import { broadcast, channel, detail, job, now, systemStatus } from './browser/fixtures';
+import { broadcast, channel, detail, job, now } from './browser/fixtures';
 
 let client: QueryClient;
 const response = (data: unknown, status = 200) => Promise.resolve(new Response(JSON.stringify(data), { status, headers: {'Content-Type':'application/json'} }));
 function defaultResponse(path: string) {
-  if (path === '/status') return systemStatus;
   if (path === '/channels') return {items:[channel],observed_at:now,next_cursor:null};
   if (path.startsWith('/broadcasts?')) return {items:[broadcast],observed_at:now,next_cursor:null};
   if (path === '/broadcasts/broadcast-1') return detail;
   if (path.startsWith('/jobs?')) return {items:[job],observed_at:now,next_cursor:null};
   if (path === '/jobs/job-1') return {...job,attempt_history:[]};
-  if (path.startsWith('/commands/')) return {id:'command-1',state:'accepted'};
-  if (path === '/settings') return {enabled:true,storage:{originals_preserved:true},features:{durable_jobs:true,legacy_ui:true},links:{configuration:'/config',operations:'/operations'}};
   return {};
 }
 function mock(overrides?: (path: string, init?: RequestInit) => Promise<Response> | undefined) {
@@ -36,13 +33,14 @@ beforeAll(() => {
 });
 afterEach(()=>{cleanup();client?.clear();vi.unstubAllGlobals();});
 
-it.each([['/v2','녹화 현황'],['/v2/broadcasts','방송 보관함'],['/v2/channels','채널'],['/v2/jobs','작업'],['/v2/settings','설정'],['/v2/broadcasts/broadcast-1',broadcast.title]])('renders %s with actual API fixture fields',async(path,title)=>{
+it.each([['/broadcasts','방송 보관함'],['/jobs','작업 상태'],['/broadcasts/broadcast-1',broadcast.title]])('renders the embedded %s screen without a replacement shell',async(path,title)=>{
   mock();mount(path);await waitFor(()=>expect(screen.getByRole('heading',{name:title,level:1})).toBeTruthy());
-  await waitFor(()=>expect(screen.getByText('서버 연결됨')).toBeTruthy());
   expect(screen.queryByText('화면을 표시하지 못했습니다.')).toBeNull();
+  expect(screen.queryByRole('navigation')).toBeNull();
+  expect(document.querySelector('.sidebar, .app-layout, .mobile-nav')).toBeNull();
 });
 it('keeps select labels separate from their option text',async()=>{
-  mock();mount('/v2/broadcasts');await screen.findByRole('option',{name:channel.name});
+  mock();mount('/broadcasts');await screen.findByRole('option',{name:channel.name});
   for (const name of ['플랫폼','채널','방송 상태']) {
     const select=screen.getByRole('combobox',{name}) as HTMLSelectElement;
     expect(select.labels).toHaveLength(1);
@@ -52,7 +50,7 @@ it('keeps select labels separate from their option text',async()=>{
   }
 });
 it('persists search, select and UTC date filters in URL and API requests',async()=>{
-  const fetch=mock();mount('/v2/broadcasts');await screen.findByRole('heading',{name:'방송 보관함',level:1});
+  const fetch=mock();mount('/broadcasts');await screen.findByRole('heading',{name:'방송 보관함',level:1});
   fireEvent.change(screen.getByRole('searchbox',{name:'방송 제목 검색'}),{target:{value:'가을'}});
   fireEvent.change(screen.getByLabelText('플랫폼',{exact:true}),{target:{value:'chzzk'}});
   await screen.findByRole('option',{name:channel.name});
@@ -67,49 +65,37 @@ it('persists search, select and UTC date filters in URL and API requests',async(
     return Object.entries(filters).every(([key,value])=>params.get(key)===value);
   })).toBe(true));
 });
-it('closes a command confirmation without sending a command',async()=>{
-  const fetch=mock();mount('/v2/channels');await screen.findByRole('heading',{name:channel.name});
-  fireEvent.click(screen.getByRole('button',{name:'지금 한 번 녹화'}));
+it('closes a merge confirmation without sending a job',async()=>{
+  const fetch=mock();mount('/broadcasts/broadcast-1');await screen.findByRole('heading',{name:broadcast.title});
+  fireEvent.click(screen.getByRole('button',{name:'조각 합치기'}));
   expect(screen.getByRole('dialog')).toBeTruthy();fireEvent.click(screen.getByRole('button',{name:'돌아가기'}));
   expect(screen.queryByRole('dialog')).toBeNull();expect(fetch.mock.calls.some(([,options])=>options?.method==='POST')).toBe(false);
 });
-it('never paints recording or resends while a command is accepted',async()=>{
-  let finish!:(value:Response)=>void;
-  const fetch=mock((path)=>path==='/channels/ch-1/commands'?new Promise(resolve=>{finish=resolve;}):undefined);
-  mount('/v2/channels');await screen.findByRole('heading',{name:channel.name});
-  fireEvent.click(screen.getByRole('button',{name:'지금 한 번 녹화'}));
-  fireEvent.click(screen.getByRole('button',{name:'한 번 녹화 요청'}));
-  fireEvent.click(screen.getByRole('button',{name:'명령 전송 중…'}));
-  expect(fetch.mock.calls.filter(([path])=>path.endsWith('/commands'))).toHaveLength(1);
-  finish(new Response(JSON.stringify({command_id:'command-1',state:'accepted'}),{status:202}));
-  await screen.findByText('명령 접수 · 실제 처리 결과를 기다리는 중입니다.');
-  expect(screen.getByText('감시 중',{selector:'.channel-states .badge'})).toBeTruthy();
-  expect(screen.queryByText('녹화 중',{selector:'.channel-states .badge'})).toBeNull();
-  expect((screen.getByRole('button',{name:'명령 처리 중…'}) as HTMLButtonElement).disabled).toBe(true);
+it('deduplicates repeated merge confirmation clicks until its observed response',async()=>{
+  let finish!:(response:Response)=>void;
+  const fetch=mock((path,init)=>path==='/jobs'&&init?.method==='POST'?new Promise(resolve=>{finish=resolve;}):undefined);
+  mount('/broadcasts/broadcast-1');await screen.findByRole('heading',{name:broadcast.title});
+  fireEvent.click(screen.getByRole('button',{name:'조각 합치기'}));
+  const button=screen.getByRole('button',{name:'작업 요청'});fireEvent.click(button);fireEvent.click(button);
+  expect(fetch.mock.calls.filter(([,init])=>init?.method==='POST')).toHaveLength(1);
+  expect((button as HTMLButtonElement).disabled).toBe(true);
+  expect(screen.queryByText('작업이 접수되었습니다.')).toBeNull();
+  finish(new Response(JSON.stringify({job_id:'job-1',state:'queued'}),{status:202}));
+  await screen.findByText('작업이 접수되었습니다.');
+  expect(screen.getByRole('link',{name:'작업 보기'}).getAttribute('href')).toBe('/jobs?selected=job-1');
 });
-it('shows blocked command reason and releases its pending state',async()=>{
-  mock(path=>path==='/channels/ch-1/commands'?response({command_id:'command-1',state:'blocked',error_code:'STORAGE_UNAVAILABLE'},202):path==='/commands/command-1'?response({id:'command-1',state:'blocked',error_code:'STORAGE_UNAVAILABLE'}):undefined);
-  mount('/v2/channels');await screen.findByRole('heading',{name:channel.name});
-  fireEvent.click(screen.getByRole('button',{name:'지금 한 번 녹화'}));fireEvent.click(screen.getByRole('button',{name:'한 번 녹화 요청'}));
-  await screen.findByText(/명령 오류 · STORAGE_UNAVAILABLE/);
-  expect((screen.getByRole('button',{name:'지금 한 번 녹화'}) as HTMLButtonElement).disabled).toBe(false);
-});
-it('a running once request still permits stopping an observed recording',async()=>{
-  let recording=false;
-  mock(path=>path==='/channels'?response({items:[recording?{...channel,actual_state:'recording',broadcast_id:'broadcast-1',revision:5}:channel],observed_at:now+1}):path==='/channels/ch-1/commands'?(recording=true,response({command_id:'command-1',state:'running'},202)):path==='/commands/command-1'?response({id:'command-1',state:'running'}):undefined);
-  mount('/v2/channels');await screen.findByRole('heading',{name:channel.name});fireEvent.click(screen.getByRole('button',{name:'지금 한 번 녹화'}));fireEvent.click(screen.getByRole('button',{name:'한 번 녹화 요청'}));
-  const stop=await screen.findByRole('button',{name:'이번 방송 중지'});expect((stop as HTMLButtonElement).disabled).toBe(false);
-});
-it('a revision conflict refetches and explains the latest state',async()=>{
+it('a revision conflict refreshes broadcast data without showing success',async()=>{
   let changed=false;
-  mock(path=>path==='/channels/ch-1'?(changed=true,response({code:'REVISION_CONFLICT',message:'changed',request_id:'r409'},409)):path==='/channels'?response({items:[changed?{...channel,desired_mode:'paused',revision:5}:channel],observed_at:now+1}):undefined);
-  mount('/v2/channels');await screen.findByRole('heading',{name:channel.name});fireEvent.click(screen.getByRole('button',{name:'자동 녹화 끄기'}));
-  await screen.findByText('다른 곳에서 상태가 바뀌었습니다');await screen.findByRole('button',{name:'자동 녹화 켜기'});
-  expect(screen.getByText(/r409/)).toBeTruthy();
+  const fetch=mock((path,init)=>path==='/jobs'&&init?.method==='POST'?(changed=true,response({code:'REVISION_CONFLICT',message:'changed',request_id:'r409'},409)):path==='/broadcasts/broadcast-1'?response({...detail,revision:changed?4:3,observed_at:now+(changed?1:0)}):undefined);
+  mount('/broadcasts/broadcast-1');await screen.findByRole('heading',{name:broadcast.title});
+  fireEvent.click(screen.getByRole('button',{name:'조각 합치기'}));fireEvent.click(screen.getByRole('button',{name:'작업 요청'}));
+  await screen.findByText('다른 곳에서 상태가 바뀌었습니다');expect(screen.getByText(/r409/)).toBeTruthy();
+  expect(screen.queryByText('작업이 접수되었습니다.')).toBeNull();
+  await waitFor(()=>expect(fetch.mock.calls.filter(([path])=>path.endsWith('/broadcasts/broadcast-1')).length).toBeGreaterThan(1));
 });
 it('merge preview preserves order and submits the observed detail revision',async()=>{
   const fetch=mock((path,init)=>path==='/jobs'&&init?.method==='POST'?response({job_id:'merged-job'},202):undefined);
-  mount('/v2/broadcasts/broadcast-1');await screen.findByRole('heading',{name:broadcast.title,level:1});fireEvent.click(screen.getByRole('button',{name:'조각 합치기'}));
+  mount('/broadcasts/broadcast-1');await screen.findByRole('heading',{name:broadcast.title,level:1});fireEvent.click(screen.getByRole('button',{name:'조각 합치기'}));
   const dialog=screen.getByRole('dialog');const files=within(dialog).getAllByRole('listitem');
   expect(files[0].textContent).toContain('segment-1.ts');expect(files[1].textContent).toContain('segment-2.ts');
   fireEvent.click(within(dialog).getByRole('button',{name:'작업 요청'}));await screen.findByText('작업이 접수되었습니다.');
@@ -118,14 +104,44 @@ it('merge preview preserves order and submits the observed detail revision',asyn
 it('job cancellation distinguishes requested from actual termination',async()=>{
   let requested=false;
   mock(path=>path==='/jobs/job-1/cancel'?(requested=true,response({...job,state:'cancel_requested',revision:3},202)):path==='/jobs/job-1'?response({...job,state:requested?'cancel_requested':'running',revision:requested?3:2,attempt_history:[]}):undefined);
-  mount('/v2/jobs?selected=job-1');await screen.findByRole('button',{name:'작업 취소'});
+  mount('/jobs?selected=job-1');await screen.findByRole('button',{name:'작업 취소'});
   fireEvent.click(screen.getByRole('button',{name:'작업 취소'}));fireEvent.click(screen.getByRole('button',{name:'취소 요청'}));
   await screen.findByText('프로세스가 종료되었는지 확인 중입니다. 아직 취소 완료 상태가 아닙니다.');
   expect(screen.queryByText('취소됨')).toBeNull();
 });
-it('storage errors and last-good timestamp survive screen navigation',async()=>{
-  mock(path=>path==='/status'?response({...systemStatus,storage:{status:'blocked',message:'NAS unavailable',last_ok_at:now-300}}):undefined);
-  mount('/v2');await screen.findByText('NAS unavailable');
-  fireEvent.click(within(screen.getByRole('navigation',{name:'주 메뉴'})).getByRole('link',{name:'방송 보관함'}));
-  await screen.findByRole('heading',{name:'방송 보관함',level:1});expect(screen.getByText('NAS unavailable')).toBeTruthy();expect(screen.getByText(/마지막 정상 확인 2026/)).toBeTruthy();
+it('keeps last library data visible when a refresh loses the connection',async()=>{
+  let offline=false;
+  mock(path=>path.startsWith('/broadcasts?')&&offline?Promise.reject(new TypeError('connection lost')):undefined);
+  mount('/broadcasts');await screen.findByRole('link',{name:broadcast.title});offline=true;
+  fireEvent.click(screen.getByRole('button',{name:'모든 상태 새로고침'}));
+  await screen.findByText('갱신 중단 · 마지막 확인 데이터',{}, {timeout:5000});
+  expect(screen.getByRole('link',{name:broadcast.title})).toBeTruthy();
+});
+it('shows a request-specific initial error and can retry to real data',async()=>{
+  let failed=true;
+  mock(path=>path.startsWith('/broadcasts?')&&failed?response({code:'STORAGE_UNAVAILABLE',message:'Storage check failed',request_id:'r503'},503):undefined);
+  mount('/broadcasts');await screen.findByText('Storage check failed',{}, {timeout:5000});
+  expect(screen.getByText(/r503/)).toBeTruthy();failed=false;
+  fireEvent.click(screen.getByRole('button',{name:'다시 확인'}));await screen.findByRole('link',{name:broadcast.title});
+});
+it('leaves original history visible but disables all file mutations without durable jobs',async()=>{
+  const fetch=mock(path=>path==='/broadcasts/broadcast-1'?response({...detail,jobs_available:false,artifacts:detail.artifacts.map(file=>({...file,controls_available:false}))}):undefined);
+  mount('/broadcasts/broadcast-1');await screen.findByRole('heading',{name:broadcast.title});
+  expect(screen.getByText('파일 작업 기능이 꺼져 있습니다.')).toBeTruthy();
+  const merge=screen.getByRole('button',{name:'조각 합치기'}) as HTMLButtonElement;expect(merge.disabled).toBe(true);fireEvent.click(merge);
+  expect(screen.queryByRole('dialog')).toBeNull();expect(fetch.mock.calls.some(([,init])=>init?.method==='POST')).toBe(false);
+});
+it('never requests job details or exposes cancellation when the queue is disabled',async()=>{
+  const fetch=mock(path=>path.startsWith('/jobs?')?response({items:[],available:false,observed_at:now}):undefined);
+  mount('/jobs?selected=job-1');await screen.findByText('파일 작업 기능이 꺼져 있습니다');
+  expect(screen.queryByRole('dialog')).toBeNull();expect(screen.queryByRole('button',{name:'작업 취소'})).toBeNull();
+  expect(fetch.mock.calls.some(([path])=>path.endsWith('/jobs/job-1'))).toBe(false);
+});
+
+it('does not imply existing legacy merge outputs are absent when unavailable',async()=>{
+  mock(path=>path==='/broadcasts/broadcast-1'?response({...detail,jobs_available:false,artifacts:detail.artifacts.filter(file=>file.kind==='original'),jobs:[]}):undefined);
+  mount('/broadcasts/broadcast-1');
+  await screen.findByText('기존 결과물은 파일 관리에서 확인하세요');
+  expect(screen.queryByText('아직 만들어진 결과물이 없습니다')).toBeNull();
+  expect(screen.getByRole('link',{name:'결과 파일 찾기'}).getAttribute('href')).toBe('/files');
 });
