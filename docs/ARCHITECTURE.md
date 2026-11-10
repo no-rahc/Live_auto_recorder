@@ -74,7 +74,7 @@ smoke test for the dashboard and management endpoints.
 
 ## Next extraction targets
 
-The next safe refactor stages are:
+The next safe refactor stages are (each requires separate tests and visual review; avoid sweeping changes to a running recorder):
 
 1. Split route registration from `live_auto_recorder.py` into router modules
    while preserving route paths and dependency functions.
