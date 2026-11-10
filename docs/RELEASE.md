@@ -77,9 +77,9 @@ PR 제목도 Conventional Commits 형식을 사용합니다.
 feat(ui): refine light dashboard and release v1.1.5
 ```
 
-필수 검사가 모두 통과하면 squash merge합니다. `main`에 push되면 `Regression tests`가 실행되며 전체 회귀 테스트, 아티팩트 확인, Python 3.15 검증이 **모두 성공한 뒤** 재사용 가능한 Docker 게시 워크플로를 호출합니다. 게시 대상은 `DOCKERHUB_USERNAME/live-auto-recorder:latest`이며, 실제 계정명이 `.env.example` 및 Compose의 기본 이미지와 다르면 게시를 차단합니다.
+필수 검사가 모두 통과하면 squash merge합니다. `main`에 push되면 `Regression tests`가 실행되며 전체 회귀 테스트, 아티팩트 확인, Python 3.15 검증이 **모두 성공한 뒤** 재사용 가능한 Docker 게시 워크플로를 호출합니다. 게시 대상은 `DOCKERHUB_USERNAME/live-auto-recorder:latest`와 롤백 가능한 `sha-<40자리 SHA>` 태그이며, 실제 계정명이 `.env.example` 및 Compose의 기본 이미지와 다르면 게시를 차단합니다.
 
-`v*` Git 태그를 push한 경우에만 별도의 버전 태그가 게시됩니다. 태그/수동 게시도 그 SHA와 일치하는 `main`의 성공한 회귀 테스트가 필요합니다. 배포 전 기존 정상 이미지 digest를 기록하고, 이상 시 해당 digest로 롤백합니다.
+`v*` Git 태그를 push한 경우에만 별도의 버전 태그가 게시됩니다. 태그/수동 게시도 그 SHA와 일치하는 `main`의 성공한 회귀 테스트가 필요합니다. 배포 전 기존 정상 이미지 digest와 SHA 태그를 기록하고, 이상 시 해당 `LIVE_AUTO_RECORDER_IMAGE`를 지정해 컨테이너를 재생성합니다.
 
 ## 권장 작업 순서
 

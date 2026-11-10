@@ -9,6 +9,11 @@ on:
     - cron: '20 18 * * 1'
   workflow_dispatch:
 
+# Cancel expensive duplicated runs for superseded commits.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 

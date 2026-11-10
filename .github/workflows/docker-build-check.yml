@@ -39,6 +39,11 @@ on:
       - 'module/**'
       - '.github/workflows/docker-build-check.yml'
 
+# Cancel expensive duplicated runs for superseded commits.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 

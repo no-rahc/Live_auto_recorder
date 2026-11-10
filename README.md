@@ -96,9 +96,9 @@ docker compose up -d --force-recreate
 
 ## 배포 안전성
 
-`main`의 변경은 회귀 테스트, 아티팩트 다운로드 무결성 검사, Python 3.15 런타임 회귀 테스트가 모두 성공해야 Docker Hub의 `latest`로 게시됩니다. 태그나 수동 배포도 동일 커밋의 성공한 `main` 회귀 테스트가 있어야 진행됩니다. 실제 Docker Hub 게시 계정은 `compose.yaml` 및 `.env.example`의 기본 이미지 이름과 일치해야 합니다.
+`main`의 변경은 회귀 테스트, 아티팩트 다운로드 무결성 검사, Python 3.15 런타임 회귀 테스트가 모두 성공해야 Docker Hub의 `latest`와 커밋별 `sha-<40자리 SHA>` 태그로 게시됩니다. 태그나 수동 배포도 동일 커밋의 성공한 `main` 회귀 테스트가 있어야 진행됩니다. 실제 Docker Hub 게시 계정은 `compose.yaml` 및 `.env.example`의 기본 이미지 이름과 일치해야 합니다.
 
-실수로 최신 이미지를 배포해도 이전 정상 이미지로 복귀할 수 있도록 운영 환경에서는 `latest`보다 검증된 불변 이미지 digest를 기록해서 사용하는 것이 좋습니다. V2/NAS 운영 전 실기기 검증은 [출시 검증 체크리스트](docs/v2/RELEASE_VALIDATION.md)를 따르세요.
+실수로 최신 이미지를 배포해도 이전 정상 이미지로 복귀할 수 있도록 운영 환경에서는 `latest` 대신 검증된 `sha-<40자리 SHA>` 태그 또는 이미지 digest를 기록해서 사용하세요. 롤백 시 `.env`의 `LIVE_AUTO_RECORDER_IMAGE` 값을 해당 이미지로 바꾸고 `docker compose pull && docker compose up -d --force-recreate`를 실행합니다. V2/NAS 운영 전 실기기 검증은 [출시 검증 체크리스트](docs/v2/RELEASE_VALIDATION.md)를 따르세요.
 
 ## 저장되는 데이터
 
