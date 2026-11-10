@@ -45,3 +45,26 @@ test-results/
 *.lock
 *.part
 *.tmp
+
+# Local database files and SQLite sidecars
+*.sqlite
+*.sqlite-*
+*.sqlite3
+*.sqlite3-*
+*.db
+*.db-*
+
+# Private credentials, key material and certificate bundles
+rclone.conf
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa
+id_ecdsa
+id_ed25519
+
+# Locally captured recordings (not source code or test fixtures)
+*.mp4
+*.mkv
+*.flv
