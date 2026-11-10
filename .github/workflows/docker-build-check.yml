@@ -93,7 +93,7 @@ jobs:
       - name: Verify actual Python image runtime dependencies
         run: |
           docker run --rm --entrypoint python live-auto-recorder:smoke -m pip check
-          docker run --rm --entrypoint python live-auto-recorder:smoke -c "from lar_app.server import ServerSettings; import fastapi, streamlink; assert ServerSettings.from_environ({'HOST': '127.0.0.1', 'PORT': '5000'}).port == 5000"
+          docker run --rm --entrypoint python live-auto-recorder:smoke -c "from lar_app.server import ServerSettings; import fastapi, streamlink; assert ServerSettings.from_env({'HOST': '127.0.0.1', 'PORT': '5000'}).port == 5000"
       - name: Smoke test local dashboard and operations
         shell: bash
         run: |
