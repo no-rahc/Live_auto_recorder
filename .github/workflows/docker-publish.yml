@@ -1,13 +1,19 @@
 name: Publish Docker image
 
 on:
+  workflow_call:
+    inputs:
+      verified_by_ci:
+        description: Set only by the main-branch regression workflow after all checks pass.
+        type: boolean
+        default: false
   push:
-    branches: [main]
     tags: ["v*"]
   workflow_dispatch:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: docker-publish-${{ github.ref }}
@@ -28,6 +34,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
+      - name: Refuse publishing a stale main commit
+        if: ${{ inputs.verified_by_ci }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          main_sha="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/main" --jq '.object.sha')"
+          if [[ "$GITHUB_SHA" != "$main_sha" ]]; then
+            echo '::error::A newer commit is now on main; refusing to publish an outdated tested image.'
+            exit 1
+          fi
+
       - name: Validate release metadata
         run: python3 scripts/release.py check
 
@@ -39,6 +58,49 @@ jobs:
           test "${GITHUB_REF_NAME}" = "$version" || (
             echo "Tag ${GITHUB_REF_NAME} does not match VERSION $version" && exit 1
           )
+
+      - name: Require successful regression checks for direct releases
+        if: ${{ !inputs.verified_by_ci }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api "repos/${GITHUB_REPOSITORY}/actions/runs?head_sha=${GITHUB_SHA}&event=push&per_page=100" > "$RUNNER_TEMP/regression-runs.json"
+          python3 - "$RUNNER_TEMP/regression-runs.json" "$GITHUB_SHA" <<'PY'
+          import json
+          import sys
+          with open(sys.argv[1], encoding='utf-8') as stream:
+              runs = json.load(stream).get('workflow_runs', [])
+          verified = any(
+              run.get('name') == 'Regression tests'
+              and run.get('event') == 'push'
+              and run.get('head_branch') == 'main'
+              and run.get('head_sha') == sys.argv[2]
+              and run.get('conclusion') == 'success'
+              for run in runs
+          )
+          if not verified:
+              raise SystemExit('No successful main-branch Regression tests for this exact commit. Refusing publication.')
+          print('Verified successful main-branch Regression tests for this commit.')
+          PY
+
+      - name: Verify public image defaults match the Docker Hub target
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import os
+          import re
+          from pathlib import Path
+          compose = Path('compose.yaml').read_text(encoding='utf-8')
+          example = Path('.env.example').read_text(encoding='utf-8')
+          match = re.search(r'image:\s*\$\{LIVE_AUTO_RECORDER_IMAGE:-([^}]+)\}', compose)
+          declared = re.search(r'^LIVE_AUTO_RECORDER_IMAGE=([^\s]+)$', example, re.MULTILINE)
+          expected = os.environ['IMAGE_NAME'] + ':latest'
+          if not (match and declared and match.group(1) == declared.group(1) == expected):
+              raise SystemExit('Compose/.env.example image defaults differ from the configured Docker Hub publisher. Refusing publication.')
+          print('Compose and example image defaults match the Docker Hub publisher.')
+          PY
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v4
@@ -124,8 +186,11 @@ jobs:
         uses: docker/metadata-action@v6
         with:
           images: ${{ env.IMAGE_NAME }}
+          flavor: |
+            latest=false
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,format=long
             type=ref,event=tag
 
       - name: Build and push Docker image

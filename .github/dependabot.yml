@@ -38,3 +38,19 @@ updates:
       container-images:
         patterns:
           - "*"
+
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+      day: monday
+      time: "03:15"
+      timezone: Asia/Seoul
+    open-pull-requests-limit: 3
+    groups:
+      frontend-safe-updates:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch

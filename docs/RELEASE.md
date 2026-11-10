@@ -50,7 +50,7 @@ python scripts/release.py bump major --summary "설정 파일 형식을 변경�
 python scripts/release.py check
 ```
 
-GitHub Actions와 Docker 게시 워크플로도 같은 검사를 실행하므로 버전이 어긋난 상태로 병합하거나 이미지를 게시할 수 없습니다.
+GitHub Actions와 Docker 게시 워크플로도 같은 검사를 실행합니다. 메타데이터 검사만으로 전체 테스트 통과를 의미하지는 않습니다.
 
 ## 4. 릴리스 커밋
 
@@ -77,12 +77,9 @@ PR 제목도 Conventional Commits 형식을 사용합니다.
 feat(ui): refine light dashboard and release v1.1.5
 ```
 
-검사가 모두 통과하면 squash merge합니다. 병합 후 Docker 게시 워크플로가 다음 태그를 생성합니다.
+필수 검사가 모두 통과하면 squash merge합니다. `main`에 push되면 `Regression tests`가 실행되며 전체 회귀 테스트, 아티팩트 확인, Python 3.15 검증이 **모두 성공한 뒤** 재사용 가능한 Docker 게시 워크플로를 호출합니다. 게시 대상은 `DOCKERHUB_USERNAME/live-auto-recorder:latest`와 롤백 가능한 `sha-<40자리 SHA>` 태그이며, 실제 계정명이 `.env.example` 및 Compose의 기본 이미지와 다르면 게시를 차단합니다.
 
-```text
-no-rahc/live-auto-recorder:latest
-no-rahc/live-auto-recorder:v1.1.5
-```
+`v*` Git 태그를 push한 경우에만 별도의 버전 태그가 게시됩니다. 태그/수동 게시도 그 SHA와 일치하는 `main`의 성공한 회귀 테스트가 필요합니다. 배포 전 기존 정상 이미지 digest와 SHA 태그를 기록하고, 이상 시 해당 `LIVE_AUTO_RECORDER_IMAGE`를 지정해 컨테이너를 재생성합니다.
 
 ## 권장 작업 순서
 
@@ -93,5 +90,6 @@ no-rahc/live-auto-recorder:v1.1.5
 → release metadata check
 → PR
 → squash merge
-→ Docker Hub latest + version tag 게시
+→ main의 필수 CI 전부 성공 → Docker Hub latest 게시
+→ 별도 v* Git 태그 + 동일 SHA의 성공한 main CI → 버전 태그 게시
 ```

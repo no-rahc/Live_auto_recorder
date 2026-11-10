@@ -74,6 +74,10 @@ metadata from backup and re-index new media explicitly. Merely disabling the eng
 flag is not a downgrade or a configuration rollback. No automatic reverse
 schema conversion is provided.
 
+## Safe read-only deployment preflight
+
+Before enabling `LAR_V2_ENABLED`, run `python scripts/check_v2_readiness.py --data-dir data --recordings-root recordings` on the host. This verifies the existing mount marker, data directory locality and free space **without creating or deleting any files**. For NAS volumes, pass the real host-mounted directory and `--expected-marker` to pin its identity. Passing preflight does not replace real recording/NAS release tests. See [release validation](RELEASE_VALIDATION.md).
+
 ## Release gates still requiring real hardware
 
 Do not promote this preview on unit-test counts alone. A release requires:

@@ -2,22 +2,17 @@ name: Security checks
 
 on:
   pull_request:
-    paths:
-      - '**/*.py'
-      - '**/*.js'
-      - 'requirements.txt'
-      - '.github/workflows/security-check.yml'
   push:
     branches: [main]
-    paths:
-      - '**/*.py'
-      - '**/*.js'
-      - 'requirements.txt'
-      - '.github/workflows/security-check.yml'
   public:
   schedule:
     - cron: '20 18 * * 1'
   workflow_dispatch:
+
+# Cancel expensive duplicated runs for superseded commits.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -78,3 +73,19 @@ jobs:
         with:
           languages: ${{ matrix.language }}
       - uses: github/codeql-action/analyze@v4
+
+  frontend-dependency-audit:
+    name: Audit npm dependencies
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install lockfile-resolved frontend dependencies
+        run: npm --prefix frontend ci --no-audit --no-fund
+      - name: Block known high/critical npm vulnerabilities
+        run: npm --prefix frontend audit --audit-level=high

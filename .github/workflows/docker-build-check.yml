@@ -39,6 +39,11 @@ on:
       - 'module/**'
       - '.github/workflows/docker-build-check.yml'
 
+# Cancel expensive duplicated runs for superseded commits.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
@@ -48,6 +53,35 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
+      - name: Verify Compose forwards optional runtime settings
+        shell: bash
+        run: |
+          set -euo pipefail
+          LAR_V2_ENABLED=true \
+          LAR_ALLOWED_HOSTS=recorder.example.test \
+          LAR_V2_RECORDINGS_MARKER=.mounted-recordings \
+          LAR_V2_RECORDINGS_MARKER_VALUE=media-fixture \
+          LAR_V2_ARCHIVE_ROOT=/archive \
+          LAR_V2_ARCHIVE_MARKER=.mounted-archive \
+          LAR_V2_ARCHIVE_MARKER_VALUE=archive-fixture \
+          docker compose config --format json > "$RUNNER_TEMP/compose-test.json"
+          python3 - "$RUNNER_TEMP/compose-test.json" <<'PY'
+          import json
+          import sys
+          env = json.load(open(sys.argv[1], encoding='utf-8'))['services']['recorder']['environment']
+          expected = {
+              'LAR_V2_ENABLED': 'true',
+              'LAR_ALLOWED_HOSTS': 'recorder.example.test',
+              'LAR_V2_RECORDINGS_MARKER': '.mounted-recordings',
+              'LAR_V2_RECORDINGS_MARKER_VALUE': 'media-fixture',
+              'LAR_V2_ARCHIVE_ROOT': '/archive',
+              'LAR_V2_ARCHIVE_MARKER': '.mounted-archive',
+              'LAR_V2_ARCHIVE_MARKER_VALUE': 'archive-fixture',
+          }
+          for key, value in expected.items():
+              assert str(env.get(key, '')).lower() == value.lower(), f'Compose did not pass {key}'
+          print('All optional LAR_* settings reach the container configuration.')
+          PY
       - uses: docker/setup-qemu-action@v4
       - uses: docker/setup-buildx-action@v4
 
@@ -61,6 +95,10 @@ jobs:
           tags: live-auto-recorder:smoke
           cache-from: type=gha
 
+      - name: Verify actual Python image runtime dependencies
+        run: |
+          docker run --rm --entrypoint python live-auto-recorder:smoke -m pip check
+          docker run --rm --entrypoint python live-auto-recorder:smoke -c "from lar_app.server import ServerSettings; import fastapi, streamlink; assert ServerSettings.from_env({'HOST': '127.0.0.1', 'PORT': '5000'}).port == 5000"
       - name: Smoke test local dashboard and operations
         shell: bash
         run: |

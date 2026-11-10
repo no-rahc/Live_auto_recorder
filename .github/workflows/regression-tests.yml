@@ -5,8 +5,14 @@ on:
   push:
     branches: [main]
 
+# Cancel expensive duplicated runs for superseded commits.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
+  actions: read
 
 jobs:
   rendered-preview:
@@ -205,3 +211,30 @@ jobs:
 
           print('All four artifacts downloaded with expected reports and screenshots.')
           PY
+
+  runtime-regressions:
+    name: Python 3.15 production-runtime regressions
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.15'
+          cache: pip
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+      - name: Install production Python dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Run full Python regressions on the deployed Python major version
+        run: python scripts/test_regressions.py
+
+  publish-after-tests:
+    name: Publish tested main commit
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    needs: [verify-artifact-downloads, runtime-regressions]
+    uses: ./.github/workflows/docker-publish.yml
+    with:
+      verified_by_ci: true
+    secrets: inherit
