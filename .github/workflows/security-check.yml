@@ -84,3 +84,28 @@ jobs:
         run: npm --prefix frontend ci --no-audit --no-fund
       - name: Block known high/critical npm vulnerabilities
         run: npm --prefix frontend audit --audit-level=high
+
+  # Temporary, read-only branch remediation helper. It writes only to an
+  # ephemeral runner and uploads a proposed lockfile for review.
+  propose-npm-lockfile-upgrade:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+      - name: Generate Vitest 5 compatible lockfile
+        run: npm --prefix frontend install --save-dev 'vitest@^5.1.0' --package-lock-only --no-audit --no-fund
+      - name: Audit the proposed lockfile
+        run: npm --prefix frontend audit --audit-level=high
+      - name: Upload reviewed lockfile proposal
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: proposed-frontend-lockfile
+          path: |
+            frontend/package.json
+            frontend/package-lock.json
+          retention-days: 2
+          if-no-files-found: error
