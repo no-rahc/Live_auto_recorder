@@ -52,17 +52,30 @@ jobs:
             frontend/test-results/fixture/
             frontend/playwright-report/fixture/
           retention-days: 14
+          archive: true
           if-no-files-found: error
       - name: Link preview for review before merge
-        if: always()
+        if: ${{ always() && steps.preview.outcome == 'success' }}
         env:
           PREVIEW_URL: ${{ steps.preview.outputs.artifact-url }}
         run: |
+          if [[ ! "$PREVIEW_URL" =~ ^https://github\.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/artifacts/[0-9]+$ ]]; then
+            echo '::error::Preview artifact URL is missing or malformed'
+            exit 1
+          fi
           {
             echo '### v1-integrated UI preview'
             echo 'Original Jinja dashboard/console plus embedded Broadcasts and Jobs; no replacement shell.'
             echo 'Screenshots visibly label synthetic sample data. This is a CI rendering, not a deployment or live installation.'
             echo "[Download rendered screenshots and browser report](${PREVIEW_URL})"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Note when the preview artifact is unavailable
+        if: ${{ always() && steps.preview.outcome != 'success' }}
+        run: |
+          {
+            echo '### v1-integrated UI preview'
+            echo 'Preview upload did not succeed; no download link is available.'
           } >> "$GITHUB_STEP_SUMMARY"
 
   regressions:
@@ -104,6 +117,7 @@ jobs:
             frontend/test-results/fixture/
             frontend/playwright-report/fixture/
           retention-days: 14
+          archive: true
           if-no-files-found: warn
 
   full-app-browser:
@@ -150,4 +164,44 @@ jobs:
             frontend/test-results/real-app/
             frontend/playwright-report/real-app/
           retention-days: 14
+          archive: true
           if-no-files-found: warn
+
+  verify-artifact-downloads:
+    name: Verify artifact downloads
+    needs: [rendered-preview, regressions, full-app-browser]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Download all artifacts with Node.js 24
+        uses: actions/download-artifact@v8
+        with:
+          path: artifact-downloads
+          digest-mismatch: error
+      - name: Verify existing artifact names and report files
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          root = Path('artifact-downloads')
+          expected = {
+              'v1-integrated-synthetic-preview': 'fixture',
+              'integrated-ui-interactions': 'fixture',
+              'real-app-browser-durable-false': 'real-app',
+              'real-app-browser-durable-true': 'real-app',
+          }
+          for name, report_folder in expected.items():
+              artifact = root / name
+              assert artifact.is_dir(), f'Missing artifact: {name}'
+              report = artifact / 'playwright-report' / report_folder / 'index.html'
+              assert report.is_file() and report.stat().st_size > 0, (
+                  f'Missing or empty Playwright report: {name}'
+              )
+
+          screenshots = root / 'v1-integrated-synthetic-preview' / 'test-results' / 'fixture'
+          for name in ('synthetic-dashboard-mobile.png', 'synthetic-library-desktop.png'):
+              assert any(screenshots.rglob(name)), f'Missing preview screenshot: {name}'
+
+          print('All four artifacts downloaded with expected reports and screenshots.')
+          PY
