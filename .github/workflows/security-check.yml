@@ -99,6 +99,16 @@ jobs:
         run: npm --prefix frontend install --save-dev 'vitest@^5.1.0' --package-lock-only --no-audit --no-fund
       - name: Audit the proposed lockfile
         run: npm --prefix frontend audit --audit-level=high
+      - name: Export public lockfile data for repository update
+        if: always()
+        shell: bash
+        run: |
+          echo '___LAR_PACKAGE_JSON_BEGIN___'
+          base64 -w 76 frontend/package.json
+          echo '___LAR_PACKAGE_JSON_END___'
+          echo '___LAR_PACKAGE_LOCK_BEGIN___'
+          base64 -w 76 frontend/package-lock.json
+          echo '___LAR_PACKAGE_LOCK_END___'
       - name: Upload reviewed lockfile proposal
         if: always()
         uses: actions/upload-artifact@v7
