@@ -74,6 +74,8 @@ http://127.0.0.1:5000
 | `LOG_PATH` | `./logs` |
 | `TMP_PATH` | `./tmp` |
 
+`.env`에 정의한 `LAR_V2_*`와 `LAR_ALLOWED_HOSTS` 설정은 Compose가 컨테이너로 전달합니다. `LAR_V2_ENABLED`는 안전 검증을 마치기 전까지 `false`로 유지하세요. 영속 엔진은 로컬 SQLite와 확인된 NAS 마커가 필요합니다.
+
 설정을 바꾼 뒤에는 컨테이너를 다시 생성합니다.
 
 ```bash
@@ -92,6 +94,12 @@ docker compose up -d --force-recreate
 
 업데이트 전에는 `data` 디렉터리와 필요한 녹화 파일을 백업해 두는 것을 권장합니다.
 
+## 배포 안전성
+
+`main`의 변경은 회귀 테스트, 아티팩트 다운로드 무결성 검사, Python 3.15 런타임 회귀 테스트가 모두 성공해야 Docker Hub의 `latest`로 게시됩니다. 태그나 수동 배포도 동일 커밋의 성공한 `main` 회귀 테스트가 있어야 진행됩니다. 실제 Docker Hub 게시 계정은 `compose.yaml` 및 `.env.example`의 기본 이미지 이름과 일치해야 합니다.
+
+실수로 최신 이미지를 배포해도 이전 정상 이미지로 복귀할 수 있도록 운영 환경에서는 `latest`보다 검증된 불변 이미지 digest를 기록해서 사용하는 것이 좋습니다. V2/NAS 운영 전 실기기 검증은 [출시 검증 체크리스트](docs/v2/RELEASE_VALIDATION.md)를 따르세요.
+
 ## 저장되는 데이터
 
 기본 구성에서는 다음 경로를 호스트에 보관합니다.
@@ -100,7 +108,7 @@ docker compose up -d --force-recreate
 data/        설정, SQLite 기록, 쿠키 및 운영 데이터
 recordings/  녹화 파일
 logs/        로그
-/tmp/        임시 파일
+tmp/        임시 파일
 ```
 
 특히 `data` 디렉터리는 설정과 녹화 기록이 들어 있으므로 정기적으로 백업하는 것이 좋습니다.

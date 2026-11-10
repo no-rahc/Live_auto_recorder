@@ -17,6 +17,14 @@ services:
       PORT: 5000
       LOG_LEVEL: ${LOG_LEVEL:-info}
       ALLOW_SECRET_BACKUPS: ${ALLOW_SECRET_BACKUPS:-false}
+      # .env is used for interpolation, not automatically passed into the container.
+      LAR_V2_ENABLED: "${LAR_V2_ENABLED:-false}"
+      LAR_ALLOWED_HOSTS: "${LAR_ALLOWED_HOSTS:-localhost,127.0.0.1,::1}"
+      LAR_V2_RECORDINGS_MARKER: "${LAR_V2_RECORDINGS_MARKER:-.lar-storage-id}"
+      LAR_V2_RECORDINGS_MARKER_VALUE: "${LAR_V2_RECORDINGS_MARKER_VALUE:-}"
+      LAR_V2_ARCHIVE_ROOT: "${LAR_V2_ARCHIVE_ROOT:-}"
+      LAR_V2_ARCHIVE_MARKER: "${LAR_V2_ARCHIVE_MARKER:-.lar-storage-id}"
+      LAR_V2_ARCHIVE_MARKER_VALUE: "${LAR_V2_ARCHIVE_MARKER_VALUE:-}"
     volumes:
       - ${CONFIG_PATH:-./data}:/app/json
       - ${RECORDINGS_PATH:-./recordings}:/app/chzzk
